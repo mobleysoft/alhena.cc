@@ -1,0 +1,7 @@
+name = "alhena-cc-worker"
+main = "worker.js"
+compatibility_date = "2024-05-12"
+
+[vars]
+ALHENA_INFERENCE_URL = "https://core.jmobleyworks.com/v1/chat/completions"
+ENVIRONMENT = "production"
