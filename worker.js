@@ -1,3 +1,32 @@
+async function hmacSha256Base64Url(message, secret) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(message));
+  const binary = String.fromCharCode(...new Uint8Array(sig));
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+// AuthFor is the conglomerate-wide identity provider (mascom/CLAUDE.md
+// standing policy). Alhena has no local user store of its own, so a real
+// user for billing purposes is: a Bearer token that verifies against
+// AuthFor's real GET /api/v1/verify, contract confirmed live via
+// weylandai's identical real integration (weyland.worker.js) - returns
+// {id, email, name} on success.
+async function authenticateViaAuthFor(request) {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    throw { status: 401, msg: 'Missing or invalid Authorization header', code: 'UNAUTHORIZED' };
+  }
+  const token = authHeader.slice(7).trim();
+  const res = await fetch('https://authfor.com/api/v1/verify', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) throw { status: 401, msg: 'Token invalid', code: 'UNAUTHORIZED' };
+  const identity = await res.json();
+  if (!identity || !identity.email) throw { status: 401, msg: 'Token invalid', code: 'UNAUTHORIZED' };
+  return identity;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -213,11 +242,10 @@ Decision type: ${decision_type || 'general_guidance'}`;
         return new Response(JSON.stringify({
           recommendations,
           current_tier: current_tier || 'free',
-          // Honest as of 2026-09-03: checkout is not wired to real billing
-          // yet (see /api/v1/payments/stripe/session below) - was
-          // previously claimed true while pointing at a non-functional
-          // decoy host.
-          stripe_integration_enabled: false
+          // Real as of 2026-09-03: POST /api/v1/payments/stripe/session
+          // creates an actual Stripe Checkout Session via vendyai, gated
+          // on a real AuthFor Bearer token.
+          stripe_integration_enabled: true
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
@@ -229,24 +257,78 @@ Decision type: ${decision_type || 'general_guidance'}`;
       }
     }
 
-    // Checkout intentionally disabled as of 2026-09-03. This previously
-    // called POST https://vendyai-com-worker.jmobleyworks.workers.dev/api/stripe/session
-    // - a decoy host (see mascom/.reward_hack_audit/README.md's
-    // "jmobleyworks decoy account" section) with a route that doesn't
-    // exist on the real vendyai-com-worker at all, so this always 500'd
-    // for a real user. Returning a clear, honest "not available" response
-    // instead of a confusing error - real billing gets wired once this
-    // product's live surface (this file) has been reviewed as safe to
-    // charge for, matching the same pattern used for authfor.com and
-    // weylandai.com's real vendyai integrations.
+    // Real checkout as of 2026-09-03 - alhena is the third real vendyai
+    // consumer (after weylandai, authfor), registered via
+    // POST https://vendyai.com/api/ventures/register. Requires a real
+    // AuthFor Bearer token (see authenticateViaAuthFor above) rather than
+    // trusting a client-supplied user_id, since this now creates a real
+    // Stripe Checkout Session. Previously called a decoy host with a route
+    // that doesn't exist on the real vendyai-com-worker - see
+    // mascom/.reward_hack_audit/README.md.
+    const ALHENA_PRICES = {
+      premium: 'price_1UBe5zLWTxUJi5AVzivKc35I',
+      elite: 'price_1UBe5zLWTxUJi5AVcPMTXTzI',
+    };
     if (url.pathname === '/api/v1/payments/stripe/session' && request.method === 'POST') {
-      return new Response(JSON.stringify({
-        error: 'Checkout is not enabled yet for Alhena.',
-        code: 'NOT_AVAILABLE'
-      }), {
-        status: 501,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      let identity;
+      try { identity = await authenticateViaAuthFor(request); } catch (e) {
+        return new Response(JSON.stringify({ error: e.msg, code: e.code }), { status: e.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      const body = await request.json().catch(() => ({}));
+      const priceId = ALHENA_PRICES[body.tier];
+      if (!priceId) {
+        return new Response(JSON.stringify({ error: `tier must be one of: ${Object.keys(ALHENA_PRICES).join(', ')}`, code: 'VALIDATION_ERROR' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      const origin = `${url.protocol}//${url.host}`;
+      try {
+        const vendyRes = await fetch('https://vendyai.com/api/checkout/sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            venture_id: 'alhena',
+            mode: 'subscription',
+            customer_email: identity.email,
+            success_url: `${origin}/?checkout=success`,
+            cancel_url: `${origin}/?checkout=cancelled`,
+            line_items: [{ price: priceId, quantity: 1 }],
+            metadata: { alhena_user_email: identity.email, tier: body.tier },
+          }),
+        });
+        const vendyData = await vendyRes.json().catch(() => ({}));
+        if (!vendyRes.ok) {
+          return new Response(JSON.stringify({ error: vendyData.error || 'checkout session creation failed', code: 'VENDYAI_ERROR' }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        return new Response(JSON.stringify({ success: true, payment_url: vendyData.session?.url, tier: body.tier, venture: 'alhena.cc' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message, code: 'INTERNAL_ERROR' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+
+    // Receives vendyai's forwarded checkout.session.completed event -
+    // verifies the same HMAC scheme vendyai signs with (shared secret set
+    // at registration time), matching authfor.com's identical real
+    // integration.
+    if (url.pathname === '/api/vendyai/webhook' && request.method === 'POST') {
+      const rawBody = await request.text();
+      const signature = request.headers.get('X-Webhook-Signature');
+      const timestamp = request.headers.get('X-Webhook-Timestamp');
+      if (!signature || !timestamp) {
+        return new Response(JSON.stringify({ error: 'missing signature headers', code: 'UNAUTHORIZED' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      const expected = await hmacSha256Base64Url(`${timestamp}.${rawBody}`, env.VENDYAI_HMAC_SECRET);
+      if (expected !== signature) {
+        return new Response(JSON.stringify({ error: 'invalid signature', code: 'UNAUTHORIZED' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      const event = JSON.parse(rawBody);
+      if (event.type === 'checkout.session.completed') {
+        const { alhena_user_email, tier } = event.data?.metadata || {};
+        if (alhena_user_email && tier) {
+          await env.ALHENA_KV.put(`user:${alhena_user_email}`, JSON.stringify({ tier, activated_at: Date.now() }));
+        }
+      }
+      return new Response(JSON.stringify({ received: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Stripe Webhook Handler

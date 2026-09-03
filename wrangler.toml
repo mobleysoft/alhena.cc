@@ -5,3 +5,7 @@ compatibility_date = "2024-05-12"
 [vars]
 ALHENA_INFERENCE_URL = "https://core.jmobleyworks.com/v1/chat/completions"
 ENVIRONMENT = "production"
+
+[[kv_namespaces]]
+binding = "ALHENA_KV"
+id = "2f7a00d8db6c4f038a9ef21cb71d0ac8"
