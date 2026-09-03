@@ -32,31 +32,37 @@ export default {
           });
         }
 
-        // Connect to local AGI inference gateway for personalized guidance
-        const alhenaEndpoint = env.ALHENA_INFERENCE_URL || 'https://core.jmobleyworks.com/v1/chat/completions';
+        // Real inference gateway - env.ALHENA_INFERENCE_URL, if set, must
+        // point at something that actually resolves. wrangler.toml's
+        // default (core.jmobleyworks.com) does not resolve at all
+        // (confirmed 2026-09-03: DNS lookup fails) - skip the network call
+        // entirely rather than pretend to try connecting to a dead host.
+        const alhenaEndpoint = env.ALHENA_INFERENCE_URL;
+        const inferenceConfigured = !!alhenaEndpoint && alhenaEndpoint !== 'https://core.jmobleyworks.com/v1/chat/completions';
 
-        const systemPrompt = `You are Alhena, a compassionate AI companion. Your role is to provide empathetic, intelligent personal guidance on life decisions and wellness.
-You understand the user's context deeply and provide actionable, emotionally aware advice.
+        const systemPrompt = `You are Alhena, a supportive companion for talking through everyday decisions. You are not a therapist and do not provide medical or mental-health treatment.
 Decision type: ${decision_type || 'general_guidance'}`;
 
         let inferenceRes = null;
-        let isFallback = false;
-        try {
-          inferenceRes = await fetch(alhenaEndpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${env.JWT_SECRET || 'local_key'}`
-            },
-            body: JSON.stringify({
-              system: systemPrompt,
-              messages: [{ role: 'user', content: `User Context: ${JSON.stringify(user_context)}\n\nQuestion: ${question}` }],
-              temperature: 0.7,
-              max_tokens: 1000
-            })
-          });
-        } catch(e) {
-          isFallback = true;
+        let isFallback = !inferenceConfigured;
+        if (inferenceConfigured) {
+          try {
+            inferenceRes = await fetch(alhenaEndpoint, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${env.JWT_SECRET || 'local_key'}`
+              },
+              body: JSON.stringify({
+                system: systemPrompt,
+                messages: [{ role: 'user', content: `User Context: ${JSON.stringify(user_context)}\n\nQuestion: ${question}` }],
+                temperature: 0.7,
+                max_tokens: 1000
+              })
+            });
+          } catch(e) {
+            isFallback = true;
+          }
         }
 
         let guidance = '';
@@ -67,17 +73,17 @@ Decision type: ${decision_type || 'general_guidance'}`;
           } catch(e) {
             isFallback = true;
           }
-        } else {
+        } else if (inferenceConfigured) {
           isFallback = true;
         }
 
         if (isFallback) {
-          guidance = `I'm here to support you through this ${decision_type || 'decision'}. While I'm processing this moment, consider: What feels most aligned with your values? Let's break this down together.`;
+          guidance = `I'm not connected to a live guidance model right now, so I can't give you a personalized response to this. What I can say generally: it often helps to write down what you actually want here before weighing options. Alhena is not a therapist or medical provider - if what you're working through feels heavier than a decision, the 988 Suicide & Crisis Lifeline (call or text 988) and Crisis Text Line (text HOME to 741741) are real, free, 24/7 resources.`;
         }
 
         // Fire event tracking to VendyAI telemetry
         ctx.waitUntil(
-          fetch('https://vendyai-com-worker.jmobleyworks.workers.dev/api/billing/event', {
+          fetch('https://vendyai.com/api/billing/event', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -95,6 +101,7 @@ Decision type: ${decision_type || 'general_guidance'}`;
           decision_type: decision_type || 'general',
           companion: 'Alhena',
           fallback_mode: isFallback,
+          disclaimer: 'Alhena is a decision-support companion, not therapy or medical care. In a crisis, call or text 988 (Suicide & Crisis Lifeline) or text HOME to 741741 (Crisis Text Line).',
           session_id: `sess_${Date.now()}`,
           next_check_in: new Date(Date.now() + 86400000).toISOString()
         }), {
@@ -115,13 +122,18 @@ Decision type: ${decision_type || 'general_guidance'}`;
         const body = await request.json();
         const { mood, energy_level, notes } = body;
 
+        // No numeric "wellness score" - a mood/energy check-in isn't a
+        // clinical assessment, and inventing a number from Math.random()
+        // (the previous version of this endpoint did exactly that,
+        // presented as if measured) would mislead a real user about their
+        // own wellbeing. This just reflects back what was reported.
         const checkin = {
           timestamp: new Date().toISOString(),
           mood: mood || 'neutral',
           energy_level: energy_level || 'medium',
           notes: notes || '',
-          wellness_score: Math.floor(Math.random() * 40 + 60), // 60-100 scale
-          recommendations: []
+          recommendations: [],
+          disclaimer: 'This check-in is not a mental-health assessment and Alhena is not a therapist. In a crisis, call or text 988 (Suicide & Crisis Lifeline) or text HOME to 741741 (Crisis Text Line) - real, free, 24/7 resources.'
         };
 
         // Generate wellness recommendations based on mood/energy
@@ -136,7 +148,7 @@ Decision type: ${decision_type || 'general_guidance'}`;
 
         // Fire event to VendyAI
         ctx.waitUntil(
-          fetch('https://vendyai-com-worker.jmobleyworks.workers.dev/api/billing/event', {
+          fetch('https://vendyai.com/api/billing/event', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -161,60 +173,15 @@ Decision type: ${decision_type || 'general_guidance'}`;
       }
     }
 
-    // Treasury Management: Wellness Account Analytics
-    if (url.pathname === '/api/v1/treasury/accounts' && request.method === 'GET') {
-      return new Response(JSON.stringify({
-        accounts: [
-          { id: 'wellness_primary', name: 'Wellness Subscription Account', balance: 2500.00, currency: 'USD', type: 'subscription', last_reconciled: new Date().toISOString(), status: 'active' },
-          { id: 'wellness_premium', name: 'Premium Companion Features', balance: 5000.00, currency: 'USD', type: 'premium_tier', last_reconciled: new Date(Date.now() - 86400000).toISOString(), status: 'active' },
-          { id: 'wellness_coaching', name: 'Personalized Coaching Credits', balance: 1200.50, currency: 'USD', type: 'credit_account', last_reconciled: new Date(Date.now() - 172800000).toISOString(), status: 'active' }
-        ],
-        total_balance: 8700.50,
-        reconciliation_status: 'current',
-        alerts: [],
-        subscription_tier: 'premium'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
+    // Removed 2026-09-03: /api/v1/treasury/accounts and /api/v1/treasury/forecast
+    // returned entirely fabricated data - hardcoded fake account balances
+    // ($8,700.50 total) presented as reconciled real accounts, and a 90-day
+    // "engagement forecast" generated from Math.random() presented as a
+    // real projection. Alhena is a subscription wellness product, not a
+    // treasury - there was never a real thing for these endpoints to
+    // report. See mascom/.reward_hack_audit/README.md.
 
-    // Treasury Management: Engagement Forecast
-    if (url.pathname === '/api/v1/treasury/forecast' && request.method === 'GET') {
-      const days = parseInt(url.searchParams.get('days')) || 90;
-      const forecast = [];
-      let projectedValue = 8700.50;
-
-      for (let i = 0; i < days; i++) {
-        const date = new Date();
-        date.setDate(date.getDate() + i);
-        // Simulate engagement trends
-        const dailyEngagement = 150 + Math.random() * 200; // engagement score
-        const dailyCost = 25 + Math.random() * 15; // subscription costs
-        projectedValue += (dailyEngagement * 0.001) - dailyCost; // simplified economics
-
-        forecast.push({
-          date: date.toISOString().split('T')[0],
-          projected_wellness_value: Math.round(projectedValue * 100) / 100,
-          engagement_score: Math.round(dailyEngagement * 100) / 100,
-          daily_cost: Math.round(dailyCost * 100) / 100,
-          net_wellness_gain: Math.round((dailyEngagement * 0.001 - dailyCost) * 100) / 100
-        });
-      }
-
-      return new Response(JSON.stringify({
-        forecast,
-        summary: {
-          current_wellness_value: 8700.50,
-          forecast_period_days: days,
-          projected_ending_value: forecast[forecast.length - 1].projected_wellness_value,
-          avg_daily_engagement: Math.round(forecast.reduce((sum, f) => sum + f.engagement_score, 0) / forecast.length * 100) / 100
-        }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Treasury Management: Subscription Recommendations
+    // Subscription Recommendations (tier upsell copy - not billing yet, see below)
     if (url.pathname === '/api/v1/treasury/subscription-recommendations' && request.method === 'POST') {
       try {
         const body = await request.json();
@@ -232,19 +199,25 @@ Decision type: ${decision_type || 'general_guidance'}`;
         }
 
         if (current_tier === 'premium') {
+          // 'Therapy integration' removed 2026-09-03 - Alhena is not a
+          // therapy provider and never was; this claimed a clinical service
+          // that doesn't exist.
           recommendations.push({
             tier: 'elite',
             monthly_cost: 19.99,
-            features: ['1:1 coaching calls', 'Advanced wellness insights', 'Therapy integration'],
-            savings_estimate: 'Premium mental health value'
+            features: ['1:1 coaching calls', 'Advanced wellness insights', 'Extended session time'],
+            savings_estimate: 'For frequent users who want more coaching time'
           });
         }
 
         return new Response(JSON.stringify({
           recommendations,
           current_tier: current_tier || 'free',
-          stripe_integration_enabled: true,
-          upgrade_url: 'https://vendyai-com-worker.jmobleyworks.workers.dev/checkout/alhena_tier_upgrade'
+          // Honest as of 2026-09-03: checkout is not wired to real billing
+          // yet (see /api/v1/payments/stripe/session below) - was
+          // previously claimed true while pointing at a non-functional
+          // decoy host.
+          stripe_integration_enabled: false
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
@@ -256,45 +229,24 @@ Decision type: ${decision_type || 'general_guidance'}`;
       }
     }
 
-    // Stripe Payment Integration: Initialize subscription session
+    // Checkout intentionally disabled as of 2026-09-03. This previously
+    // called POST https://vendyai-com-worker.jmobleyworks.workers.dev/api/stripe/session
+    // - a decoy host (see mascom/.reward_hack_audit/README.md's
+    // "jmobleyworks decoy account" section) with a route that doesn't
+    // exist on the real vendyai-com-worker at all, so this always 500'd
+    // for a real user. Returning a clear, honest "not available" response
+    // instead of a confusing error - real billing gets wired once this
+    // product's live surface (this file) has been reviewed as safe to
+    // charge for, matching the same pattern used for authfor.com and
+    // weylandai.com's real vendyai integrations.
     if (url.pathname === '/api/v1/payments/stripe/session' && request.method === 'POST') {
-      try {
-        const body = await request.json();
-        const { tier, user_id } = body;
-
-        // Delegate to VendyAI Stripe integration endpoint
-        const vendyRes = await fetch('https://vendyai-com-worker.jmobleyworks.workers.dev/api/stripe/session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            venture_id: 'alhena.cc',
-            amount: tier === 'premium' ? 999 : (tier === 'elite' ? 1999 : 0),
-            description: `Alhena ${tier} subscription`,
-            customer_id: user_id,
-            webhook_url: 'https://alhena-cc-worker.jmobleyworks.workers.dev/api/v1/payments/webhook'
-          })
-        });
-
-        if (!vendyRes.ok) {
-          throw new Error('VendyAI Stripe integration failed');
-        }
-
-        const stripeSession = await vendyRes.json();
-        return new Response(JSON.stringify({
-          success: true,
-          session_id: stripeSession.session_id,
-          payment_url: stripeSession.checkout_url,
-          tier,
-          venture: 'alhena.cc'
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      } catch (err) {
-        return new Response(JSON.stringify({ error: err.message }), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
+      return new Response(JSON.stringify({
+        error: 'Checkout is not enabled yet for Alhena.',
+        code: 'NOT_AVAILABLE'
+      }), {
+        status: 501,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     // Stripe Webhook Handler
@@ -306,7 +258,7 @@ Decision type: ${decision_type || 'general_guidance'}`;
         if (body.type === 'payment_intent.succeeded') {
           // Update subscription status and telemetry
           ctx.waitUntil(
-            fetch('https://vendyai-com-worker.jmobleyworks.workers.dev/api/billing/event', {
+            fetch('https://vendyai.com/api/billing/event', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
