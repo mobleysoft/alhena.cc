@@ -97,6 +97,33 @@ export default {
         // default (core.jmobleyworks.com) does not resolve at all
         // (confirmed 2026-09-03: DNS lookup fails) - skip the network call
         // entirely rather than pretend to try connecting to a dead host.
+        //
+        // Real gap confirmed 2026-09-11 (not just this default - checked
+        // live, no secret override exists either): companion_guidance runs
+        // in fallback_mode:true for 100% of real production traffic today.
+        // Two real candidate fix paths were found and evaluated, neither
+        // wired up this pass:
+        //   (1) https://llama.mobleysoft.com - real, live, CF-Access-gated
+        //       bridge to this Mac's llama-server (Qwen3-8B), already
+        //       proven by mobley-venture-fleet-a's JITAGI_CAPABILITIES
+        //       bridge via a real CF-Access-Client-Id/Secret service
+        //       token. Not reused here because that Access application
+        //       isn't visible via the Access Apps API under the same
+        //       Cloudflare account that hosts alhena-cc-worker (confirmed
+        //       via `wrangler whoami` + a live API call - 0 apps
+        //       returned), so a working token can't be safely provisioned
+        //       without further access.
+        //   (2) https://mobley.mobleysoft.com - ingress config already
+        //       exists (~/.cloudflared/mascom-v5.yml) pointing at the
+        //       real, already-running mascom_qwen_adapter.py on
+        //       127.0.0.1:11435, but that tunnel process wasn't running
+        //       at check time and is shared fleet-wide infra (~20 other
+        //       hostnames) - starting it as a side effect of this one
+        //       endpoint would be disproportionate without an explicit
+        //       decision.
+        // See ventures.json's alhena.cc insight.evidence for the full
+        // investigation. Left honestly as fallback-only, not fabricated
+        // as fixed.
         const alhenaEndpoint = env.ALHENA_INFERENCE_URL;
         const inferenceConfigured = !!alhenaEndpoint && alhenaEndpoint !== 'https://core.jmobleyworks.com/v1/chat/completions';
 
