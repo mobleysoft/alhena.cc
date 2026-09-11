@@ -405,39 +405,17 @@ Decision type: ${decision_type || 'general_guidance'}`;
       return new Response(JSON.stringify({ received: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Stripe Webhook Handler
-    if (url.pathname === '/api/v1/payments/webhook' && request.method === 'POST') {
-      try {
-        const body = await request.json();
-        // Process webhook (signature verification would happen here in production)
-
-        if (body.type === 'payment_intent.succeeded') {
-          // Update subscription status and telemetry
-          ctx.waitUntil(
-            fetch('https://vendyai.com/api/billing/event', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                venture_id: 'alhena.cc',
-                event: 'subscription_activated',
-                payment_id: body.payment_intent.id,
-                amount: body.payment_intent.amount,
-                timestamp: Date.now()
-              })
-            }).catch(e => console.error('VendyAI webhook trace failed:', e))
-          );
-        }
-
-        return new Response(JSON.stringify({ success: true }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      } catch (err) {
-        return new Response(JSON.stringify({ error: err.message }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-    }
+    // Removed 2026-09-11: /api/v1/payments/webhook was a real, unauthenticated
+    // hole - accepted any POST claiming payment_intent.succeeded and fired an
+    // unverified "subscription_activated" event into VendyAI's cross-venture
+    // billing telemetry, with zero signature verification ("would happen here
+    // in production" never happened). Confirmed dead/superseded, not merely
+    // undertested: VendyAI's own real webhook registration for alhena
+    // (vendyai_ledger.venture_webhook_endpoints, checked live) points at
+    // /api/vendyai/webhook, the properly HMAC-verified handler above - nothing
+    // external ever called this route. No Stripe webhook secret exists for
+    // this worker either (checked via `wrangler secret list`), confirming no
+    // real Stripe subscription was ever wired to it to make signing possible.
 
     // Default static server fallback (serve index.html)
     const indexPath = '/index.html';
