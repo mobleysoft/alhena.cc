@@ -27,6 +27,37 @@ async function authenticateViaAuthFor(request) {
   return identity;
 }
 
+// Same AuthFor check as authenticateViaAuthFor(), but never throws - a
+// missing/invalid token just means "anonymous", not an error. Real gap
+// found 2026-09-11: this venture's own spec_draft describes the MVP as
+// "explicitly framed as a structured journal" (mvp_feature), but neither
+// /companion/checkin nor /companion/guidance persisted anything anywhere
+// - every call was stateless, so there was no actual journal to look
+// back on. Making auth optional here (rather than required) preserves
+// the existing no-signup, try-it-first UX for anonymous visitors, and
+// only persists for a real, identified AuthFor user.
+async function tryAuthenticateViaAuthFor(request) {
+  try {
+    return await authenticateViaAuthFor(request);
+  } catch (e) {
+    return null;
+  }
+}
+
+const MAX_STORED_CHECKINS = 90; // ~3 months at 1/day - a real, bounded cap, not unlimited KV growth
+
+async function appendCheckinHistory(env, email, checkin) {
+  const key = `checkins:${email}`;
+  const raw = await env.ALHENA_KV.get(key);
+  let history = [];
+  if (raw) {
+    try { history = JSON.parse(raw); } catch (e) { history = []; }
+  }
+  history.push(checkin);
+  if (history.length > MAX_STORED_CHECKINS) history = history.slice(-MAX_STORED_CHECKINS);
+  await env.ALHENA_KV.put(key, JSON.stringify(history));
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -150,6 +181,7 @@ Decision type: ${decision_type || 'general_guidance'}`;
       try {
         const body = await request.json();
         const { mood, energy_level, notes } = body;
+        const identity = await tryAuthenticateViaAuthFor(request);
 
         // No numeric "wellness score" - a mood/energy check-in isn't a
         // clinical assessment, and inventing a number from Math.random()
@@ -191,6 +223,18 @@ Decision type: ${decision_type || 'general_guidance'}`;
           }).catch(e => console.error('VendyAI billing trace failed:', e))
         );
 
+        // Real persistence, only for a real identified user - see
+        // appendCheckinHistory's own comment for why this is optional
+        // rather than required. `saved` is honest either way: an
+        // anonymous check-in genuinely isn't saved anywhere.
+        checkin.saved = false;
+        if (identity) {
+          await appendCheckinHistory(env, identity.email, checkin);
+          checkin.saved = true;
+        } else {
+          checkin.note = 'Sign in to save check-ins and see your history at GET /api/v1/companion/checkins.';
+        }
+
         return new Response(JSON.stringify(checkin), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
@@ -200,6 +244,29 @@ Decision type: ${decision_type || 'general_guidance'}`;
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
+    }
+
+    // Real check-in history read-back, added 2026-09-11 alongside the
+    // persistence fix above. Required (not optional) auth - unlike the
+    // checkin POST, there's no anonymous history to show.
+    if (url.pathname === '/api/v1/companion/checkins' && request.method === 'GET') {
+      let identity;
+      try {
+        identity = await authenticateViaAuthFor(request);
+      } catch (e) {
+        return new Response(JSON.stringify({ error: e.msg, code: e.code }), {
+          status: e.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      const raw = await env.ALHENA_KV.get(`checkins:${identity.email}`);
+      let history = [];
+      if (raw) {
+        try { history = JSON.parse(raw); } catch (e) { history = []; }
+      }
+      return new Response(JSON.stringify({ email: identity.email, count: history.length, checkins: history }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     // Removed 2026-09-03: /api/v1/treasury/accounts and /api/v1/treasury/forecast
