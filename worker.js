@@ -405,6 +405,108 @@ Decision type: ${decision_type || 'general_guidance'}`;
       return new Response(JSON.stringify({ received: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    // Real SMS companion brain, added 2026-09-11 - the actual fix for
+    // "Alhena.cc is supposed to be the Alhena texting Jim, not some
+    // one-off script you wrote." Before this, 100% of James's real
+    // conversation (mascom/alhena_checkin_companion.py) ran entirely on
+    // John's Mac with no connection to this product at all. This is the
+    // first real seam: the local iMessage poller (which still has to run
+    // locally - AppleScript/Messages.app only exists on the Mac) now
+    // calls THIS Worker for the reply, and this Worker calls back into
+    // the Mac via SMS_RELAY_URL (alhena-relay.mobleysoft.com, a
+    // cloudflared tunnel John pointed out already existed for exactly
+    // this - see llama-server-gateway.yml) to actually send it. The Mac
+    // no longer decides what Alhena says; it's now pure transport.
+    //
+    // Auth is a shared secret (SMS_INBOUND_SECRET), not AuthFor - the
+    // caller is John's own local poller process, not an end user.
+    //
+    // State (recipient history, mood/endocrine model) is NOT migrated to
+    // D1 in this pass - it still reads/writes the same local JSON files
+    // via the relay's /generate passthrough, which only proxies the
+    // model call. Moving recipients.json's real state into D1 is the
+    // next real step, not done here - flagging honestly rather than
+    // claiming a full migration that didn't happen.
+    if (url.pathname === '/api/v1/companion/sms/inbound' && request.method === 'POST') {
+      const provided = request.headers.get('X-Inbound-Secret');
+      if (!provided || provided !== env.SMS_INBOUND_SECRET) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      let body;
+      try {
+        body = await request.json();
+      } catch (e) {
+        return new Response(JSON.stringify({ error: 'invalid JSON body' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      const { chat_id, system_prompt, messages, dry_run } = body;
+      if (!chat_id || !messages || !Array.isArray(messages)) {
+        return new Response(JSON.stringify({ error: 'chat_id and messages[] are required' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      if (!env.SMS_RELAY_URL || !env.SMS_RELAY_SECRET) {
+        return new Response(JSON.stringify({ error: 'SMS relay not configured', code: 'RELAY_UNCONFIGURED' }), {
+          status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      const fullMessages = system_prompt
+        ? [{ role: 'system', content: system_prompt }, ...messages]
+        : messages;
+
+      let reply;
+      try {
+        const genRes = await fetch(`${env.SMS_RELAY_URL}/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Relay-Secret': env.SMS_RELAY_SECRET },
+          body: JSON.stringify({ messages: fullMessages, max_tokens: 400, temperature: 0.7 })
+        });
+        if (!genRes.ok) {
+          return new Response(JSON.stringify({ error: 'relay generate failed', status: genRes.status }), {
+            status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        const genData = await genRes.json();
+        reply = genData?.choices?.[0]?.message?.content?.trim();
+        if (!reply) {
+          return new Response(JSON.stringify({ error: 'empty reply from model' }), {
+            status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      } catch (e) {
+        return new Response(JSON.stringify({ error: `relay unreachable: ${e.message}` }), {
+          status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      let sent = false;
+      if (!dry_run) {
+        try {
+          const sendRes = await fetch(`${env.SMS_RELAY_URL}/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Relay-Secret': env.SMS_RELAY_SECRET },
+            body: JSON.stringify({ chat_id, text: reply })
+          });
+          const sendData = await sendRes.json();
+          sent = !!sendData.ok;
+        } catch (e) {
+          return new Response(JSON.stringify({ reply, sent: false, send_error: e.message }), {
+            status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
+      return new Response(JSON.stringify({ reply, sent, dry_run: !!dry_run }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     // Removed 2026-09-11: /api/v1/payments/webhook was a real, unauthenticated
     // hole - accepted any POST claiming payment_intent.succeeded and fired an
     // unverified "subscription_activated" event into VendyAI's cross-venture
