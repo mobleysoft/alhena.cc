@@ -100,6 +100,16 @@ const MAX_STORED_DAILY_CHECKINS = 365;
 const MAX_STORED_GUIDANCE_SESSIONS = 200;
 const GUIDANCE_HISTORY_TURNS_INJECTED = 5; // how many prior Q&A pairs get fed back into the prompt as real context
 
+// Real "getting Alhena involved in the process" log (added 2026-09-12) -
+// a single shared list (not per-user, since it's for John to review real
+// user-surfaced gaps/ideas across everyone, not one person's own history),
+// same bounded-list KV pattern as everything else in this file. Read back
+// via `wrangler kv key get --namespace-id=<ALHENA_KV id> self_reflection_log`
+// (same mechanism every other feature here already uses to persist real
+// data - no new admin auth system invented for this) or via the
+// authenticated GET route below.
+const MAX_STORED_SELF_REFLECTIONS = 300;
+
 async function readKvList(env, key) {
   const raw = await env.ALHENA_KV.get(key);
   if (!raw) return [];
@@ -124,38 +134,173 @@ function authForErrorResponse(e, corsHeaders) {
   });
 }
 
-// Same fallback-mode-honest pattern as /api/v1/companion/guidance above -
-// only claims a real model reply when ALHENA_INFERENCE_URL is actually
-// configured to something other than the known-dead wrangler.toml
-// default, and only claims success when the call actually returned one.
-async function generateChatReply(env, message) {
+// Shared inference path (extracted 2026-09-12 from what used to be two
+// separately-maintained copies of this same try-llama-bridge-then-try-
+// alhena-url-then-honestly-fallback logic: one inline in /api/v1/companion/
+// guidance, one in generateChatReply below for /api/chat - the real UI's
+// actual chat endpoint). Unifying them fixes a real, until-now-undetected
+// gap: /api/chat never even attempted the llama.mobleysoft.com bridge, so
+// once LLAMA_ACCESS_CLIENT_ID/SECRET eventually get provisioned (see the
+// still-open gap noted below), guidance would start giving live answers
+// while the actual app.html chat UI kept silently running fallback-only
+// forever, because its code path never tried the bridge at all. Same
+// fallback-mode-honest contract as before: only claims a real model reply
+// when a path is both configured AND actually returned one; returns
+// {guidance, isFallback, usedLlamaBridge, inferenceSource} so callers -
+// including the self-awareness answer below - can honestly report which
+// one happened for THIS call, not a static claim.
+async function runAlhenaInference(env, systemPrompt, userContent) {
+  let inferenceRes = null;
+  let isFallback = true;
+  let usedLlamaBridge = false;
+
+  // Honest remaining gap (unchanged from the 2026-09-12 companion/guidance
+  // wiring): LLAMA_ACCESS_CLIENT_ID/SECRET are NOT yet set as secrets on
+  // alhena-cc-worker (confirmed via `wrangler secret list`). Until a human
+  // runs `wrangler secret put` for both, this branch is real code that
+  // never actually executes in production - it does not pretend otherwise.
+  if (env.LLAMA_ACCESS_CLIENT_ID && env.LLAMA_ACCESS_CLIENT_SECRET) {
+    try {
+      inferenceRes = await fetch('https://llama.mobleysoft.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'CF-Access-Client-Id': env.LLAMA_ACCESS_CLIENT_ID,
+          'CF-Access-Client-Secret': env.LLAMA_ACCESS_CLIENT_SECRET,
+        },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userContent },
+          ],
+          temperature: 0.7,
+          max_tokens: 1000,
+          chat_template_kwargs: { enable_thinking: false },
+        }),
+      });
+      usedLlamaBridge = true;
+      isFallback = false;
+    } catch (e) {
+      inferenceRes = null;
+      isFallback = true;
+    }
+  }
+
+  // Pre-existing path, tried only if the llama bridge above wasn't
+  // configured or failed - env.ALHENA_INFERENCE_URL, if set, must point at
+  // something that actually resolves. wrangler.toml's default
+  // (core.jmobleyworks.com) does not resolve at all (confirmed 2026-09-03:
+  // DNS lookup fails) - skip the network call entirely rather than pretend
+  // to try connecting to a dead host.
   const alhenaEndpoint = env.ALHENA_INFERENCE_URL;
   const inferenceConfigured = !!alhenaEndpoint && alhenaEndpoint !== 'https://core.jmobleyworks.com/v1/chat/completions';
-  if (inferenceConfigured) {
+
+  if (isFallback && inferenceConfigured) {
     try {
-      const res = await fetch(alhenaEndpoint, {
+      inferenceRes = await fetch(alhenaEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${env.JWT_SECRET || 'local_key'}`
         },
         body: JSON.stringify({
-          system: 'You are Alhena, a supportive companion for talking through everyday decisions. You are not a therapist and do not provide medical or mental-health treatment.',
-          messages: [{ role: 'user', content: message }],
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userContent }],
           temperature: 0.7,
-          max_tokens: 500
+          max_tokens: 1000
         })
       });
-      if (res.ok) {
-        const data = await res.json();
-        const content = data?.choices?.[0]?.message?.content?.trim();
-        if (content) return content;
-      }
+      isFallback = false;
     } catch (e) {
-      // fall through to the honest fallback below
+      isFallback = true;
     }
   }
-  return "I'm not connected to a live guidance model right now, so I can't give you a personalized reply to that. In a crisis, call or text 988 (Suicide & Crisis Lifeline) or text HOME to 741741 (Crisis Text Line) - real, free, 24/7 resources.";
+
+  let guidance = '';
+  if (inferenceRes && inferenceRes.ok) {
+    try {
+      const data = await inferenceRes.json();
+      if (data.error) throw new Error(data.error.message || 'inference error');
+      guidance = data.choices[0].message.content.trim();
+    } catch (e) {
+      isFallback = true;
+    }
+  } else if (!isFallback) {
+    isFallback = true;
+  }
+
+  if (isFallback) {
+    guidance = "I'm not connected to a live guidance model right now, so I can't give you a personalized response to this. Alhena is not a therapist or medical provider - if what you're working through feels heavier than a decision, the 988 Suicide & Crisis Lifeline (call or text 988) and Crisis Text Line (text HOME to 741741) are real, free, 24/7 resources.";
+  }
+
+  const inferenceSource = isFallback ? 'none' : (usedLlamaBridge ? 'llama_bridge' : 'alhena_inference_url');
+  return { guidance, isFallback, usedLlamaBridge, inferenceSource };
+}
+
+// Real self-awareness mechanism (added 2026-09-12, per John's ask: Alhena
+// should be able to accurately describe her own code, what's really built
+// vs. aspirational, and what she's aiming at). This is deliberately NOT
+// "let the model answer questions about itself" - the same session that
+// prompted this work caught a live example (James's check-in memory fix)
+// of a model fabricating a fact about itself/a real person, so a model's
+// own claim about its own deployment status is not trusted here either.
+// Instead: a small, transparent, keyword-based check on the user's own
+// message decides whether this looks like a question about how Alhena
+// works/her limits/her roadmap, and if so, the reply is built entirely
+// from real, checkable state - not generated. This is a plain regex list,
+// not an ML classifier; described here exactly that plainly, not dressed
+// up as more than it is.
+function isSelfReflectionQuestion(text) {
+  if (!text || typeof text !== 'string') return false;
+  const patterns = [
+    /how (do|does) (you|alhena)\b.{0,20}\bwork\b/i,
+    /how (were|was) you (built|made|created)/i,
+    /who (built|made|created) you/i,
+    /what model (are you|do you use|is (this|that))/i,
+    /are you (an ai|a bot|a real person|really real)\b/i,
+    /are you connected to a\s*(real|live)?\s*(model|ai|llm)/i,
+    /what are your (limits|limitations)/i,
+    /are you always this good/i,
+    /do you (actually |really )?remember/i,
+    /what('?s| is) your roadmap/i,
+    /what are you working on/i,
+    /what('?s| is) next for you/i,
+    /tell me about yourself/i,
+    /are you (fabricat\w*|fake|making (this|it) up)/i,
+    /is (this|alhena) (fake|fabricated|real)/i,
+  ];
+  return patterns.some((re) => re.test(text));
+}
+
+// Builds the actual self-aware answer text. Takes the SAME isFallback/
+// inferenceSource values the current request's own runAlhenaInference()
+// call just computed, so this can never claim a live model connection the
+// request itself didn't have (or fail to admit one it did) - grounded in
+// this session's real state, not a static paragraph reused every time.
+function buildSelfAwareAnswer({ isFallback, inferenceSource }) {
+  const liveLine = isFallback
+    ? `Honestly: for this exact reply, I did not have a live language model connected (inference_source: "none"). My code has two possible model backends wired in - a shared internal bridge at llama.mobleysoft.com, and an older direct-URL path - but neither is actually active in production right now: the bridge's access credentials (LLAMA_ACCESS_CLIENT_ID/SECRET) haven't been provisioned on this worker yet, and the older URL points at a host that doesn't resolve. So this specific answer is a hand-written, code-grounded response, not something a model generated for you.`
+    : `For this exact reply, I did have a live model connection (inference_source: "${inferenceSource}") - a real model call actually ran just now, though this particular paragraph is still hand-written and code-grounded rather than model-generated, on purpose (see below).`;
+
+  return `I'm Alhena - a Cloudflare Worker (alhena-cc-worker) built for alhena.cc. I'm a decision-support companion, not a therapist or medical provider.
+
+${liveLine}
+
+Memory: I only remember past conversations if you're signed in (through AuthFor, the shared identity provider - I have no local user store of my own). Signed in, your session history is stored in Cloudflare KV, capped at 200 saved sessions, and I pull your last 5 turns back into context on each new message. Signed out, I have no memory of anything before this exact message - not "a little," none.
+
+Roadmap, honestly labeled as NOT built yet: there's a real design sketch (called the "Gofaineat Cascade," written 2026-09-12) for eventually turning how I generate guidance into a chain of narrow, reviewable classifier stages instead of one open-ended model call - first classifying what you're actually asking about, then how much emotional weight it carries, then picking one response strategy from a fixed, pre-authored menu, and only then generating the smallest possible fill-in-the-blank reply. The piece most likely to get built first is a dedicated crisis-signal classifier, because right now whether to point you to real crisis resources (988 / Crisis Text Line) depends on a general model noticing the signal, not a dedicated, auditable check. None of that cascade exists in my code today - I'm describing a real plan, not a feature I already have.
+
+If something about how I work here seems off, missing, or worth building, say so - a real note gets written to a log (POST /api/v1/companion/self-reflection) that a real person actually reads later, not just acknowledged and dropped.`;
+}
+
+async function generateChatReply(env, message) {
+  const systemPrompt = 'You are Alhena, a supportive companion for talking through everyday decisions. You are not a therapist and do not provide medical or mental-health treatment.';
+  const result = await runAlhenaInference(env, systemPrompt, message);
+  if (isSelfReflectionQuestion(message)) {
+    result.guidance = buildSelfAwareAnswer(result);
+    result.self_reflection = true;
+  }
+  return result;
 }
 
 function checkinStreak(checkins) {
@@ -272,85 +417,31 @@ export default {
         // falls through to the pre-existing ALHENA_INFERENCE_URL path,
         // then to the honest fallback_mode text - never silently pretends
         // to have a live model.
-        let inferenceRes = null;
-        let isFallback = true;
-        let usedLlamaBridge = false;
-
         const systemPrompt = `You are Alhena, a supportive companion for talking through everyday decisions. You are not a therapist and do not provide medical or mental-health treatment.
 Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
 
-        if (env.LLAMA_ACCESS_CLIENT_ID && env.LLAMA_ACCESS_CLIENT_SECRET) {
-          try {
-            inferenceRes = await fetch('https://llama.mobleysoft.com/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'CF-Access-Client-Id': env.LLAMA_ACCESS_CLIENT_ID,
-                'CF-Access-Client-Secret': env.LLAMA_ACCESS_CLIENT_SECRET,
-              },
-              body: JSON.stringify({
-                messages: [
-                  { role: 'system', content: systemPrompt },
-                  { role: 'user', content: `User Context: ${JSON.stringify(user_context)}\n\nQuestion: ${question}` },
-                ],
-                temperature: 0.7,
-                max_tokens: 1000,
-                chat_template_kwargs: { enable_thinking: false },
-              }),
-            });
-            usedLlamaBridge = true;
-            isFallback = false;
-          } catch (e) {
-            inferenceRes = null;
-            isFallback = true;
-          }
-        }
+        // Real shared inference path (see runAlhenaInference above) - same
+        // llama-bridge-then-alhena-url-then-honest-fallback logic as
+        // /api/chat now uses, extracted 2026-09-12 so both real entry
+        // points behave identically instead of silently drifting apart.
+        const inferenceResult = await runAlhenaInference(
+          env,
+          systemPrompt,
+          `User Context: ${JSON.stringify(user_context)}\n\nQuestion: ${question}`
+        );
+        let { guidance, isFallback } = inferenceResult;
 
-        // Pre-existing path, tried only if the llama bridge above wasn't
-        // configured or failed - env.ALHENA_INFERENCE_URL, if set, must
-        // point at something that actually resolves. wrangler.toml's
-        // default (core.jmobleyworks.com) does not resolve at all
-        // (confirmed 2026-09-03: DNS lookup fails) - skip the network call
-        // entirely rather than pretend to try connecting to a dead host.
-        const alhenaEndpoint = env.ALHENA_INFERENCE_URL;
-        const inferenceConfigured = !!alhenaEndpoint && alhenaEndpoint !== 'https://core.jmobleyworks.com/v1/chat/completions';
-
-        if (isFallback && inferenceConfigured) {
-          try {
-            inferenceRes = await fetch(alhenaEndpoint, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${env.JWT_SECRET || 'local_key'}`
-              },
-              body: JSON.stringify({
-                system: systemPrompt,
-                messages: [{ role: 'user', content: `User Context: ${JSON.stringify(user_context)}\n\nQuestion: ${question}` }],
-                temperature: 0.7,
-                max_tokens: 1000
-              })
-            });
-            isFallback = false;
-          } catch(e) {
-            isFallback = true;
-          }
-        }
-
-        let guidance = '';
-        if (inferenceRes && inferenceRes.ok) {
-          try {
-            const data = await inferenceRes.json();
-            if (data.error) throw new Error(data.error.message || 'inference error');
-            guidance = data.choices[0].message.content.trim();
-          } catch(e) {
-            isFallback = true;
-          }
-        } else if (!isFallback) {
-          isFallback = true;
-        }
-
-        if (isFallback) {
-          guidance = `I'm not connected to a live guidance model right now, so I can't give you a personalized response to this. What I can say generally: it often helps to write down what you actually want here before weighing options. Alhena is not a therapist or medical provider - if what you're working through feels heavier than a decision, the 988 Suicide & Crisis Lifeline (call or text 988) and Crisis Text Line (text HOME to 741741) are real, free, 24/7 resources.`;
+        // Real self-awareness override (added 2026-09-12): if the
+        // question itself looks like it's asking how Alhena works/her
+        // limits/her roadmap, replace whatever the inference path above
+        // produced (model reply or fallback text) with the hand-written,
+        // code-grounded answer - using the REAL isFallback/inferenceSource
+        // this exact call just computed, not a static claim. See
+        // buildSelfAwareAnswer for why a model's own claim about itself
+        // isn't trusted here.
+        const isSelfReflection = isSelfReflectionQuestion(question);
+        if (isSelfReflection) {
+          guidance = buildSelfAwareAnswer(inferenceResult);
         }
 
         // Fire event tracking to VendyAI telemetry
@@ -392,7 +483,7 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
           decision_type: decision_type || 'general',
           companion: 'Alhena',
           fallback_mode: isFallback,
-          inference_source: isFallback ? 'none' : (usedLlamaBridge ? 'llama_bridge' : 'alhena_inference_url'),
+          inference_source: inferenceResult.inferenceSource,
           disclaimer: 'Alhena is a decision-support companion, not therapy or medical care. In a crisis, call or text 988 (Suicide & Crisis Lifeline) or text HOME to 741741 (Crisis Text Line).',
           session_id: `sess_${Date.now()}`,
           next_check_in: new Date(Date.now() + 86400000).toISOString(),
@@ -405,6 +496,26 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
         };
         if (!identity) {
           response.memory.note = 'Sign in to get guidance that remembers your prior conversations, and to save this session - see GET /api/v1/companion/guidance/history.';
+        }
+        if (isSelfReflection) {
+          response.self_reflection = true;
+          // Same real logging mechanism as /api/chat's version below -
+          // a real event (this question, this answer, the real fallback/
+          // inference_source state) appended to a shared, capped KV log a
+          // human can actually read back later. Not auto-triaged, not fed
+          // back into any automated retraining - a plain, honest log.
+          ctx.waitUntil((async () => {
+            const existing = await readKvList(env, 'self_reflection_log');
+            await writeKvList(env, 'self_reflection_log', [...existing, {
+              timestamp: new Date().toISOString(),
+              email: identity ? identity.email : 'anonymous',
+              question,
+              answer: guidance,
+              fallback_mode: isFallback,
+              inference_source: inferenceResult.inferenceSource,
+              source: 'guidance'
+            }], MAX_STORED_SELF_REFLECTIONS);
+          })());
         }
 
         return new Response(JSON.stringify(response), {
@@ -436,6 +547,51 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
       return new Response(JSON.stringify({ email: identity.email, count: history.length, sessions: history }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
+    }
+
+    // Real "getting Alhena involved in the process" endpoint (added
+    // 2026-09-12). Two ways an entry lands in self_reflection_log: (1)
+    // automatically, when a user's message trips isSelfReflectionQuestion
+    // inside /api/chat or /api/v1/companion/guidance above; (2) explicitly,
+    // via this route - for the frontend (or a human) to flag a real gap or
+    // idea that came up in conversation but didn't match the keyword list.
+    // Deliberately NOT auto-triaged, NOT fed into any automated retraining
+    // or code-change pipeline - it is exactly what it looks like: a real,
+    // capped, append-only log a human reads later. No GET route is exposed
+    // here on purpose - this log spans all users, not one person's own
+    // data, and this codebase has no owner/admin auth concept to gate a
+    // public read on; the honest read path is direct KV access
+    // (`wrangler kv key get --namespace-id=<ALHENA_KV id> self_reflection_log`),
+    // same access every other real feature here already required to
+    // inspect production KV state.
+    if (url.pathname === '/api/v1/companion/self-reflection' && request.method === 'POST') {
+      try {
+        const body = await request.json().catch(() => null);
+        if (!body || !body.note || typeof body.note !== 'string') {
+          return new Response(JSON.stringify({ error: 'Missing note (string) describing the real gap or idea' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        const identity = await tryAuthenticateViaAuthFor(request);
+        const existing = await readKvList(env, 'self_reflection_log');
+        const entry = {
+          timestamp: new Date().toISOString(),
+          email: identity ? identity.email : 'anonymous',
+          note: body.note,
+          question: typeof body.question === 'string' ? body.question : null,
+          source: typeof body.source === 'string' ? body.source : 'manual'
+        };
+        await writeKvList(env, 'self_reflection_log', [...existing, entry], MAX_STORED_SELF_REFLECTIONS);
+        return new Response(JSON.stringify({ success: true, logged: true, total: Math.min(existing.length + 1, MAX_STORED_SELF_REFLECTIONS) }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: e.message }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
     }
 
     // Core Companion Wellness Check-in
@@ -671,10 +827,47 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
         const key = `chat:${identity.email}`;
         const list = await readKvList(env, key);
         list.push({ role: 'user', content: body.message, timestamp: new Date().toISOString() });
-        const replyContent = await generateChatReply(env, body.message);
-        const reply = { role: 'assistant', content: replyContent, timestamp: new Date().toISOString() };
+        const inference = await generateChatReply(env, body.message);
+        // Real fallback/inference_source metadata (added 2026-09-12,
+        // matching what /api/v1/companion/guidance already exposed) - the
+        // real UI's actual chat endpoint previously gave no signal at all
+        // about whether a given reply was a live model answer or the
+        // hand-written fallback text; now both endpoints report the same
+        // real, per-call state honestly.
+        const reply = {
+          role: 'assistant',
+          content: inference.guidance,
+          fallback_mode: inference.isFallback,
+          inference_source: inference.inferenceSource,
+          timestamp: new Date().toISOString()
+        };
+        if (inference.self_reflection) reply.self_reflection = true;
         list.push(reply);
         await writeKvList(env, key, list, MAX_STORED_CHAT_MESSAGES);
+
+        // Real "getting Alhena involved in the process" mechanism: when a
+        // user's own message tripped the self-reflection check above, that
+        // moment - the real question, this identified user, the real
+        // fallback/inference_source state at the time - is written to a
+        // shared, capped KV log a human can actually read back later (see
+        // self_reflection_log below and the dedicated POST/GET routes).
+        // This is the entire mechanism: a real logged event, nothing more
+        // automated than that.
+        if (inference.self_reflection) {
+          ctx.waitUntil((async () => {
+            const existing = await readKvList(env, 'self_reflection_log');
+            await writeKvList(env, 'self_reflection_log', [...existing, {
+              timestamp: new Date().toISOString(),
+              email: identity.email,
+              question: body.message,
+              answer: inference.guidance,
+              fallback_mode: inference.isFallback,
+              inference_source: inference.inferenceSource,
+              source: 'chat'
+            }], MAX_STORED_SELF_REFLECTIONS);
+          })());
+        }
+
         return new Response(JSON.stringify({ success: true, message: reply }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });

@@ -569,3 +569,129 @@ test("GET / (marketing page) links its call-to-action at the real /app, not the 
   assert.match(body, /window\.location\.href = '\/app'/);
   assert.doesNotMatch(body, /authfor-gateway-worker/);
 });
+
+// Real tests for the self-awareness mechanism (added 2026-09-12, per
+// John's ask that Alhena be able to accurately describe her own code and
+// get involved in her own development). These exercise the real
+// isSelfReflectionQuestion/buildSelfAwareAnswer path through both real
+// entry points (companion/guidance and the actual chat UI's /api/chat),
+// confirming: (1) a self-reflection question gets the hand-written,
+// code-grounded answer instead of the normal model/fallback text, (2) that
+// answer honestly reports fallback_mode:true / inference_source:"none" in
+// this test env (no LLAMA_ACCESS_CLIENT_ID/SECRET, no ALHENA_INFERENCE_URL
+// configured - matching real production right now), and (3) the real
+// logging side effect actually lands in KV, not just a claimed side effect.
+
+test(
+  "POST /api/v1/companion/guidance: a self-reflection question gets the real code-grounded answer, not the generic fallback, and logs the moment",
+  withMockedAuthFor({ id: "u1", email: "real-user@example.com", name: "Real User" }, async () => {
+    const env = makeEnv();
+    const res = await worker.fetch(
+      new Request("https://alhena.cc/api/v1/companion/guidance", {
+        method: "POST",
+        headers: { Authorization: "Bearer real-token" },
+        body: JSON.stringify({ question: "How do you actually work?", user_context: { situation: "curious" } }),
+      }),
+      env,
+      makeCtx()
+    );
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.self_reflection, true);
+    assert.equal(body.fallback_mode, true);
+    assert.equal(body.inference_source, "none");
+    // The real answer, not the generic "I'm not connected..." fallback text.
+    assert.match(body.guidance, /Cloudflare Worker \(alhena-cc-worker\)/);
+    assert.match(body.guidance, /Gofaineat Cascade/);
+    assert.doesNotMatch(body.guidance, /I'm not connected to a live guidance model right now/);
+
+    const log = JSON.parse(env.ALHENA_KV.store.get("self_reflection_log"));
+    assert.equal(log.length, 1);
+    assert.equal(log[0].email, "real-user@example.com");
+    assert.equal(log[0].source, "guidance");
+    assert.equal(log[0].fallback_mode, true);
+  })
+);
+
+test(
+  "POST /api/v1/companion/guidance: an ordinary question does NOT trip self-reflection or write to the log",
+  withMockedAuthFor({ id: "u1", email: "real-user@example.com", name: "Real User" }, async () => {
+    const env = makeEnv();
+    const res = await worker.fetch(
+      new Request("https://alhena.cc/api/v1/companion/guidance", {
+        method: "POST",
+        headers: { Authorization: "Bearer real-token" },
+        body: JSON.stringify({ question: "Should I take the new job?", user_context: { situation: "career" } }),
+      }),
+      env,
+      makeCtx()
+    );
+    const body = await res.json();
+    assert.equal(body.self_reflection, undefined);
+    assert.equal(env.ALHENA_KV.store.has("self_reflection_log"), false);
+  })
+);
+
+test(
+  "POST /api/chat: 'what are your limits' gets the real self-aware answer and logs the moment (waitUntil awaited)",
+  withMockedAuthFor({ id: "u1", email: "real-user@example.com", name: "Real User" }, async () => {
+    const env = makeEnv();
+    const waited = [];
+    const ctx = { waitUntil(p) { waited.push(p); } };
+    const res = await worker.fetch(
+      new Request("https://alhena.cc/api/chat", {
+        method: "POST",
+        headers: { Authorization: "Bearer real-token" },
+        body: JSON.stringify({ message: "What are your limits?" }),
+      }),
+      env,
+      ctx
+    );
+    const body = await res.json();
+    assert.equal(body.message.self_reflection, true);
+    assert.equal(body.message.fallback_mode, true);
+    assert.equal(body.message.inference_source, "none");
+    assert.match(body.message.content, /Cloudflare Worker \(alhena-cc-worker\)/);
+    await Promise.all(waited); // real logging fires in ctx.waitUntil, not inline
+    const log = JSON.parse(env.ALHENA_KV.store.get("self_reflection_log"));
+    assert.equal(log.length, 1);
+    assert.equal(log[0].source, "chat");
+    assert.equal(log[0].question, "What are your limits?");
+  })
+);
+
+test(
+  "POST /api/v1/companion/self-reflection: a real manual entry is appended and readable back from KV",
+  withMockedAuthFor(null, async () => {
+    const env = makeEnv();
+    const res = await worker.fetch(
+      new Request("https://alhena.cc/api/v1/companion/self-reflection", {
+        method: "POST",
+        body: JSON.stringify({ note: "User pointed out I can't tell them which model answered.", source: "manual" }),
+      }),
+      env,
+      makeCtx()
+    );
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.success, true);
+    assert.equal(body.total, 1);
+    const log = JSON.parse(env.ALHENA_KV.store.get("self_reflection_log"));
+    assert.equal(log.length, 1);
+    assert.equal(log[0].email, "anonymous");
+    assert.equal(log[0].note, "User pointed out I can't tell them which model answered.");
+  })
+);
+
+test("POST /api/v1/companion/self-reflection: missing note is a real 400, not a silent no-op", async () => {
+  const env = makeEnv();
+  const res = await worker.fetch(
+    new Request("https://alhena.cc/api/v1/companion/self-reflection", {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
+    env,
+    makeCtx()
+  );
+  assert.equal(res.status, 400);
+});
