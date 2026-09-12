@@ -58,6 +58,104 @@ async function appendCheckinHistory(env, email, checkin) {
   await env.ALHENA_KV.put(key, JSON.stringify(history));
 }
 
+// ── Companion app-shell backend (added 2026-09-11) ─────────────────────
+// reference/legacy-roots/alhena/app.html is a real, already-built chat/
+// journal/goals/check-in UI - far ahead of this venture's actual deployed
+// front end - that expected these routes and none of them existed. Its
+// own auth screen calls AuthFor directly (mascom/CLAUDE.md: "AuthFor for
+// auth, not a per-venture choice"), so no local signup/login/user-store
+// route was added here - every route below requires a real AuthFor
+// Bearer token, same authenticateViaAuthFor() used above. Storage is
+// ALHENA_KV, same as the existing checkin history, with the same
+// bounded-list-cap pattern (no unlimited per-user growth).
+const MAX_STORED_JOURNAL_ENTRIES = 500;
+const MAX_STORED_GOALS = 200;
+const MAX_STORED_CHAT_MESSAGES = 500;
+const MAX_STORED_DAILY_CHECKINS = 365;
+
+async function readKvList(env, key) {
+  const raw = await env.ALHENA_KV.get(key);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+async function writeKvList(env, key, list, cap) {
+  const bounded = list.length > cap ? list.slice(-cap) : list;
+  await env.ALHENA_KV.put(key, JSON.stringify(bounded));
+  return bounded;
+}
+
+function authForErrorResponse(e, corsHeaders) {
+  return new Response(JSON.stringify({ success: false, error: e.msg || 'Unauthorized', code: e.code || 'UNAUTHORIZED' }), {
+    status: e.status || 401,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+
+// Same fallback-mode-honest pattern as /api/v1/companion/guidance above -
+// only claims a real model reply when ALHENA_INFERENCE_URL is actually
+// configured to something other than the known-dead wrangler.toml
+// default, and only claims success when the call actually returned one.
+async function generateChatReply(env, message) {
+  const alhenaEndpoint = env.ALHENA_INFERENCE_URL;
+  const inferenceConfigured = !!alhenaEndpoint && alhenaEndpoint !== 'https://core.jmobleyworks.com/v1/chat/completions';
+  if (inferenceConfigured) {
+    try {
+      const res = await fetch(alhenaEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${env.JWT_SECRET || 'local_key'}`
+        },
+        body: JSON.stringify({
+          system: 'You are Alhena, a supportive companion for talking through everyday decisions. You are not a therapist and do not provide medical or mental-health treatment.',
+          messages: [{ role: 'user', content: message }],
+          temperature: 0.7,
+          max_tokens: 500
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const content = data?.choices?.[0]?.message?.content?.trim();
+        if (content) return content;
+      }
+    } catch (e) {
+      // fall through to the honest fallback below
+    }
+  }
+  return "I'm not connected to a live guidance model right now, so I can't give you a personalized reply to that. In a crisis, call or text 988 (Suicide & Crisis Lifeline) or text HOME to 741741 (Crisis Text Line) - real, free, 24/7 resources.";
+}
+
+function checkinStreak(checkins) {
+  // Distinct calendar days, most recent first, counting consecutive days
+  // back from today or yesterday (a check-in today shouldn't be required
+  // to keep yesterday's streak alive before the day is over).
+  const days = [...new Set(checkins.map(c => c.date.slice(0, 10)))].sort().reverse();
+  if (days.length === 0) return 0;
+  const oneDay = 24 * 60 * 60 * 1000;
+  const today = new Date(new Date().toISOString().slice(0, 10)).getTime();
+  let cursor = today;
+  if (days[0] !== new Date(today).toISOString().slice(0, 10)) {
+    cursor = today - oneDay; // most recent check-in was yesterday, not today
+  }
+  let streak = 0;
+  for (const day of days) {
+    const dayTime = new Date(day).getTime();
+    if (dayTime === cursor) {
+      streak++;
+      cursor -= oneDay;
+    } else if (dayTime < cursor) {
+      break;
+    }
+  }
+  return streak;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -82,7 +180,18 @@ export default {
     // Core Companion Guidance: Life Decision Support
     if (url.pathname === '/api/v1/companion/guidance' && request.method === 'POST') {
       try {
-        const body = await request.json();
+        // Real bug found 2026-09-11 (route-vs-reality audit): a missing or
+        // malformed JSON body threw uncaught inside this try block and fell
+        // through to the outer catch's blanket 500 - a client sending bad
+        // input got a server-error status, not the 400 that's actually
+        // correct for it.
+        const body = await request.json().catch(() => null);
+        if (!body) {
+          return new Response(JSON.stringify({ error: 'Invalid or missing JSON body' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
         const { user_context, question, decision_type } = body;
 
         if (!question || !user_context) {
@@ -206,7 +315,9 @@ Decision type: ${decision_type || 'general_guidance'}`;
     // Core Companion Wellness Check-in
     if (url.pathname === '/api/v1/companion/checkin' && request.method === 'POST') {
       try {
-        const body = await request.json();
+        // Same real fix as /api/v1/companion/guidance above: a missing or
+        // malformed JSON body must not fall through to a blanket 500.
+        const body = await request.json().catch(() => ({}));
         const { mood, energy_level, notes } = body;
         const identity = await tryAuthenticateViaAuthFor(request);
 
@@ -294,6 +405,227 @@ Decision type: ${decision_type || 'general_guidance'}`;
       return new Response(JSON.stringify({ email: identity.email, count: history.length, checkins: history }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
+    }
+
+    // ── Companion app-shell routes (app.html) ──────────────────────────
+    if (url.pathname === '/api/journal' && request.method === 'POST') {
+      try {
+        const identity = await authenticateViaAuthFor(request);
+        const body = await request.json();
+        if (!body.content) {
+          return new Response(JSON.stringify({ success: false, error: 'Missing content' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        const entry = {
+          id: crypto.randomUUID(),
+          title: body.title || null,
+          content: body.content,
+          mood: typeof body.mood === 'number' ? body.mood : null,
+          createdAt: new Date().toISOString()
+        };
+        const key = `journal:${identity.email}`;
+        const list = await readKvList(env, key);
+        list.push(entry);
+        await writeKvList(env, key, list, MAX_STORED_JOURNAL_ENTRIES);
+        return new Response(JSON.stringify({ success: true, entry }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (e) {
+        if (e.status) return authForErrorResponse(e, corsHeaders);
+        return new Response(JSON.stringify({ success: false, error: e.message }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    if (url.pathname === '/api/journal' && request.method === 'GET') {
+      try {
+        const identity = await authenticateViaAuthFor(request);
+        const list = await readKvList(env, `journal:${identity.email}`);
+        return new Response(JSON.stringify({ success: true, entries: [...list].reverse() }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (e) {
+        return authForErrorResponse(e, corsHeaders);
+      }
+    }
+
+    if (url.pathname === '/api/goals' && request.method === 'POST') {
+      try {
+        const identity = await authenticateViaAuthFor(request);
+        const body = await request.json();
+        if (!body.title) {
+          return new Response(JSON.stringify({ success: false, error: 'Missing title' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        const goal = {
+          id: crypto.randomUUID(),
+          title: body.title,
+          description: body.description || null,
+          category: body.category || 'personal',
+          status: 'active',
+          progress: 0,
+          createdAt: new Date().toISOString()
+        };
+        const key = `goals:${identity.email}`;
+        const list = await readKvList(env, key);
+        list.push(goal);
+        await writeKvList(env, key, list, MAX_STORED_GOALS);
+        return new Response(JSON.stringify({ success: true, goal }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (e) {
+        if (e.status) return authForErrorResponse(e, corsHeaders);
+        return new Response(JSON.stringify({ success: false, error: e.message }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    if (url.pathname === '/api/goals' && request.method === 'GET') {
+      try {
+        const identity = await authenticateViaAuthFor(request);
+        const list = await readKvList(env, `goals:${identity.email}`);
+        return new Response(JSON.stringify({ success: true, goals: [...list].reverse() }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (e) {
+        return authForErrorResponse(e, corsHeaders);
+      }
+    }
+
+    if (url.pathname.startsWith('/api/goals/') && request.method === 'PUT') {
+      try {
+        const identity = await authenticateViaAuthFor(request);
+        const goalId = url.pathname.slice('/api/goals/'.length);
+        const body = await request.json();
+        const key = `goals:${identity.email}`;
+        const list = await readKvList(env, key);
+        const goal = list.find(g => g.id === goalId);
+        if (!goal) {
+          return new Response(JSON.stringify({ success: false, error: 'Goal not found' }), {
+            status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        if (typeof body.progress === 'number') {
+          goal.progress = Math.max(0, Math.min(100, body.progress));
+          goal.status = goal.progress >= 100 ? 'completed' : 'active';
+        }
+        await env.ALHENA_KV.put(key, JSON.stringify(list));
+        return new Response(JSON.stringify({ success: true, goal }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (e) {
+        if (e.status) return authForErrorResponse(e, corsHeaders);
+        return new Response(JSON.stringify({ success: false, error: e.message }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    if (url.pathname === '/api/chat' && request.method === 'POST') {
+      try {
+        const identity = await authenticateViaAuthFor(request);
+        const body = await request.json();
+        if (!body.message) {
+          return new Response(JSON.stringify({ success: false, error: 'Missing message' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        const key = `chat:${identity.email}`;
+        const list = await readKvList(env, key);
+        list.push({ role: 'user', content: body.message, timestamp: new Date().toISOString() });
+        const replyContent = await generateChatReply(env, body.message);
+        const reply = { role: 'assistant', content: replyContent, timestamp: new Date().toISOString() };
+        list.push(reply);
+        await writeKvList(env, key, list, MAX_STORED_CHAT_MESSAGES);
+        return new Response(JSON.stringify({ success: true, message: reply }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (e) {
+        if (e.status) return authForErrorResponse(e, corsHeaders);
+        return new Response(JSON.stringify({ success: false, error: e.message }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    if (url.pathname === '/api/chat/history' && request.method === 'GET') {
+      try {
+        const identity = await authenticateViaAuthFor(request);
+        const limit = Math.max(1, Math.min(1000, parseInt(url.searchParams.get('limit'), 10) || 100));
+        const list = await readKvList(env, `chat:${identity.email}`);
+        return new Response(JSON.stringify({ success: true, messages: list.slice(-limit) }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (e) {
+        return authForErrorResponse(e, corsHeaders);
+      }
+    }
+
+    // Numeric mood/energy (1-10) daily check-ins for the app shell -
+    // deliberately a distinct KV key (checkin2:) from the string-mood
+    // ('anxious'/'happy') anonymous-capable /api/v1/companion/checkin
+    // above. Different data shape, different feature, same venture.
+    if (url.pathname === '/api/checkin' && request.method === 'POST') {
+      try {
+        const identity = await authenticateViaAuthFor(request);
+        const body = await request.json();
+        if (typeof body.mood !== 'number') {
+          return new Response(JSON.stringify({ success: false, error: 'Missing mood' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        const record = {
+          date: new Date().toISOString(),
+          mood: body.mood,
+          energy: typeof body.energy === 'number' ? body.energy : null,
+          note: body.note || null
+        };
+        const key = `checkin2:${identity.email}`;
+        const list = await readKvList(env, key);
+        list.push(record);
+        await writeKvList(env, key, list, MAX_STORED_DAILY_CHECKINS);
+
+        let aiNote;
+        if (body.mood <= 3) {
+          aiNote = "Thanks for checking in, even on a harder day. Small steps count - maybe a short walk, or writing a line in your journal about what's weighing on you.";
+        } else if (body.mood >= 8) {
+          aiNote = "Glad to hear you're doing well today. Good moments like this are worth noting - maybe jot it in your journal so you can look back on it later.";
+        } else {
+          aiNote = "Thanks for checking in. Steady days matter too - keep an eye on what's shifting your mood day to day.";
+        }
+
+        return new Response(JSON.stringify({ success: true, aiNote }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (e) {
+        if (e.status) return authForErrorResponse(e, corsHeaders);
+        return new Response(JSON.stringify({ success: false, error: e.message }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    if (url.pathname === '/api/checkin/history' && request.method === 'GET') {
+      try {
+        const identity = await authenticateViaAuthFor(request);
+        const days = Math.max(1, Math.min(365, parseInt(url.searchParams.get('days'), 10) || 30));
+        const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+        const list = await readKvList(env, `checkin2:${identity.email}`);
+        const inRange = list.filter(c => new Date(c.date).getTime() >= cutoff);
+        return new Response(JSON.stringify({
+          success: true,
+          summary: { streak: checkinStreak(list) },
+          checkins: [...inRange].reverse()
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (e) {
+        return authForErrorResponse(e, corsHeaders);
+      }
     }
 
     // Removed 2026-09-03: /api/v1/treasury/accounts and /api/v1/treasury/forecast
