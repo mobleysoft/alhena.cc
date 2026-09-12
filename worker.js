@@ -249,41 +249,73 @@ export default {
         // (confirmed 2026-09-03: DNS lookup fails) - skip the network call
         // entirely rather than pretend to try connecting to a dead host.
         //
-        // Real gap confirmed 2026-09-11 (not just this default - checked
-        // live, no secret override exists either): companion_guidance runs
-        // in fallback_mode:true for 100% of real production traffic today.
-        // Two real candidate fix paths were found and evaluated, neither
-        // wired up this pass:
-        //   (1) https://llama.mobleysoft.com - real, live, CF-Access-gated
-        //       bridge to this Mac's llama-server (Qwen3-8B), already
-        //       proven by mobley-venture-fleet-a's JITAGI_CAPABILITIES
-        //       bridge via a real CF-Access-Client-Id/Secret service
-        //       token. Not reused here because that Access application
-        //       isn't visible via the Access Apps API under the same
-        //       Cloudflare account that hosts alhena-cc-worker (confirmed
-        //       via `wrangler whoami` + a live API call - 0 apps
-        //       returned), so a working token can't be safely provisioned
-        //       without further access.
-        //   (2) https://mobley.mobleysoft.com - ingress config already
-        //       exists (~/.cloudflared/mascom-v5.yml) pointing at the
-        //       real, already-running mascom_qwen_adapter.py on
-        //       127.0.0.1:11435, but that tunnel process wasn't running
-        //       at check time and is shared fleet-wide infra (~20 other
-        //       hostnames) - starting it as a side effect of this one
-        //       endpoint would be disproportionate without an explicit
-        //       decision.
-        // See ventures.json's alhena.cc insight.evidence for the full
-        // investigation. Left honestly as fallback-only, not fabricated
-        // as fixed.
-        const alhenaEndpoint = env.ALHENA_INFERENCE_URL;
-        const inferenceConfigured = !!alhenaEndpoint && alhenaEndpoint !== 'https://core.jmobleyworks.com/v1/chat/completions';
+        // Real gap confirmed 2026-09-11: companion_guidance ran in
+        // fallback_mode:true for 100% of real production traffic. Two
+        // candidate fix paths were found; path (1) below was reported
+        // blocked because "that Access application isn't visible... under
+        // the same Cloudflare account that hosts alhena-cc-worker" - RE-
+        // VERIFIED 2026-09-12 and that reason no longer holds: a live API
+        // check confirms alhena-cc-worker's zone (alhena.cc) and the
+        // llama-server-gateway Access app are both on the same account
+        // ($MY_CLOUDFLARE_ACCOUNT_ID). Wiring the real call now, matching
+        // the exact working pattern already proven by mobley-venture-
+        // fleet-a's JITAGI_CAPABILITIES bridge (same jitagi-kernel-m2m
+        // service token, same https://llama.mobleysoft.com endpoint).
+        //
+        // Honest remaining gap: LLAMA_ACCESS_CLIENT_ID/SECRET are NOT yet
+        // set as secrets on alhena-cc-worker (confirmed via `wrangler
+        // secret list` - not present). Entering the actual secret value is
+        // a real human/credential-handling action, not something this
+        // pass does - `wrangler secret put LLAMA_ACCESS_CLIENT_ID` /
+        // `LLAMA_ACCESS_CLIENT_SECRET` on alhena-cc-worker still needs to
+        // happen before this path activates. Until then this correctly
+        // falls through to the pre-existing ALHENA_INFERENCE_URL path,
+        // then to the honest fallback_mode text - never silently pretends
+        // to have a live model.
+        let inferenceRes = null;
+        let isFallback = true;
+        let usedLlamaBridge = false;
 
         const systemPrompt = `You are Alhena, a supportive companion for talking through everyday decisions. You are not a therapist and do not provide medical or mental-health treatment.
 Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
 
-        let inferenceRes = null;
-        let isFallback = !inferenceConfigured;
-        if (inferenceConfigured) {
+        if (env.LLAMA_ACCESS_CLIENT_ID && env.LLAMA_ACCESS_CLIENT_SECRET) {
+          try {
+            inferenceRes = await fetch('https://llama.mobleysoft.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'CF-Access-Client-Id': env.LLAMA_ACCESS_CLIENT_ID,
+                'CF-Access-Client-Secret': env.LLAMA_ACCESS_CLIENT_SECRET,
+              },
+              body: JSON.stringify({
+                messages: [
+                  { role: 'system', content: systemPrompt },
+                  { role: 'user', content: `User Context: ${JSON.stringify(user_context)}\n\nQuestion: ${question}` },
+                ],
+                temperature: 0.7,
+                max_tokens: 1000,
+                chat_template_kwargs: { enable_thinking: false },
+              }),
+            });
+            usedLlamaBridge = true;
+            isFallback = false;
+          } catch (e) {
+            inferenceRes = null;
+            isFallback = true;
+          }
+        }
+
+        // Pre-existing path, tried only if the llama bridge above wasn't
+        // configured or failed - env.ALHENA_INFERENCE_URL, if set, must
+        // point at something that actually resolves. wrangler.toml's
+        // default (core.jmobleyworks.com) does not resolve at all
+        // (confirmed 2026-09-03: DNS lookup fails) - skip the network call
+        // entirely rather than pretend to try connecting to a dead host.
+        const alhenaEndpoint = env.ALHENA_INFERENCE_URL;
+        const inferenceConfigured = !!alhenaEndpoint && alhenaEndpoint !== 'https://core.jmobleyworks.com/v1/chat/completions';
+
+        if (isFallback && inferenceConfigured) {
           try {
             inferenceRes = await fetch(alhenaEndpoint, {
               method: 'POST',
@@ -298,6 +330,7 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
                 max_tokens: 1000
               })
             });
+            isFallback = false;
           } catch(e) {
             isFallback = true;
           }
@@ -307,11 +340,12 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
         if (inferenceRes && inferenceRes.ok) {
           try {
             const data = await inferenceRes.json();
+            if (data.error) throw new Error(data.error.message || 'inference error');
             guidance = data.choices[0].message.content.trim();
           } catch(e) {
             isFallback = true;
           }
-        } else if (inferenceConfigured) {
+        } else if (!isFallback) {
           isFallback = true;
         }
 
@@ -358,6 +392,7 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
           decision_type: decision_type || 'general',
           companion: 'Alhena',
           fallback_mode: isFallback,
+          inference_source: isFallback ? 'none' : (usedLlamaBridge ? 'llama_bridge' : 'alhena_inference_url'),
           disclaimer: 'Alhena is a decision-support companion, not therapy or medical care. In a crisis, call or text 988 (Suicide & Crisis Lifeline) or text HOME to 741741 (Crisis Text Line).',
           session_id: `sess_${Date.now()}`,
           next_check_in: new Date(Date.now() + 86400000).toISOString(),
