@@ -1,0 +1,2111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alhena — Your Personal Companion</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Alhena">
+  <meta name="theme-color" content="#0a0a0f">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%230a0a0f'/%3E%3Ccircle cx='90' cy='70' r='28' fill='none' stroke='%23E91E63' stroke-width='3'/%3E%3Cpath d='M90 98 C60 98 42 120 42 145 L138 145 C138 120 120 98 90 98Z' fill='none' stroke='%23E91E63' stroke-width='3'/%3E%3Ccircle cx='90' cy='70' r='6' fill='%23E91E63'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --surface-2: #1a1a25;
+      --border: #2a2a3a;
+      --text: #e8e8f0;
+      --text-muted: #8888a0;
+      --accent: #E91E63;
+      --accent-soft: rgba(233, 30, 99, 0.15);
+      --success: #4caf50;
+      --radius: 12px;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+    }
+
+    /* ── Auth Screen ───────────────────────────────── */
+    #auth-screen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .auth-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px;
+      max-width: 400px;
+      width: 100%;
+    }
+
+    .auth-card h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    .auth-card p { color: var(--text-muted); margin-bottom: 24px; font-size: 14px; }
+
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
+    .form-group input {
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus { border-color: var(--accent); }
+
+    .btn {
+      width: 100%;
+      padding: 12px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      margin-top: 8px;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .auth-toggle {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .auth-toggle a { color: var(--accent); cursor: pointer; text-decoration: none; }
+
+    .auth-error { color: #f44336; font-size: 13px; margin-top: 8px; min-height: 18px; }
+
+    /* ── App Layout ────────────────────────────────── */
+    #app-screen { display: none; width: 100%; height: 100vh; }
+
+    .sidebar {
+      width: 260px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .sidebar-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-header h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 22px;
+    }
+    .sidebar-header .user-name {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* ── Badge Display ────────────────────────────── */
+    .badge-display {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .badge-icon {
+      font-size: 18px;
+      cursor: help;
+      position: relative;
+      display: inline-block;
+    }
+    .badge-icon .badge-tooltip {
+      visibility: hidden;
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--surface-2);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      white-space: nowrap;
+      margin-bottom: 6px;
+      border: 1px solid var(--border);
+      z-index: 10;
+      pointer-events: none;
+    }
+    .badge-icon:hover .badge-tooltip {
+      visibility: visible;
+    }
+
+    /* ── Badge Celebration Animation ────────────── */
+    @keyframes badgePop {
+      0% { transform: scale(0); opacity: 0; }
+      50% { transform: scale(1.2); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .badge-celebration {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--surface);
+      border: 2px solid var(--accent);
+      border-radius: 16px;
+      padding: 32px;
+      text-align: center;
+      z-index: 2000;
+      animation: badgePop 0.5s ease;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    .badge-celebration-emoji {
+      font-size: 64px;
+      margin-bottom: 12px;
+    }
+    .badge-celebration h3 {
+      font-size: 20px;
+      margin-bottom: 8px;
+      color: var(--accent);
+    }
+    .badge-celebration p {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+    .badge-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1999;
+    }
+
+    .nav-items { flex: 1; padding: 12px; overflow-y: auto; }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--text-muted);
+      transition: all 0.15s;
+      margin-bottom: 4px;
+    }
+    .nav-item:hover { background: var(--surface-2); color: var(--text); }
+    .nav-item.active { background: var(--accent-soft); color: var(--accent); }
+    .nav-item svg { width: 20px; height: 20px; flex-shrink: 0; }
+
+    .sidebar-footer {
+      padding: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .logout-btn {
+      width: 100%;
+      padding: 10px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-muted);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .logout-btn:hover { border-color: #f44336; color: #f44336; }
+
+    /* ── Main Content ──────────────────────────────── */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Chat View ─────────────────────────────────── */
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .message {
+      max-width: 75%;
+      padding: 12px 16px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      position: relative;
+    }
+    .message.user {
+      align-self: flex-end;
+      background: var(--accent);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .message.assistant {
+      align-self: flex-start;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 4px;
+    }
+    .message .msg-time {
+      font-size: 11px;
+      opacity: 0.6;
+      margin-top: 6px;
+      display: block;
+    }
+
+    /* ── Sentiment Indicator ───────────────────────── */
+    .sentiment-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      position: absolute;
+      top: 8px;
+      right: 8px;
+    }
+    .sentiment-positive { background: #4caf50; }
+    .sentiment-neutral { background: #ffc107; }
+    .sentiment-negative { background: #f44336; }
+
+    .chat-input-area {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .chat-input-wrap {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+    .chat-input-wrap textarea {
+      flex: 1;
+      padding: 12px 14px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      resize: none;
+      outline: none;
+      max-height: 120px;
+      min-height: 44px;
+      line-height: 1.4;
+      transition: border-color 0.2s;
+    }
+    .chat-input-wrap textarea:focus { border-color: var(--accent); }
+    .send-btn {
+      width: 44px;
+      height: 44px;
+      background: var(--accent);
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: opacity 0.2s;
+    }
+    .send-btn:hover { opacity: 0.9; }
+    .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Panel Views (Journal, Goals, Check-in, Insights) ──── */
+    .panel-view { display: none; flex: 1; overflow-y: auto; padding: 24px; }
+    .panel-view.active { display: block; }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .panel-header h2 { font-size: 22px; font-family: 'Playfair Display', serif; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .card h3 { font-size: 15px; margin-bottom: 6px; }
+    .card p { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+    .card .meta { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+
+    .btn-sm {
+      padding: 8px 16px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* ── Insights Dashboard ─────────────────────────── */
+    .insights-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .insight-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+    .insight-card h3 {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .insight-value {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+    .insight-label {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* ── CSS Mood Chart ────────────────────────────── */
+    .mood-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      height: 120px;
+      margin-top: 16px;
+    }
+    .mood-bar {
+      flex: 1;
+      background: var(--surface-2);
+      border-radius: 4px 4px 0 0;
+      position: relative;
+      transition: all 0.3s;
+      cursor: pointer;
+      min-height: 12px;
+    }
+    .mood-bar:hover {
+      opacity: 0.8;
+    }
+    .mood-bar.low { background: linear-gradient(to top, #f44336, #e57373); }
+    .mood-bar.medium { background: linear-gradient(to top, #ffc107, #ffd54f); }
+    .mood-bar.high { background: linear-gradient(to top, #4caf50, #81c784); }
+    .mood-bar .bar-label {
+      position: absolute;
+      bottom: -20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .mood-bar .bar-value {
+      position: absolute;
+      top: -20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .mood-bar:hover .bar-value {
+      opacity: 1;
+    }
+
+    .weekly-summary {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .weekly-summary h3 {
+      font-size: 16px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .weekly-summary p {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text);
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .stat-item {
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* ── Forms inside panels ─────────────────────── */
+    .panel-form { margin-bottom: 24px; }
+    .panel-form .form-group { margin-bottom: 12px; }
+    .panel-form textarea {
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      resize: vertical;
+      outline: none;
+      min-height: 80px;
+    }
+    .panel-form textarea:focus { border-color: var(--accent); }
+
+    .mood-selector {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .mood-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .mood-btn:hover { border-color: var(--accent); }
+    .mood-btn.selected { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+
+    /* ── Progress bar ────────────────────────────── */
+    .progress-bar {
+      height: 6px;
+      background: var(--surface-2);
+      border-radius: 3px;
+      margin-top: 10px;
+      overflow: hidden;
+    }
+    .progress-bar .fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 3px;
+      transition: width 0.3s;
+    }
+
+    .streak-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--text-muted);
+    }
+    .empty-state p { font-size: 14px; }
+
+    .typing-indicator {
+      display: none;
+      align-self: flex-start;
+      padding: 12px 16px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      border-bottom-left-radius: 4px;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+    .typing-indicator.visible { display: block; }
+
+    /* ── Responsive ───────────────────────────────── */
+    @media (max-width: 768px) {
+      .sidebar { display: none; position: fixed; z-index: 100; width: 100%; height: 100%; }
+      .sidebar.open { display: flex; }
+      .mobile-header {
+        display: flex !important;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+      }
+      .hamburger {
+        background: none;
+        border: none;
+        color: var(--text);
+        font-size: 24px;
+        cursor: pointer;
+        padding: 4px;
+      }
+      .message { max-width: 90%; }
+      .insights-grid {
+        grid-template-columns: 1fr;
+      }
+      .stat-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .mobile-header { display: none; }
+
+    /* ── Onboarding Overlay ──────────────────────── */
+    .onboarding-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+    .onboarding-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 480px;
+      width: 100%;
+      text-align: center;
+      animation: slideUp 0.4s ease;
+    }
+    .onboarding-card h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 26px;
+      margin-bottom: 12px;
+    }
+    .onboarding-card p {
+      color: var(--text-muted);
+      font-size: 15px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .onboarding-avatar {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+    }
+    .onboarding-avatar svg {
+      width: 36px;
+      height: 36px;
+      color: var(--accent);
+    }
+
+    .onboarding-step-indicator {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 28px;
+    }
+    .onboarding-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: background 0.3s, width 0.3s;
+    }
+    .onboarding-dot.active {
+      background: var(--accent);
+      width: 24px;
+      border-radius: 4px;
+    }
+
+    .interest-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+    .interest-chip {
+      padding: 10px 18px;
+      border-radius: 24px;
+      border: 1.5px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text-muted);
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+    }
+    .interest-chip:hover {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+    .interest-chip.selected {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 500;
+    }
+    .interest-chip-hint {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .onboarding-btn {
+      display: inline-block;
+      padding: 14px 32px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+      margin-top: 4px;
+    }
+    .onboarding-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+
+    .onboarding-checkmark {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: rgba(76, 175, 80, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+    }
+    .onboarding-checkmark svg {
+      width: 32px;
+      height: 32px;
+      color: var(--success);
+    }
+
+    /* ── Chat Welcome Area ───────────────────────── */
+    .chat-welcome {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      padding: 40px 20px;
+      text-align: center;
+    }
+    .chat-welcome-avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .chat-welcome-avatar svg {
+      width: 40px;
+      height: 40px;
+      color: var(--accent);
+    }
+    .chat-welcome h3 {
+      font-family: 'Playfair Display', serif;
+      font-size: 22px;
+      margin-bottom: 8px;
+    }
+    .chat-welcome p {
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.6;
+      max-width: 380px;
+      margin-bottom: 24px;
+    }
+    .starter-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      max-width: 480px;
+    }
+    .starter-chip {
+      padding: 10px 18px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .starter-chip:hover {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    /* ── Back to Home Link ───────────────────────── */
+    .back-to-home {
+      display: block;
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 8px 10px 4px;
+      transition: color 0.15s;
+    }
+    .back-to-home:hover { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+  <!-- ── Auth Screen ─────────────────────────────── -->
+  <div id="auth-screen">
+    <div class="auth-card">
+      <h1 id="auth-title">Welcome to Alhena</h1>
+      <p id="auth-subtitle">Sign in to start your journey</p>
+
+      <form id="auth-form">
+        <div class="form-group" id="name-group" style="display:none">
+          <label for="auth-name">Name</label>
+          <input type="text" id="auth-name" placeholder="Your name">
+        </div>
+        <div class="form-group">
+          <label for="auth-email">Email</label>
+          <input type="email" id="auth-email" placeholder="you@example.com" required>
+        </div>
+        <div class="form-group">
+          <label for="auth-password">Password</label>
+          <input type="password" id="auth-password" placeholder="Min. 8 characters" required minlength="8">
+        </div>
+        <button type="submit" class="btn" id="auth-btn">Sign In</button>
+        <div class="auth-error" id="auth-error"></div>
+      </form>
+
+      <div class="auth-toggle">
+        <span id="auth-toggle-text">Don't have an account?</span>
+        <a id="auth-toggle-link" onclick="toggleAuthMode()">Sign Up</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Onboarding Overlay ────────────────────────── -->
+  <div class="onboarding-overlay" id="onboarding-overlay" style="display:none">
+    <div class="onboarding-card">
+      <div class="onboarding-step-indicator">
+        <div class="onboarding-dot active" id="ob-dot-1"></div>
+        <div class="onboarding-dot" id="ob-dot-2"></div>
+        <div class="onboarding-dot" id="ob-dot-3"></div>
+      </div>
+
+      <!-- Step 1: Welcome -->
+      <div id="ob-step-1">
+        <div class="onboarding-avatar">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+        </div>
+        <h2>Welcome to Alhena</h2>
+        <p>I'm your personal AI companion for reflection, growth, and well-being. Think of me as a thoughtful friend who's always here to listen.</p>
+        <button class="onboarding-btn" onclick="onboardingNext(2)">Continue</button>
+      </div>
+
+      <!-- Step 2: Interests -->
+      <div id="ob-step-2" style="display:none">
+        <h2>What brings you here?</h2>
+        <p>Select 1-3 areas you're interested in. This helps me personalize your experience.</p>
+        <div class="interest-chips" id="interest-chips">
+          <div class="interest-chip" data-interest="stress_anxiety" onclick="toggleInterest(this)">Stress &amp; Anxiety</div>
+          <div class="interest-chip" data-interest="career_guidance" onclick="toggleInterest(this)">Career Guidance</div>
+          <div class="interest-chip" data-interest="personal_growth" onclick="toggleInterest(this)">Personal Growth</div>
+          <div class="interest-chip" data-interest="relationships" onclick="toggleInterest(this)">Relationships</div>
+          <div class="interest-chip" data-interest="health_wellness" onclick="toggleInterest(this)">Health &amp; Wellness</div>
+          <div class="interest-chip" data-interest="decision_making" onclick="toggleInterest(this)">Decision Making</div>
+        </div>
+        <div class="interest-chip-hint" id="interest-hint">Choose at least 1 topic</div>
+        <button class="onboarding-btn" id="ob-interests-btn" onclick="onboardingNext(3)" style="opacity:0.5;pointer-events:none">Continue</button>
+      </div>
+
+      <!-- Step 3: All Set -->
+      <div id="ob-step-3" style="display:none">
+        <div class="onboarding-checkmark">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+        </div>
+        <h2>You're all set!</h2>
+        <p id="ob-summary">Your personalized experience is ready. Alhena is here whenever you need a thoughtful conversation, journaling space, or help tracking your goals.</p>
+        <button class="onboarding-btn" onclick="finishOnboarding()">Start Chatting</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── App Screen ──────────────────────────────── -->
+  <div id="app-screen">
+    <!-- Mobile Header -->
+    <div class="mobile-header">
+      <button class="hamburger" onclick="toggleSidebar()">&#9776;</button>
+      <span style="font-weight:600">Alhena</span>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h2>Alhena</h2>
+        <div class="user-name" id="user-display-name"></div>
+        <div class="badge-display" id="badge-display"></div>
+      </div>
+
+      <div class="nav-items">
+        <div class="nav-item active" data-view="chat" onclick="switchView('chat')">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+          Chat
+        </div>
+        <div class="nav-item" data-view="journal" onclick="switchView('journal')">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+          Journal
+        </div>
+        <div class="nav-item" data-view="goals" onclick="switchView('goals')">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          Goals
+        </div>
+        <div class="nav-item" data-view="checkin" onclick="switchView('checkin')">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+          Wellness
+        </div>
+        <div class="nav-item" data-view="insights" onclick="switchView('insights')">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          Insights
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <a href="/" class="back-to-home">&larr; Back to alhena.cc</a>
+        <button class="logout-btn" onclick="logout()">Sign Out</button>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+
+      <!-- Chat View -->
+      <div id="view-chat" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+        <!-- Welcome area shown when no messages -->
+        <div class="chat-welcome" id="chat-welcome" style="display:none">
+          <div class="chat-welcome-avatar">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+          </div>
+          <h3 id="chat-welcome-greeting">Hello! I'm Alhena</h3>
+          <p>Your companion for reflection, growth, and well-being. Start a conversation, or try one of these:</p>
+          <div class="starter-chips">
+            <div class="starter-chip" onclick="sendStarter(this)">I'm feeling stressed about work</div>
+            <div class="starter-chip" onclick="sendStarter(this)">Help me set a new goal</div>
+            <div class="starter-chip" onclick="sendStarter(this)">I need to make a big decision</div>
+          </div>
+        </div>
+        <div class="chat-messages" id="chat-messages"></div>
+        <div class="typing-indicator" id="typing-indicator">Alhena is thinking...</div>
+        <div class="chat-input-area">
+          <div class="chat-input-wrap">
+            <textarea id="chat-input" placeholder="What's on your mind?" rows="1" onkeydown="handleChatKey(event)"></textarea>
+            <button class="send-btn" id="send-btn" onclick="sendMessage()">
+              <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19V5m-7 7l7-7 7 7"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Journal View -->
+      <div id="view-journal" class="panel-view">
+        <div class="panel-header">
+          <h2>Memory Journal</h2>
+          <button class="btn-sm" onclick="showJournalForm()">+ New Entry</button>
+        </div>
+
+        <div id="journal-form" class="panel-form" style="display:none">
+          <div class="form-group">
+            <label>Title (optional)</label>
+            <input type="text" id="journal-title" placeholder="Give it a title..." style="width:100%;padding:12px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none">
+          </div>
+          <div class="form-group">
+            <label>What's on your mind?</label>
+            <textarea id="journal-content" placeholder="Write freely..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>Mood</label>
+            <div class="mood-selector" id="journal-mood">
+              <button type="button" class="mood-btn" data-mood="1">1</button>
+              <button type="button" class="mood-btn" data-mood="2">2</button>
+              <button type="button" class="mood-btn" data-mood="3">3</button>
+              <button type="button" class="mood-btn" data-mood="4">4</button>
+              <button type="button" class="mood-btn" data-mood="5">5</button>
+              <button type="button" class="mood-btn" data-mood="6">6</button>
+              <button type="button" class="mood-btn" data-mood="7">7</button>
+              <button type="button" class="mood-btn" data-mood="8">8</button>
+              <button type="button" class="mood-btn" data-mood="9">9</button>
+              <button type="button" class="mood-btn" data-mood="10">10</button>
+            </div>
+          </div>
+          <button class="btn-sm" onclick="submitJournal()">Save Entry</button>
+          <button class="btn-sm" style="background:transparent;border:1px solid var(--border);margin-left:8px" onclick="hideJournalForm()">Cancel</button>
+        </div>
+
+        <div id="journal-list"></div>
+      </div>
+
+      <!-- Goals View -->
+      <div id="view-goals" class="panel-view">
+        <div class="panel-header">
+          <h2>Goal Tracking</h2>
+          <button class="btn-sm" onclick="showGoalForm()">+ New Goal</button>
+        </div>
+
+        <div id="goal-form" class="panel-form" style="display:none">
+          <div class="form-group">
+            <label>Goal title</label>
+            <input type="text" id="goal-title" placeholder="What do you want to achieve?" style="width:100%;padding:12px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none">
+          </div>
+          <div class="form-group">
+            <label>Description (optional)</label>
+            <textarea id="goal-desc" placeholder="Describe your goal..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>Category</label>
+            <select id="goal-category" style="width:100%;padding:12px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none">
+              <option value="general">General</option>
+              <option value="health">Health & Wellness</option>
+              <option value="career">Career</option>
+              <option value="relationships">Relationships</option>
+              <option value="personal">Personal Growth</option>
+              <option value="financial">Financial</option>
+            </select>
+          </div>
+          <button class="btn-sm" onclick="submitGoal()">Create Goal</button>
+          <button class="btn-sm" style="background:transparent;border:1px solid var(--border);margin-left:8px" onclick="hideGoalForm()">Cancel</button>
+        </div>
+
+        <div id="goals-list"></div>
+      </div>
+
+      <!-- Wellness Check-in View -->
+      <div id="view-checkin" class="panel-view">
+        <div class="panel-header">
+          <h2>Daily Wellness</h2>
+          <div id="streak-display"></div>
+        </div>
+
+        <div id="checkin-form" class="panel-form">
+          <div class="card">
+            <h3>How are you feeling today?</h3>
+            <p style="margin-bottom:12px">Rate your mood from 1 (low) to 10 (great)</p>
+            <div class="mood-selector" id="checkin-mood">
+              <button type="button" class="mood-btn" data-mood="1">1</button>
+              <button type="button" class="mood-btn" data-mood="2">2</button>
+              <button type="button" class="mood-btn" data-mood="3">3</button>
+              <button type="button" class="mood-btn" data-mood="4">4</button>
+              <button type="button" class="mood-btn" data-mood="5">5</button>
+              <button type="button" class="mood-btn" data-mood="6">6</button>
+              <button type="button" class="mood-btn" data-mood="7">7</button>
+              <button type="button" class="mood-btn" data-mood="8">8</button>
+              <button type="button" class="mood-btn" data-mood="9">9</button>
+              <button type="button" class="mood-btn" data-mood="10">10</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Energy level</h3>
+            <p style="margin-bottom:12px">How's your energy? (1-10)</p>
+            <div class="mood-selector" id="checkin-energy">
+              <button type="button" class="mood-btn" data-mood="1">1</button>
+              <button type="button" class="mood-btn" data-mood="2">2</button>
+              <button type="button" class="mood-btn" data-mood="3">3</button>
+              <button type="button" class="mood-btn" data-mood="4">4</button>
+              <button type="button" class="mood-btn" data-mood="5">5</button>
+              <button type="button" class="mood-btn" data-mood="6">6</button>
+              <button type="button" class="mood-btn" data-mood="7">7</button>
+              <button type="button" class="mood-btn" data-mood="8">8</button>
+              <button type="button" class="mood-btn" data-mood="9">9</button>
+              <button type="button" class="mood-btn" data-mood="10">10</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Any notes?</h3>
+            <textarea id="checkin-note" placeholder="Anything on your mind..." style="width:100%;padding:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:14px;resize:vertical;outline:none;min-height:60px;margin-top:8px"></textarea>
+          </div>
+
+          <button class="btn" style="max-width:200px" onclick="submitCheckin()">Submit Check-in</button>
+        </div>
+
+        <div id="checkin-response" style="display:none;margin-top:16px"></div>
+
+        <h3 style="margin-top:32px;margin-bottom:16px">Recent Check-ins</h3>
+        <div id="checkin-history"></div>
+      </div>
+
+      <!-- Insights View -->
+      <div id="view-insights" class="panel-view">
+        <div class="panel-header">
+          <h2>Your Insights</h2>
+        </div>
+
+        <!-- Weekly Summary -->
+        <div class="weekly-summary">
+          <h3>
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink:0"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+            Weekly Summary
+          </h3>
+          <p id="weekly-summary-text">Loading your insights...</p>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="insights-grid">
+          <div class="insight-card">
+            <h3>Wellness Streak</h3>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="insight-value" id="insight-streak">0</div>
+              <span style="font-size:28px">🔥</span>
+            </div>
+            <div class="insight-label">Days in a row</div>
+          </div>
+
+          <div class="insight-card">
+            <h3>Conversation Stats</h3>
+            <div class="insight-value" id="insight-conversations">0</div>
+            <div class="insight-label">Total conversations</div>
+            <div class="stat-grid" style="margin-top:12px">
+              <div class="stat-item">
+                <div class="stat-value" id="insight-messages-week">0</div>
+                <div class="stat-label">This week</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value" id="insight-avg-engagement">0</div>
+                <div class="stat-label">Avg. messages</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="insight-card">
+            <h3>Goal Progress</h3>
+            <div class="insight-value" id="insight-goal-completion">0%</div>
+            <div class="insight-label">Overall completion</div>
+            <div class="stat-grid" style="margin-top:12px">
+              <div class="stat-item">
+                <div class="stat-value" id="insight-goals-active">0</div>
+                <div class="stat-label">Active</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value" id="insight-goals-completed">0</div>
+                <div class="stat-label">Completed</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mood Trend Chart -->
+        <div class="insight-card">
+          <h3>Mood Trend (Last 14 Days)</h3>
+          <div class="mood-chart" id="mood-chart">
+            <!-- Bars will be generated dynamically -->
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ── Config ─────────────────────────────────────
+    const API = window.location.hostname === 'localhost'
+      ? 'http://localhost:8787'
+      : 'https://alhena.cc';
+
+    // Conglomerate-wide identity provider (mascom/CLAUDE.md: "AuthFor for
+    // auth, not a per-venture choice") - Alhena has no local user store.
+    const AUTHFOR_API = 'https://authfor.com';
+
+    let authToken = localStorage.getItem('alhena_token');
+    let currentUser = null;
+    let isSignup = false;
+    let selectedJournalMood = null;
+    let selectedCheckinMood = null;
+    let selectedCheckinEnergy = null;
+
+    // ── Session State (Smarter AI Engine) ─────────
+    let sessionTopics = [];
+    let sessionMessageCount = 0;
+    let lastDeepFollowupAt = 0;
+
+    // ── Badge System ───────────────────────────────
+    const BADGES = {
+      first_chat: { emoji: '💬', name: 'First Chat', description: 'Sent your first message' },
+      journaling_spirit: { emoji: '📝', name: 'Journaling Spirit', description: 'Created 3+ journal entries' },
+      goal_setter: { emoji: '🎯', name: 'Goal Setter', description: 'Created your first goal' },
+      wellness_warrior: { emoji: '💪', name: 'Wellness Warrior', description: '7-day check-in streak' },
+      deep_thinker: { emoji: '🧠', name: 'Deep Thinker', description: 'Had a 10+ message conversation' },
+      self_aware: { emoji: '✨', name: 'Self-Aware', description: 'Completed all onboarding interests' }
+    };
+
+    function getBadges() {
+      const badges = localStorage.getItem('alhena_badges');
+      return badges ? JSON.parse(badges) : [];
+    }
+
+    function setBadges(badges) {
+      localStorage.setItem('alhena_badges', JSON.stringify(badges));
+    }
+
+    function earnBadge(badgeKey) {
+      const earned = getBadges();
+      if (earned.includes(badgeKey)) return false;
+      earned.push(badgeKey);
+      setBadges(earned);
+      showBadgeCelebration(badgeKey);
+      renderBadges();
+      return true;
+    }
+
+    function showBadgeCelebration(badgeKey) {
+      const badge = BADGES[badgeKey];
+      if (!badge) return;
+
+      const overlay = document.createElement('div');
+      overlay.className = 'badge-overlay';
+      overlay.onclick = () => {
+        overlay.remove();
+        celebration.remove();
+      };
+
+      const celebration = document.createElement('div');
+      celebration.className = 'badge-celebration';
+      celebration.innerHTML = `
+        <div class="badge-celebration-emoji">${badge.emoji}</div>
+        <h3>Badge Unlocked!</h3>
+        <p><strong>${badge.name}</strong></p>
+        <p>${badge.description}</p>
+      `;
+      celebration.onclick = () => {
+        overlay.remove();
+        celebration.remove();
+      };
+
+      document.body.appendChild(overlay);
+      document.body.appendChild(celebration);
+
+      setTimeout(() => {
+        if (overlay.parentNode) overlay.remove();
+        if (celebration.parentNode) celebration.remove();
+      }, 4000);
+    }
+
+    function renderBadges() {
+      const earned = getBadges();
+      const container = document.getElementById('badge-display');
+      if (!container) return;
+
+      if (earned.length === 0) {
+        container.innerHTML = '';
+        return;
+      }
+
+      container.innerHTML = earned.map(key => {
+        const badge = BADGES[key];
+        if (!badge) return '';
+        return `
+          <span class="badge-icon">
+            ${badge.emoji}
+            <span class="badge-tooltip">${badge.name}</span>
+          </span>
+        `;
+      }).join('');
+    }
+
+    function checkBadges() {
+      // Check badges asynchronously
+      checkFirstChatBadge();
+      checkJournalingBadge();
+      checkGoalSetterBadge();
+      checkWellnessWarriorBadge();
+      checkDeepThinkerBadge();
+    }
+
+    async function checkFirstChatBadge() {
+      try {
+        const data = await api('/api/chat/history?limit=1');
+        if (data.success && data.messages.length > 0) {
+          earnBadge('first_chat');
+        }
+      } catch {}
+    }
+
+    async function checkJournalingBadge() {
+      try {
+        const data = await api('/api/journal');
+        if (data.success && data.entries.length >= 3) {
+          earnBadge('journaling_spirit');
+        }
+      } catch {}
+    }
+
+    async function checkGoalSetterBadge() {
+      try {
+        const data = await api('/api/goals');
+        if (data.success && data.goals.length > 0) {
+          earnBadge('goal_setter');
+        }
+      } catch {}
+    }
+
+    async function checkWellnessWarriorBadge() {
+      try {
+        const data = await api('/api/checkin/history?days=30');
+        if (data.success && data.summary.streak >= 7) {
+          earnBadge('wellness_warrior');
+        }
+      } catch {}
+    }
+
+    async function checkDeepThinkerBadge() {
+      // This is checked after each conversation in sendMessage()
+    }
+
+    // ── API Helper ─────────────────────────────────
+    async function api(path, opts = {}) {
+      const headers = { 'Content-Type': 'application/json' };
+      if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+      const res = await fetch(`${API}${path}`, { ...opts, headers: { ...headers, ...opts.headers } });
+      const data = await res.json();
+      if (!res.ok && res.status === 401) { logout(); throw new Error('Session expired'); }
+      return data;
+    }
+
+    // ── Auth ───────────────────────────────────────
+    function toggleAuthMode() {
+      isSignup = !isSignup;
+      document.getElementById('auth-title').textContent = isSignup ? 'Create Account' : 'Welcome to Alhena';
+      document.getElementById('auth-subtitle').textContent = isSignup ? 'Start your journey of self-discovery' : 'Sign in to start your journey';
+      document.getElementById('auth-btn').textContent = isSignup ? 'Create Account' : 'Sign In';
+      document.getElementById('name-group').style.display = isSignup ? 'block' : 'none';
+      document.getElementById('auth-toggle-text').textContent = isSignup ? 'Already have an account?' : "Don't have an account?";
+      document.getElementById('auth-toggle-link').textContent = isSignup ? 'Sign In' : 'Sign Up';
+      document.getElementById('auth-error').textContent = '';
+    }
+
+    document.getElementById('auth-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('auth-btn');
+      const errEl = document.getElementById('auth-error');
+      btn.disabled = true;
+      errEl.textContent = '';
+
+      const email = document.getElementById('auth-email').value;
+      const password = document.getElementById('auth-password').value;
+      const name = document.getElementById('auth-name').value;
+
+      try {
+        // Alhena has no local user store - identity is conglomerate-wide
+        // AuthFor (mascom/CLAUDE.md standing policy: "AuthFor for auth,
+        // not a per-venture choice"). This calls AuthFor's real
+        // /api/v1/register and /api/v1/login directly from the browser
+        // (same contract weylandai's authfor-integration-standard.js
+        // uses), never a local /api/auth/* endpoint.
+        const endpoint = isSignup ? '/api/v1/register' : '/api/v1/login';
+        const body = isSignup ? { email, password, name } : { email, password };
+        const res = await fetch(`${AUTHFOR_API}${endpoint}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+
+        if (!res.ok || !data.token) { errEl.textContent = data.error || 'Sign in failed'; btn.disabled = false; return; }
+
+        authToken = data.token;
+        currentUser = data.user;
+        localStorage.setItem('alhena_token', authToken);
+        isNewSignup = isSignup;
+        showApp();
+      } catch (err) {
+        errEl.textContent = 'Network error — please try again';
+      }
+      btn.disabled = false;
+    });
+
+    function logout() {
+      authToken = null;
+      currentUser = null;
+      localStorage.removeItem('alhena_token');
+      document.getElementById('auth-screen').style.display = 'flex';
+      document.getElementById('app-screen').style.display = 'none';
+    }
+
+    // ── App Init ───────────────────────────────────
+    let isNewSignup = false;
+
+    async function showApp() {
+      document.getElementById('auth-screen').style.display = 'none';
+      document.getElementById('app-screen').style.display = 'flex';
+      document.getElementById('user-display-name').textContent = currentUser?.name || currentUser?.email || '';
+
+      // Render badges
+      renderBadges();
+
+      // Show onboarding for new users who haven't completed it
+      if (!localStorage.getItem('alhena_onboarded') && isNewSignup) {
+        showOnboarding();
+      }
+
+      // Set time-aware greeting
+      setTimeAwareGreeting();
+
+      switchView('chat');
+      loadChatHistory();
+
+      // Check badges
+      checkBadges();
+    }
+
+    function setTimeAwareGreeting() {
+      const hour = new Date().getHours();
+      let greeting = 'Hello! I\'m Alhena';
+      if (hour >= 5 && hour < 12) greeting = 'Good morning! I\'m Alhena';
+      else if (hour >= 12 && hour < 17) greeting = 'Good afternoon! I\'m Alhena';
+      else if (hour >= 17 && hour < 22) greeting = 'Good evening! I\'m Alhena';
+      else greeting = 'Hello! I\'m Alhena';
+
+      const el = document.getElementById('chat-welcome-greeting');
+      if (el) el.textContent = greeting;
+    }
+
+    async function init() {
+      if (authToken) {
+        try {
+          // AuthFor's GET /api/v1/verify returns the identity object
+          // directly ({id, email, name}) on a 200, nothing on failure.
+          const res = await fetch(`${AUTHFOR_API}/api/v1/verify`, {
+            headers: { Authorization: `Bearer ${authToken}` }
+          });
+          if (res.ok) {
+            currentUser = await res.json();
+            showApp();
+            return;
+          }
+        } catch {}
+        logout();
+      }
+    }
+
+    // ── View Switching ─────────────────────────────
+    function switchView(view) {
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.view === view));
+      document.getElementById('view-chat').style.display = view === 'chat' ? 'flex' : 'none';
+      ['journal', 'goals', 'checkin', 'insights'].forEach(v => {
+        const el = document.getElementById(`view-${v}`);
+        el.classList.toggle('active', v === view);
+      });
+
+      if (view === 'journal') loadJournal();
+      if (view === 'goals') loadGoals();
+      if (view === 'checkin') loadCheckinHistory();
+      if (view === 'insights') loadInsights();
+
+      // Close mobile sidebar
+      document.getElementById('sidebar').classList.remove('open');
+    }
+
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+    }
+
+    // ── Chat ───────────────────────────────────────
+    async function loadChatHistory() {
+      const container = document.getElementById('chat-messages');
+      const welcomeArea = document.getElementById('chat-welcome');
+      try {
+        const data = await api('/api/chat/history?limit=100');
+        if (data.success && data.messages.length > 0) {
+          welcomeArea.style.display = 'none';
+          container.style.display = 'flex';
+          container.innerHTML = data.messages.map(m => renderMessage(m)).join('');
+          container.scrollTop = container.scrollHeight;
+          sessionMessageCount = data.messages.length;
+        } else {
+          // No messages yet — show the welcome area, hide message container
+          welcomeArea.style.display = 'flex';
+          container.style.display = 'none';
+          sessionMessageCount = 0;
+        }
+      } catch {
+        // On error, show the welcome area as a fallback
+        welcomeArea.style.display = 'flex';
+        container.style.display = 'none';
+        sessionMessageCount = 0;
+      }
+    }
+
+    function renderMessage(msg) {
+      const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const sentiment = msg.role === 'user' ? detectSentiment(msg.content) : null;
+      const sentimentDot = sentiment ? `<div class="sentiment-dot sentiment-${sentiment}"></div>` : '';
+
+      return `<div class="message ${msg.role}">
+        ${escapeHtml(msg.content)}
+        <span class="msg-time">${time}</span>
+        ${sentimentDot}
+      </div>`;
+    }
+
+    function detectSentiment(text) {
+      const lower = text.toLowerCase();
+      const negativeWords = ['sad', 'angry', 'frustrated', 'upset', 'stressed', 'worried', 'anxious', 'terrible', 'awful', 'horrible', 'hate', 'disappointed'];
+      const positiveWords = ['happy', 'great', 'amazing', 'wonderful', 'excited', 'love', 'fantastic', 'awesome', 'good', 'better', 'excellent', 'grateful', 'thankful'];
+
+      const negCount = negativeWords.filter(w => lower.includes(w)).length;
+      const posCount = positiveWords.filter(w => lower.includes(w)).length;
+
+      if (negCount > posCount) return 'negative';
+      if (posCount > negCount) return 'positive';
+      return 'neutral';
+    }
+
+    function extractTopics(text) {
+      const lower = text.toLowerCase();
+      const topics = [];
+      const topicKeywords = {
+        work: ['work', 'job', 'career', 'office', 'boss', 'colleague', 'meeting'],
+        family: ['family', 'parent', 'sibling', 'child', 'mom', 'dad', 'brother', 'sister'],
+        health: ['health', 'exercise', 'sleep', 'diet', 'fitness', 'wellness'],
+        relationships: ['relationship', 'partner', 'friend', 'dating', 'marriage'],
+        stress: ['stress', 'anxiety', 'worried', 'overwhelmed'],
+        goals: ['goal', 'plan', 'achieve', 'accomplish']
+      };
+
+      for (const [topic, keywords] of Object.entries(topicKeywords)) {
+        if (keywords.some(k => lower.includes(k))) {
+          if (!topics.includes(topic)) topics.push(topic);
+        }
+      }
+      return topics;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function handleChatKey(e) {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+      // Auto-resize
+      const ta = e.target;
+      ta.style.height = 'auto';
+      ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById('chat-input');
+      const message = input.value.trim();
+      if (!message) return;
+
+      // Hide welcome area if visible, show chat messages
+      const welcomeArea = document.getElementById('chat-welcome');
+      if (welcomeArea.style.display !== 'none') {
+        welcomeArea.style.display = 'none';
+      }
+      const container = document.getElementById('chat-messages');
+      container.style.display = 'flex';
+      const sendBtn = document.getElementById('send-btn');
+
+      // Track topics for contextual memory
+      const topics = extractTopics(message);
+      topics.forEach(t => {
+        if (!sessionTopics.includes(t)) sessionTopics.push(t);
+      });
+
+      // Show user message
+      container.innerHTML += renderMessage({ role: 'user', content: message, timestamp: new Date().toISOString() });
+      input.value = '';
+      input.style.height = 'auto';
+      sendBtn.disabled = true;
+      sessionMessageCount++;
+
+      // Show typing indicator
+      const typing = document.getElementById('typing-indicator');
+      typing.classList.add('visible');
+      container.scrollTop = container.scrollHeight;
+
+      // Build contextual message
+      let contextualMessage = message;
+
+      // Add contextual memory reference if topic was mentioned before
+      const repeatedTopics = topics.filter(t => sessionTopics.filter(st => st === t).length > 1);
+      if (repeatedTopics.length > 0 && sessionMessageCount > 3) {
+        contextualMessage = `[Context: User previously discussed ${repeatedTopics.join(', ')}] ${message}`;
+      }
+
+      // Add deep follow-up prompt if appropriate
+      if (sessionMessageCount >= 5 && sessionMessageCount - lastDeepFollowupAt >= 5) {
+        const shouldAskDeepFollowup = Math.random() < 0.3;
+        if (shouldAskDeepFollowup) {
+          contextualMessage += ' [AI Note: Consider offering a deeper follow-up or suggesting journaling about this topic]';
+          lastDeepFollowupAt = sessionMessageCount;
+        }
+      }
+
+      try {
+        const data = await api('/api/chat', { method: 'POST', body: JSON.stringify({ message: contextualMessage }) });
+        typing.classList.remove('visible');
+
+        if (data.success) {
+          container.innerHTML += renderMessage(data.message);
+        } else {
+          container.innerHTML += renderMessage({ role: 'assistant', content: 'Sorry, something went wrong. Please try again.', timestamp: new Date().toISOString() });
+        }
+      } catch {
+        typing.classList.remove('visible');
+        container.innerHTML += renderMessage({ role: 'assistant', content: "I'm having trouble connecting. Please check your internet and try again.", timestamp: new Date().toISOString() });
+      }
+
+      container.scrollTop = container.scrollHeight;
+      sendBtn.disabled = false;
+      input.focus();
+
+      // Check badges
+      checkFirstChatBadge();
+      if (sessionMessageCount >= 10) {
+        earnBadge('deep_thinker');
+      }
+    }
+
+    // ── Journal ────────────────────────────────────
+    function showJournalForm() { document.getElementById('journal-form').style.display = 'block'; }
+    function hideJournalForm() {
+      document.getElementById('journal-form').style.display = 'none';
+      document.getElementById('journal-title').value = '';
+      document.getElementById('journal-content').value = '';
+      selectedJournalMood = null;
+      document.querySelectorAll('#journal-mood .mood-btn').forEach(b => b.classList.remove('selected'));
+    }
+
+    document.querySelectorAll('#journal-mood .mood-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedJournalMood = parseInt(btn.dataset.mood);
+        document.querySelectorAll('#journal-mood .mood-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+    });
+
+    async function submitJournal() {
+      const content = document.getElementById('journal-content').value.trim();
+      if (!content) return;
+
+      const body = {
+        title: document.getElementById('journal-title').value.trim() || undefined,
+        content,
+        mood: selectedJournalMood,
+      };
+
+      try {
+        const data = await api('/api/journal', { method: 'POST', body: JSON.stringify(body) });
+        if (data.success) {
+          hideJournalForm();
+          loadJournal();
+          checkJournalingBadge();
+        }
+      } catch {}
+    }
+
+    async function loadJournal() {
+      const container = document.getElementById('journal-list');
+      try {
+        const data = await api('/api/journal');
+        if (data.success && data.entries.length > 0) {
+          container.innerHTML = data.entries.map(e => `
+            <div class="card">
+              <h3>${escapeHtml(e.title || 'Untitled')}</h3>
+              <div class="meta">${new Date(e.createdAt).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}${e.mood ? ' &middot; Mood: ' + e.mood + '/10' : ''}</div>
+            </div>
+          `).join('');
+        } else {
+          container.innerHTML = '<div class="empty-state"><p>No journal entries yet. Start writing to capture your thoughts!</p></div>';
+        }
+      } catch {
+        container.innerHTML = '<div class="empty-state"><p>Could not load journal entries.</p></div>';
+      }
+    }
+
+    // ── Goals ──────────────────────────────────────
+    function showGoalForm() { document.getElementById('goal-form').style.display = 'block'; }
+    function hideGoalForm() {
+      document.getElementById('goal-form').style.display = 'none';
+      document.getElementById('goal-title').value = '';
+      document.getElementById('goal-desc').value = '';
+    }
+
+    async function submitGoal() {
+      const title = document.getElementById('goal-title').value.trim();
+      if (!title) return;
+
+      const body = {
+        title,
+        description: document.getElementById('goal-desc').value.trim() || undefined,
+        category: document.getElementById('goal-category').value,
+      };
+
+      try {
+        const data = await api('/api/goals', { method: 'POST', body: JSON.stringify(body) });
+        if (data.success) {
+          hideGoalForm();
+          loadGoals();
+          checkGoalSetterBadge();
+        }
+      } catch {}
+    }
+
+    async function updateGoalProgress(goalId, newProgress) {
+      try {
+        await api(`/api/goals/${goalId}`, { method: 'PUT', body: JSON.stringify({ progress: newProgress }) });
+        loadGoals();
+      } catch {}
+    }
+
+    async function loadGoals() {
+      const container = document.getElementById('goals-list');
+      try {
+        const data = await api('/api/goals');
+        if (data.success && data.goals.length > 0) {
+          container.innerHTML = data.goals.map(g => `
+            <div class="card">
+              <div style="display:flex;justify-content:space-between;align-items:start">
+                <div>
+                  <h3>${escapeHtml(g.title)}</h3>
+                  <div class="meta">${g.category} &middot; ${g.status}</div>
+                </div>
+                <span style="font-size:20px;font-weight:700;color:var(--accent)">${g.progress}%</span>
+              </div>
+              <div class="progress-bar"><div class="fill" style="width:${g.progress}%"></div></div>
+              ${g.status === 'active' ? `
+                <div style="margin-top:12px;display:flex;gap:6px">
+                  <button class="btn-sm" style="font-size:12px;padding:6px 12px" onclick="updateGoalProgress('${g.id}', ${Math.min(g.progress + 10, 100)})">+10%</button>
+                  <button class="btn-sm" style="font-size:12px;padding:6px 12px;background:var(--success)" onclick="updateGoalProgress('${g.id}', 100)">Complete</button>
+                </div>
+              ` : ''}
+            </div>
+          `).join('');
+        } else {
+          container.innerHTML = '<div class="empty-state"><p>No goals yet. Set a goal to start tracking your progress!</p></div>';
+        }
+      } catch {
+        container.innerHTML = '<div class="empty-state"><p>Could not load goals.</p></div>';
+      }
+    }
+
+    // ── Wellness Check-in ──────────────────────────
+    document.querySelectorAll('#checkin-mood .mood-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedCheckinMood = parseInt(btn.dataset.mood);
+        document.querySelectorAll('#checkin-mood .mood-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+    });
+
+    document.querySelectorAll('#checkin-energy .mood-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedCheckinEnergy = parseInt(btn.dataset.mood);
+        document.querySelectorAll('#checkin-energy .mood-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+    });
+
+    async function submitCheckin() {
+      if (!selectedCheckinMood) return;
+
+      const body = {
+        mood: selectedCheckinMood,
+        energy: selectedCheckinEnergy,
+        note: document.getElementById('checkin-note').value.trim() || undefined,
+      };
+
+      try {
+        const data = await api('/api/checkin', { method: 'POST', body: JSON.stringify(body) });
+        if (data.success) {
+          const respEl = document.getElementById('checkin-response');
+          respEl.style.display = 'block';
+          respEl.innerHTML = `<div class="card"><h3>Alhena says:</h3><p>${escapeHtml(data.aiNote)}</p></div>`;
+          loadCheckinHistory();
+          checkWellnessWarriorBadge();
+        }
+      } catch {}
+    }
+
+    async function loadCheckinHistory() {
+      const container = document.getElementById('checkin-history');
+      const streakEl = document.getElementById('streak-display');
+      try {
+        const data = await api('/api/checkin/history?days=30');
+        if (data.success) {
+          if (data.summary.streak > 0) {
+            streakEl.innerHTML = `<span class="streak-badge">🔥 ${data.summary.streak} day streak</span>`;
+          }
+
+          if (data.checkins.length > 0) {
+            container.innerHTML = data.checkins.map(c => `
+              <div class="card" style="display:flex;align-items:center;gap:16px">
+                <div style="font-size:28px;font-weight:700;color:var(--accent);min-width:40px;text-align:center">${c.mood}</div>
+                <div>
+                  <div style="font-size:14px">${new Date(c.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</div>
+                  <div style="font-size:12px;color:var(--text-muted)">${c.energy ? 'Energy: ' + c.energy + '/10' : ''}</div>
+                </div>
+              </div>
+            `).join('');
+          } else {
+            container.innerHTML = '<div class="empty-state"><p>No check-ins yet. Complete your first daily check-in above!</p></div>';
+          }
+        }
+      } catch {
+        container.innerHTML = '<div class="empty-state"><p>Could not load check-in history.</p></div>';
+      }
+    }
+
+    // ── Insights Dashboard ─────────────────────────
+    async function loadInsights() {
+      try {
+        // Load all data in parallel
+        const [checkinData, goalData, chatData] = await Promise.all([
+          api('/api/checkin/history?days=30'),
+          api('/api/goals'),
+          api('/api/chat/history?limit=1000')
+        ]);
+
+        // Process check-in data
+        if (checkinData.success) {
+          const streak = checkinData.summary.streak || 0;
+          document.getElementById('insight-streak').textContent = streak;
+
+          // Build mood chart (last 14 days)
+          renderMoodChart(checkinData.checkins);
+
+          // Generate weekly summary
+          generateWeeklySummary(checkinData.checkins);
+        }
+
+        // Process goal data
+        if (goalData.success && goalData.goals.length > 0) {
+          const goals = goalData.goals;
+          const activeGoals = goals.filter(g => g.status === 'active');
+          const completedGoals = goals.filter(g => g.status === 'completed');
+          const avgCompletion = goals.reduce((sum, g) => sum + g.progress, 0) / goals.length;
+
+          document.getElementById('insight-goal-completion').textContent = Math.round(avgCompletion) + '%';
+          document.getElementById('insight-goals-active').textContent = activeGoals.length;
+          document.getElementById('insight-goals-completed').textContent = completedGoals.length;
+        }
+
+        // Process chat data
+        if (chatData.success) {
+          const messages = chatData.messages;
+          const conversations = countConversations(messages);
+          const lastWeekMessages = countMessagesThisWeek(messages);
+          const avgEngagement = conversations > 0 ? Math.round(messages.length / conversations) : 0;
+
+          document.getElementById('insight-conversations').textContent = conversations;
+          document.getElementById('insight-messages-week').textContent = lastWeekMessages;
+          document.getElementById('insight-avg-engagement').textContent = avgEngagement;
+        }
+
+      } catch (err) {
+        console.error('Error loading insights:', err);
+      }
+    }
+
+    function renderMoodChart(checkins) {
+      const chart = document.getElementById('mood-chart');
+      if (!chart) return;
+
+      // Get last 14 days
+      const last14Days = [];
+      for (let i = 13; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        date.setHours(0, 0, 0, 0);
+        last14Days.push(date);
+      }
+
+      // Map checkins to days
+      const moodMap = {};
+      checkins.forEach(c => {
+        const date = new Date(c.date);
+        date.setHours(0, 0, 0, 0);
+        const key = date.toISOString().split('T')[0];
+        moodMap[key] = c.mood;
+      });
+
+      // Generate bars
+      chart.innerHTML = last14Days.map(date => {
+        const key = date.toISOString().split('T')[0];
+        const mood = moodMap[key] || 0;
+        const height = mood > 0 ? (mood / 10) * 100 : 10;
+        const className = mood >= 7 ? 'high' : mood >= 4 ? 'medium' : mood > 0 ? 'low' : '';
+        const label = date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+
+        return `
+          <div class="mood-bar ${className}" style="height:${height}%">
+            <div class="bar-value">${mood > 0 ? mood : ''}</div>
+            <div class="bar-label">${label}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function generateWeeklySummary(checkins) {
+      const el = document.getElementById('weekly-summary-text');
+      if (!el) return;
+
+      // Get last 7 days
+      const lastWeek = checkins.filter(c => {
+        const date = new Date(c.date);
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        return date >= weekAgo;
+      });
+
+      if (lastWeek.length === 0) {
+        el.textContent = 'Start tracking your wellness to see personalized insights here.';
+        return;
+      }
+
+      const avgMood = lastWeek.reduce((sum, c) => sum + c.mood, 0) / lastWeek.length;
+      const previousWeek = checkins.filter(c => {
+        const date = new Date(c.date);
+        const twoWeeksAgo = new Date();
+        twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        return date >= twoWeeksAgo && date < weekAgo;
+      });
+
+      let trend = '';
+      if (previousWeek.length > 0) {
+        const prevAvg = previousWeek.reduce((sum, c) => sum + c.mood, 0) / previousWeek.length;
+        const change = ((avgMood - prevAvg) / prevAvg * 100).toFixed(0);
+        if (change > 5) trend = `Your mood improved ${change}% this week. `;
+        else if (change < -5) trend = `Your mood decreased ${Math.abs(change)}% this week. `;
+        else trend = 'Your mood has been stable this week. ';
+      }
+
+      const bestDay = lastWeek.reduce((best, c) => c.mood > best.mood ? c : best, lastWeek[0]);
+      const dayName = new Date(bestDay.date).toLocaleDateString('en-US', { weekday: 'long' });
+
+      el.textContent = `${trend}You were most positive on ${dayName}. Keep tracking to see more patterns emerge!`;
+    }
+
+    function countConversations(messages) {
+      if (messages.length === 0) return 0;
+      let conversations = 1;
+      let lastTime = new Date(messages[0].timestamp);
+
+      messages.forEach((msg, i) => {
+        if (i === 0) return;
+        const time = new Date(msg.timestamp);
+        const diff = (time - lastTime) / 1000 / 60; // minutes
+        if (diff > 60) conversations++; // New conversation if gap > 1 hour
+        lastTime = time;
+      });
+
+      return conversations;
+    }
+
+    function countMessagesThisWeek(messages) {
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      return messages.filter(m => new Date(m.timestamp) >= weekAgo).length;
+    }
+
+    // ── Conversation Starters ─────────────────────
+    function sendStarter(chipEl) {
+      const message = chipEl.textContent;
+      // Hide welcome area, show chat messages
+      document.getElementById('chat-welcome').style.display = 'none';
+      const container = document.getElementById('chat-messages');
+      container.style.display = 'flex';
+      // Put the message in the input and send
+      document.getElementById('chat-input').value = message;
+      sendMessage();
+    }
+
+    // ── Onboarding ──────────────────────────────────
+    let selectedInterests = [];
+
+    function showOnboarding() {
+      document.getElementById('onboarding-overlay').style.display = 'flex';
+    }
+
+    function onboardingNext(step) {
+      // Hide all steps
+      document.getElementById('ob-step-1').style.display = 'none';
+      document.getElementById('ob-step-2').style.display = 'none';
+      document.getElementById('ob-step-3').style.display = 'none';
+
+      // Update dots
+      document.getElementById('ob-dot-1').classList.toggle('active', step === 1);
+      document.getElementById('ob-dot-2').classList.toggle('active', step === 2);
+      document.getElementById('ob-dot-3').classList.toggle('active', step === 3);
+
+      // Show the target step
+      document.getElementById(`ob-step-${step}`).style.display = 'block';
+
+      // On step 3, save interests and update summary
+      if (step === 3) {
+        saveOnboardingInterests();
+        const interestLabels = selectedInterests.map(id => {
+          const chip = document.querySelector(`.interest-chip[data-interest="${id}"]`);
+          return chip ? chip.textContent : id;
+        });
+        const summary = interestLabels.length > 0
+          ? `Great choices! I'll focus on ${interestLabels.join(', ')} to give you the most relevant experience. You can always explore other areas too.`
+          : 'Your personalized experience is ready. Alhena is here whenever you need a thoughtful conversation, journaling space, or help tracking your goals.';
+        document.getElementById('ob-summary').textContent = summary;
+      }
+    }
+
+    function toggleInterest(chipEl) {
+      const interest = chipEl.dataset.interest;
+      const idx = selectedInterests.indexOf(interest);
+
+      if (idx > -1) {
+        // Deselect
+        selectedInterests.splice(idx, 1);
+        chipEl.classList.remove('selected');
+      } else {
+        // Only allow up to 3
+        if (selectedInterests.length >= 3) return;
+        selectedInterests.push(interest);
+        chipEl.classList.add('selected');
+      }
+
+      // Update hint and button state
+      const hint = document.getElementById('interest-hint');
+      const btn = document.getElementById('ob-interests-btn');
+      const count = selectedInterests.length;
+
+      if (count === 0) {
+        hint.textContent = 'Choose at least 1 topic';
+        btn.style.opacity = '0.5';
+        btn.style.pointerEvents = 'none';
+      } else if (count < 3) {
+        hint.textContent = `${count} selected — you can pick ${3 - count} more`;
+        btn.style.opacity = '1';
+        btn.style.pointerEvents = 'auto';
+      } else {
+        hint.textContent = '3 selected — maximum reached';
+        btn.style.opacity = '1';
+        btn.style.pointerEvents = 'auto';
+      }
+    }
+
+    function saveOnboardingInterests() {
+      if (selectedInterests.length === 0) return;
+      // Cosmetic onboarding preference, not identity data - AuthFor (the
+      // real conglomerate-wide identity provider) has no concept of
+      // per-venture "interests", so this stays local rather than
+      // inventing a bespoke backend route for it.
+      localStorage.setItem('alhena_interests', JSON.stringify(selectedInterests));
+
+      // Check self-aware badge
+      if (selectedInterests.length >= 3) {
+        earnBadge('self_aware');
+      }
+    }
+
+    function finishOnboarding() {
+      localStorage.setItem('alhena_onboarded', 'true');
+      document.getElementById('onboarding-overlay').style.display = 'none';
+    }
+
+    // ── Bootstrap ──────────────────────────────────
+    init();
+  </script>
+    <!-- Cloudflare Web Analytics -->
+    <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "alhena-cc"}'></script>
+    <!-- End Cloudflare Web Analytics -->
+<!-- MASCOM Conglomerate Nav -->
+<div id="mascom-nav" style="position:fixed;bottom:0;left:0;right:0;height:32px;background:#0a0e14;border-top:1px solid rgba(70,130,180,0.2);display:flex;align-items:center;padding:0 12px;font-family:Inter,system-ui,sans-serif;font-size:11px;z-index:99999;gap:8px;opacity:0.85;transition:opacity 0.2s" onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='0.85'">
+<span style="color:#4682B4;font-weight:600;letter-spacing:1px;font-size:10px">MASCOM</span>
+<a href="https://mobleysoft.com" style="color:#888;text-decoration:none;padding:2px 6px;border-radius:3px" onmouseenter="this.style.color='#c8c8d4'" onmouseleave="this.style.color='#888'">PublicOS</a>
+<a href="https://weylandai.com" style="color:#888;text-decoration:none;padding:2px 6px;border-radius:3px" onmouseenter="this.style.color='#c8c8d4'" onmouseleave="this.style.color='#888'">WeylandAI</a>
+<a href="https://gamegob.com" style="color:#888;text-decoration:none;padding:2px 6px;border-radius:3px" onmouseenter="this.style.color='#c8c8d4'" onmouseleave="this.style.color='#888'">GameGob</a>
+<a href="https://helmcorp.cc" style="color:#888;text-decoration:none;padding:2px 6px;border-radius:3px" onmouseenter="this.style.color='#c8c8d4'" onmouseleave="this.style.color='#888'">HelmCorp</a>
+<a href="https://filmline.cc" style="color:#888;text-decoration:none;padding:2px 6px;border-radius:3px" onmouseenter="this.style.color='#c8c8d4'" onmouseleave="this.style.color='#888'">FilmLine</a>
+<a href="https://halside.com" style="color:#888;text-decoration:none;padding:2px 6px;border-radius:3px" onmouseenter="this.style.color='#c8c8d4'" onmouseleave="this.style.color='#888'">HALside</a>
+<a href="https://mobleyreport.com/news" style="color:#888;text-decoration:none;padding:2px 6px;border-radius:3px" onmouseenter="this.style.color='#c8c8d4'" onmouseleave="this.style.color='#888'">News</a>
+<span style="flex:1"></span>
+<a href="https://authfor.com" style="color:#666;text-decoration:none;font-size:10px">AuthFor</a>
+</div>
+<!-- HelmCorp Analytics -->
+<!-- VentureForge:collated -->
+</body>
+</html>

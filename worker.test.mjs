@@ -183,3 +183,184 @@ test(
     assert.equal(stored[89].mood, "happy");
   })
 );
+
+// ── Companion app-shell routes (reference/legacy-roots/alhena/app.html) ──
+// app.html itself calls AuthFor directly for signup/login, so there is no
+// local user store to test here - every route below just needs a real
+// AuthFor Bearer token, exercised the same mocked-fetch way as above.
+
+test(
+  "GET /api/journal: 401 with no Authorization header",
+  withMockedAuthFor(null, async () => {
+    const env = makeEnv();
+    const res = await worker.fetch(new Request("https://alhena.cc/api/journal"), env, makeCtx());
+    assert.equal(res.status, 401);
+  })
+);
+
+test(
+  "POST /api/journal then GET /api/journal: a real entry round-trips, newest first",
+  withMockedAuthFor({ id: "u1", email: "real-user@example.com", name: "Real User" }, async () => {
+    const env = makeEnv();
+    const post = await worker.fetch(
+      new Request("https://alhena.cc/api/journal", {
+        method: "POST",
+        headers: { Authorization: "Bearer real-token" },
+        body: JSON.stringify({ title: "First", content: "Today was fine.", mood: 7 }),
+      }),
+      env,
+      makeCtx()
+    );
+    assert.equal(post.status, 200);
+    const postBody = await post.json();
+    assert.equal(postBody.success, true);
+    assert.equal(postBody.entry.content, "Today was fine.");
+    assert.ok(postBody.entry.id);
+
+    await worker.fetch(
+      new Request("https://alhena.cc/api/journal", {
+        method: "POST",
+        headers: { Authorization: "Bearer real-token" },
+        body: JSON.stringify({ content: "Second entry." }),
+      }),
+      env,
+      makeCtx()
+    );
+
+    const get = await worker.fetch(
+      new Request("https://alhena.cc/api/journal", { headers: { Authorization: "Bearer real-token" } }),
+      env,
+      makeCtx()
+    );
+    const getBody = await get.json();
+    assert.equal(getBody.entries.length, 2);
+    assert.equal(getBody.entries[0].content, "Second entry."); // newest first
+  })
+);
+
+test(
+  "POST /api/goals then PUT /api/goals/:id: progress update marks completed at 100",
+  withMockedAuthFor({ id: "u1", email: "real-user@example.com", name: "Real User" }, async () => {
+    const env = makeEnv();
+    const post = await worker.fetch(
+      new Request("https://alhena.cc/api/goals", {
+        method: "POST",
+        headers: { Authorization: "Bearer real-token" },
+        body: JSON.stringify({ title: "Run a 5k", category: "health" }),
+      }),
+      env,
+      makeCtx()
+    );
+    const { goal } = await post.json();
+    assert.equal(goal.status, "active");
+    assert.equal(goal.progress, 0);
+
+    const put = await worker.fetch(
+      new Request(`https://alhena.cc/api/goals/${goal.id}`, {
+        method: "PUT",
+        headers: { Authorization: "Bearer real-token" },
+        body: JSON.stringify({ progress: 100 }),
+      }),
+      env,
+      makeCtx()
+    );
+    assert.equal(put.status, 200);
+    const putBody = await put.json();
+    assert.equal(putBody.goal.status, "completed");
+
+    const get = await worker.fetch(
+      new Request("https://alhena.cc/api/goals", { headers: { Authorization: "Bearer real-token" } }),
+      env,
+      makeCtx()
+    );
+    const getBody = await get.json();
+    assert.equal(getBody.goals.length, 1);
+    assert.equal(getBody.goals[0].status, "completed");
+  })
+);
+
+test(
+  "PUT /api/goals/:id: unknown goal id returns 404, not a silent success",
+  withMockedAuthFor({ id: "u1", email: "real-user@example.com", name: "Real User" }, async () => {
+    const env = makeEnv();
+    const res = await worker.fetch(
+      new Request("https://alhena.cc/api/goals/does-not-exist", {
+        method: "PUT",
+        headers: { Authorization: "Bearer real-token" },
+        body: JSON.stringify({ progress: 50 }),
+      }),
+      env,
+      makeCtx()
+    );
+    assert.equal(res.status, 404);
+  })
+);
+
+test(
+  "POST /api/chat then GET /api/chat/history: fallback mode is honest, order is oldest-first",
+  withMockedAuthFor({ id: "u1", email: "real-user@example.com", name: "Real User" }, async () => {
+    const env = makeEnv(); // no ALHENA_INFERENCE_URL set - must fall back, not fabricate a model reply
+    const post = await worker.fetch(
+      new Request("https://alhena.cc/api/chat", {
+        method: "POST",
+        headers: { Authorization: "Bearer real-token" },
+        body: JSON.stringify({ message: "Hello Alhena" }),
+      }),
+      env,
+      makeCtx()
+    );
+    assert.equal(post.status, 200);
+    const postBody = await post.json();
+    assert.equal(postBody.message.role, "assistant");
+    assert.match(postBody.message.content, /not connected to a live guidance model/);
+
+    const get = await worker.fetch(
+      new Request("https://alhena.cc/api/chat/history?limit=10", { headers: { Authorization: "Bearer real-token" } }),
+      env,
+      makeCtx()
+    );
+    const getBody = await get.json();
+    assert.equal(getBody.messages.length, 2);
+    assert.equal(getBody.messages[0].role, "user"); // oldest first, matches chat UI append order
+    assert.equal(getBody.messages[1].role, "assistant");
+  })
+);
+
+test(
+  "POST /api/checkin then GET /api/checkin/history: streak counts consecutive real days, not raw check-in count",
+  withMockedAuthFor({ id: "u1", email: "real-user@example.com", name: "Real User" }, async () => {
+    const env = makeEnv();
+    const today = new Date();
+    const yesterday = new Date(today.getTime() - 86400000);
+    const threeDaysAgo = new Date(today.getTime() - 3 * 86400000);
+    env.ALHENA_KV.store.set(
+      "checkin2:real-user@example.com",
+      JSON.stringify([
+        { date: threeDaysAgo.toISOString(), mood: 5, energy: 5 },
+        { date: yesterday.toISOString(), mood: 6, energy: 6 },
+      ])
+    );
+
+    const post = await worker.fetch(
+      new Request("https://alhena.cc/api/checkin", {
+        method: "POST",
+        headers: { Authorization: "Bearer real-token" },
+        body: JSON.stringify({ mood: 2, energy: 3, note: "rough one" }),
+      }),
+      env,
+      makeCtx()
+    );
+    assert.equal(post.status, 200);
+    const postBody = await post.json();
+    assert.match(postBody.aiNote, /harder day/);
+
+    const get = await worker.fetch(
+      new Request("https://alhena.cc/api/checkin/history?days=30", { headers: { Authorization: "Bearer real-token" } }),
+      env,
+      makeCtx()
+    );
+    const getBody = await get.json();
+    assert.equal(getBody.checkins.length, 3);
+    assert.equal(getBody.summary.streak, 2); // today + yesterday consecutive; the 3-days-ago entry breaks the run
+  })
+);
