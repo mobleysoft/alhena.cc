@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en" data-scene="beach">
+<head>
+<meta property="og:title" content="Paradise — a small ocean for James.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://paradise.alhena.cc">
+<meta property="og:description" content="A small, real ocean world. No accounts. No ads.">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#060d1a">
+<title>Paradise</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=DM+Sans:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<style>
+/* ── RESET ───────────────────────────────────────────────── */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { height:100%; overflow:hidden; font-family:'DM Sans',sans-serif; background:#020810; }
+
+/* ── WebGL CANVAS (full-screen behind everything) ────────── */
+#ocean-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  display: block;
+}
+
+/* ── SCENE PICKER (wind/wave controls) ───────────────────── */
+.scene-picker {
+  position: fixed;
+  bottom: 24px; left: 50%;
+  transform: translateX(-50%);
+  display: flex; gap: 10px; align-items: center;
+  z-index: 20;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.8s ease;
+  background: rgba(4,10,20,0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(125,207,239, 0.65);
+  border-radius: 24px;
+  padding: 8px 14px;
+}
+.scene-picker.visible { opacity: 1; pointer-events: auto; }
+
+.sp-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%; border: none;
+  cursor: pointer; padding: 0;
+  opacity: 0.35;
+  transition: opacity 0.3s, transform 0.3s;
+}
+.sp-dot:active { transform: scale(1.5); }
+.sp-dot.active { opacity: 1; transform: scale(1.3); }
+.sp-label {
+  font-size: 9px; color: rgba(125,207,239,0.4);
+  letter-spacing: 0.14em; text-transform: uppercase;
+  padding: 0 4px;
+  pointer-events: none;
+}
+
+/* ── INTRO ───────────────────────────────────────────────── */
+#intro {
+  position: fixed; inset: 0; z-index: 10;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 40px;
+  cursor: pointer;
+  -webkit-user-select: none; user-select: none;
+}
+#hello-text {
+  font-family: 'Lora', serif;
+  font-style: italic;
+  font-size: clamp(36px, 12vw, 56px);
+  color: rgba(200,221,232,0.9);
+  letter-spacing: 0.08em;
+  opacity: 0;
+  transform: translateY(12px) scale(0.97);
+  transition: opacity 2.2s cubic-bezier(0.16,1,0.3,1), transform 2.2s cubic-bezier(0.16,1,0.3,1);
+  text-shadow: 0 0 40px rgba(125,207,239, 0.65);
+}
+#hello-text.visible { opacity: 1; transform: none; }
+#touch-prompt {
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  opacity: 0; transition: opacity 1.4s ease;
+}
+#touch-prompt.visible { opacity: 1; }
+.pulse-ring {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 1.5px solid rgba(125,207,239,0.6);
+  opacity: 0.5;
+  animation: pulse-expand 2.4s ease-out infinite;
+}
+@keyframes pulse-expand {
+  0%  { transform:scale(1);   opacity:0.5; }
+  80% { transform:scale(2.8); opacity:0; }
+  100%{ transform:scale(2.8); opacity:0; }
+}
+.touch-label {
+  font-size: 11px; letter-spacing: 0.22em;
+  color: rgba(74,112,136,0.9); font-style: italic;
+  animation: blink-fade 3s ease-in-out infinite;
+}
+@keyframes blink-fade { 0%,100%{opacity:0.4;} 50%{opacity:0.9;} }
+#intro.out { opacity: 0; pointer-events: none; transition: opacity 0.8s cubic-bezier(0.4,0,1,1); }
+
+/* ── GREETING CARD ───────────────────────────────────────── */
+#greeting {
+  position: fixed; inset: 0; z-index: 5;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  opacity: 0; pointer-events: none;
+  transition: opacity 1.2s cubic-bezier(0.16,1,0.3,1);
+}
+#greeting.visible { opacity: 1; pointer-events: auto; }
+
+.card {
+  width: 100%;
+  max-width: 460px;
+  max-height: calc(100vh - 120px);
+  background: rgba(6,13,26,0.72);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  border: 1px solid rgba(125,207,239, 0.65);
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.55), 0 0 0 0.5px rgba(255,255,255, 0.65) inset;
+}
+
+.card-header {
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid rgba(125,207,239, 0.65);
+  display: flex; align-items: center; gap: 14px;
+}
+.card-orb {
+  width: 38px; height: 38px; flex-shrink: 0;
+  border-radius: 40% 60% 55% 45% / 45% 55% 45% 55%;
+  background: radial-gradient(circle at 38% 32%, #b8eeff, #4ab0d8 45%, #1a3a5a);
+  box-shadow: 0 0 14px rgba(74,176,216, 0.65);
+  animation: orb-breathe 4s ease-in-out infinite, orb-morph 9s ease-in-out infinite;
+}
+@keyframes orb-breathe { 0%,100%{transform:scale(1);} 50%{transform:scale(1.04);} }
+@keyframes orb-morph {
+  0%,100%{border-radius:42% 58% 52% 48%/48% 52% 48% 52%;}
+  25%    {border-radius:56% 44% 43% 57%/53% 47% 53% 47%;}
+  50%    {border-radius:44% 56% 58% 42%/42% 58% 42% 58%;}
+  75%    {border-radius:58% 42% 46% 54%/56% 44% 56% 44%;}
+}
+.card-title { font-family: 'Lora', serif; font-size: 18px; font-weight: 500; color: rgba(200,221,232,0.95); margin-bottom: 2px; }
+.card-sub { font-size: 11px; color: rgba(74,112,136,0.9); font-style: italic; }
+
+.card-body { padding: 20px 24px 8px; }
+.card-body p {
+  font-size: 14px; line-height: 1.75; color: rgba(200,221,232,0.88);
+  margin-bottom: 14px; font-weight: 300;
+}
+.card-body p:last-child { margin-bottom: 0; }
+.card-body em { font-style: italic; color: rgba(125,207,239,0.95); }
+
+.card-footer {
+  padding: 16px 24px 20px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+}
+.into-water-btn {
+  font-size: 11px; color: rgba(125,207,239,0.85); letter-spacing:0.14em; text-transform:uppercase;
+  cursor:pointer; border: 1px solid rgba(125,207,239,0.5);
+  padding: 9px 16px; border-radius: 999px;
+  background: rgba(125,207,239,0.08);
+  font-family: 'DM Sans', sans-serif;
+  transition: background 0.25s, border-color 0.25s;
+}
+.into-water-btn:hover { background: rgba(125,207,239,0.18); border-color: rgba(125,207,239,0.85); }
+.footer-note { font-size: 9px; color: rgba(74,112,136,0.4); letter-spacing: 0.1em; white-space: nowrap; }
+
+/* Small re-open tab, shown once the greeting card is dismissed */
+#reopen-tab {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  z-index: 15;
+  font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: rgba(125,207,239,0.75);
+  background: rgba(4,10,20,0.5);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(125,207,239,0.5);
+  border-radius: 999px;
+  padding: 8px 16px;
+  cursor: pointer;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+#reopen-tab.visible { opacity: 1; pointer-events: auto; }
+</style>
+</head>
+<body>
+
+<!-- ── WebGL2 OCEAN CANVAS ──────────────────────────────────── -->
+<canvas id="ocean-canvas"></canvas>
+
+<!-- ── INTRO ──────────────────────────────────────────────── -->
+<div id="intro" onclick="enterOasis()">
+  <p id="hello-text">hello, James</p>
+  <div id="touch-prompt">
+    <div class="pulse-ring"></div>
+    <span class="touch-label">touch anywhere</span>
+  </div>
+</div>
+
+<!-- ── GREETING CARD ─────────────────────────────────────── -->
+<div id="greeting">
+  <div class="card">
+    <div class="card-header">
+      <div class="card-orb"></div>
+      <div>
+        <div class="card-title">Paradise</div>
+        <div class="card-sub">a small world, built for you</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <p>Hi James — this is a small ocean Alhena made for you. It's a real wave simulation running live in your browser, not a video: 32 wave components layered together the way real swell actually forms out at sea, drawn fresh every frame.</p>
+      <p>There's nothing to sign up for and nothing being sold here. Touch the dots at the bottom to move through different sea states, from a calm morning to a real storm. Otherwise, just let it run.</p>
+      <p><em>Hope it's a nice place to sit for a minute.</em></p>
+    </div>
+    <div class="card-footer">
+      <button class="into-water-btn" onclick="closeGreeting()">into the water</button>
+      <span class="footer-note">no accounts · no ads</span>
+    </div>
+  </div>
+</div>
+
+<div id="reopen-tab" onclick="openGreeting()">read again</div>
+
+<!-- ── SCENE PICKER (wind/wave presets) ───────────────────── -->
+<div class="scene-picker" id="scene-picker">
+  <span class="sp-label">sea</span>
+  <button class="sp-dot" data-scene="beach"    title="Calm (Beaufort 2)"   style="background:#4ab0d8"></button>
+  <button class="sp-dot" data-scene="forest"   title="Breeze (Beaufort 3)" style="background:#4aab68"></button>
+  <button class="sp-dot" data-scene="aurora"   title="Fresh (Beaufort 5)"  style="background:#a060d0"></button>
+  <button class="sp-dot" data-scene="mountain" title="Strong (Beaufort 7)" style="background:#6080c0"></button>
+  <button class="sp-dot" data-scene="desert"   title="Gale (Beaufort 9)"   style="background:#d06820"></button>
+  <button class="sp-dot" data-scene="meadow"   title="Storm (Beaufort 11)" style="background:#c03060"></button>
+  <span class="sp-label">storm</span>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   WEBGL2 PHOTO-REALISTIC OCEAN RENDERER
+   ψ(x,t) = Σ A_k · sin(k_k·(x·cos(θ_k) + y·sin(θ_k)) − ω_k·t + φ_k)
+   JONSWAP spectrum, Fresnel reflectance, subsurface scatter, foam
+
+   Adapted from the sovereign WebGL2 ocean renderer originally built for
+   PandoraChat's oasis.html (reference/legacy-roots/pandorachat/oasis.html).
+   Same wave-physics/shader core, zero third-party libraries. The chat/
+   "beings" chooser UI has been removed and replaced with a simple
+   greeting card for this single-purpose page.
+   ══════════════════════════════════════════════════════════════ */
+
+// ── Wind/wave presets per scene ─────────────────────────────
+const WIND_PRESETS = {
+  beach:    { wind: 4.0,  choppiness: 1.2,  foamThresh: 0.55, skyTint: [0.08, 0.18, 0.32], horizonGold: 0.12 },
+  forest:   { wind: 7.0,  choppiness: 1.6,  foamThresh: 0.50, skyTint: [0.06, 0.20, 0.28], horizonGold: 0.10 },
+  aurora:   { wind: 12.0, choppiness: 2.0,  foamThresh: 0.44, skyTint: [0.04, 0.14, 0.26], horizonGold: 0.08 },
+  mountain: { wind: 18.0, choppiness: 2.6,  foamThresh: 0.38, skyTint: [0.03, 0.10, 0.22], horizonGold: 0.06 },
+  desert:   { wind: 26.0, choppiness: 3.2,  foamThresh: 0.30, skyTint: [0.10, 0.08, 0.14], horizonGold: 0.20 },
+  meadow:   { wind: 36.0, choppiness: 4.0,  foamThresh: 0.20, skyTint: [0.02, 0.04, 0.12], horizonGold: 0.05 },
+};
+
+let currentPreset = WIND_PRESETS.beach;
+
+// ── WebGL2 setup ────────────────────────────────────────────
+const canvas = document.getElementById('ocean-canvas');
+let gl = canvas.getContext('webgl2', { antialias: false, alpha: false, powerPreference: 'high-performance' });
+if (!gl) {
+  // Fallback: solid dark background
+  canvas.style.background = 'linear-gradient(180deg,#030812 0%,#060d1a 50%,#040a10 100%)';
+}
+
+// ── Vertex shader (full-screen quad) ───────────────────────
+const VERT_SRC = `#version 300 es
+precision highp float;
+in vec2 a_pos;
+out vec2 v_uv;
+void main() {
+  v_uv = a_pos * 0.5 + 0.5;
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}`;
+
+// ── Fragment shader — JONSWAP ocean ────────────────────────
+// N=32 wave components, full physical model
+const FRAG_SRC = `#version 300 es
+precision highp float;
+
+in vec2 v_uv;
+out vec4 fragColor;
+
+uniform float u_time;
+uniform vec2  u_resolution;
+uniform float u_wind;        // wind speed m/s
+uniform float u_chop;        // choppiness scale
+uniform float u_foamT;       // foam threshold
+uniform vec3  u_skyTint;     // deep sky color
+uniform float u_goldHorizon; // gold horizon intensity
+
+#define PI  3.14159265359
+#define TAU 6.28318530718
+#define N   32
+
+/* ── PRNG ──────────────────────────────────────────── */
+float hash1(float n) { return fract(sin(n) * 43758.5453123); }
+float hash1v(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+
+/* ── JONSWAP peak frequency (Pierson-Moskowitz) ──── */
+// f_p = 0.13g/U (Hz), ω_p = 2π f_p
+// Deep-water dispersion: ω² = g·k → k = ω²/g
+float gravity = 9.81;
+
+/* ── Wave component parameters from spectrum ──────── */
+// index i in [0, N)
+// frequencies: geometric spread from 0.5ωp to 3ωp
+vec2 waveDir(int i) {
+  float t = float(i) / float(N);
+  // spread directions ±45° around wind direction (0°=+x)
+  float theta = (t - 0.5) * PI * 0.9;
+  return vec2(cos(theta), sin(theta));
+}
+
+float waveParms(int i, float windSpeed, out float freq, out float amp, out float phase) {
+  float omegaP = 0.13 * gravity / max(windSpeed, 1.0) * TAU;
+  float t = float(i) / float(N - 1);
+  // log-spaced frequencies
+  float omegaMin = omegaP * 0.5;
+  float omegaMax = omegaP * 3.5;
+  freq = omegaMin * pow(omegaMax / omegaMin, t);
+
+  // JONSWAP spectrum S(omega)
+  float sigma = (freq <= omegaP) ? 0.07 : 0.09;
+  float r = exp(-pow((freq - omegaP), 2.0) / (2.0 * sigma * sigma * omegaP * omegaP));
+  float alpha = 0.0081;
+  float gamma = 3.3;
+  float S = alpha * gravity * gravity / pow(freq, 5.0)
+            * exp(-1.25 * pow(omegaP / freq, 4.0))
+            * pow(gamma, r);
+
+  // amplitude from spectrum: A = sqrt(2·S·Δω)
+  float dOmega = (omegaMax - omegaMin) / float(N);
+  amp = sqrt(2.0 * S * dOmega) * 0.35 * windSpeed / 12.0;
+  amp = clamp(amp, 0.0, 1.8);
+
+  // random phase
+  phase = hash1(float(i) * 17.31 + 0.73) * TAU;
+  return freq;
+}
+
+/* ── Surface height h(x,y,t) ──────────────────────── */
+float oceanHeight(vec2 pos, float t, float windSpeed, float chop) {
+  float h = 0.0;
+  float omegaP = 0.13 * gravity / max(windSpeed, 1.0) * TAU;
+
+  for (int i = 0; i < N; i++) {
+    float freq, amp, phase;
+    waveParms(i, windSpeed, freq, amp, phase);
+    float k = freq * freq / gravity;  // deep-water dispersion
+    vec2 dir = waveDir(i);
+    float proj = dot(dir, pos) * k;
+    h += amp * sin(proj - freq * t + phase);
+  }
+  return h * chop;
+}
+
+/* ── Analytical gradient → normal ────────────────── */
+vec3 oceanNormal(vec2 pos, float t, float windSpeed, float chop) {
+  float eps = 0.04;
+  float hc  = oceanHeight(pos, t, windSpeed, chop);
+  float hx  = oceanHeight(pos + vec2(eps, 0.0), t, windSpeed, chop);
+  float hy  = oceanHeight(pos + vec2(0.0, eps), t, windSpeed, chop);
+  vec3 N = normalize(vec3(-(hx - hc) / eps, 1.0, -(hy - hc) / eps));
+  return N;
+}
+
+/* ── Laplacian (for SSS) ─────────────────────────── */
+float laplacian(vec2 pos, float t, float windSpeed, float chop) {
+  float eps = 0.08;
+  float hc = oceanHeight(pos, t, windSpeed, chop);
+  float hx1 = oceanHeight(pos + vec2( eps, 0.0), t, windSpeed, chop);
+  float hx2 = oceanHeight(pos + vec2(-eps, 0.0), t, windSpeed, chop);
+  float hy1 = oceanHeight(pos + vec2(0.0,  eps), t, windSpeed, chop);
+  float hy2 = oceanHeight(pos + vec2(0.0, -eps), t, windSpeed, chop);
+  return (hx1 + hx2 + hy1 + hy2 - 4.0 * hc) / (eps * eps);
+}
+
+/* ── Fresnel (Schlick) ───────────────────────────── */
+float fresnelSchlick(float cosTheta) {
+  float F0 = 0.02; // water
+  return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+/* ── Sky color at reflected direction ────────────── */
+vec3 skyColor(vec3 R, vec3 skyTint, float horizonGold) {
+  // R.y is the vertical component of the reflected ray
+  float t = clamp(R.y * 0.5 + 0.5, 0.0, 1.0);
+  // Deep sky
+  vec3 zenith  = skyTint * 2.5 + vec3(0.04, 0.08, 0.18);
+  vec3 horizon = mix(vec3(0.12, 0.16, 0.28), vec3(0.65, 0.50, 0.20) * horizonGold, horizonGold);
+  vec3 sky = mix(horizon, zenith, smoothstep(0.0, 0.55, t));
+  // Sun disc (low horizon sun)
+  vec3 sunDir = normalize(vec3(0.5, 0.08, 0.6));
+  float sunDot = dot(normalize(R), sunDir);
+  float sun = smoothstep(0.993, 0.999, sunDot);
+  float sunGlow = smoothstep(0.90, 0.996, sunDot) * 0.3;
+  sky += vec3(1.0, 0.85, 0.5) * sun * 2.0;
+  sky += vec3(0.9, 0.7, 0.3) * sunGlow * horizonGold;
+  return sky;
+}
+
+/* ── Main ────────────────────────────────────────── */
+void main() {
+  vec2 uv = v_uv;
+  vec2 res = u_resolution;
+
+  // ── Screen-space ray ────────────────────────────────────
+  // Camera: slightly above water, looking slightly down
+  float aspect = res.x / res.y;
+  vec2 ndc = uv * 2.0 - 1.0;
+  ndc.x *= aspect;
+
+  // Horizon is at ~40% from top
+  float horizonY = 0.20; // ndc space — above center
+  float aboveHorizon = ndc.y - horizonY;
+
+  // Sky vs water split
+  if (aboveHorizon > 0.0) {
+    // ── SKY ────────────────────────────────────────
+    float t = clamp(aboveHorizon / (1.0 - horizonY), 0.0, 1.0);
+    vec3 zenith  = u_skyTint * 2.8 + vec3(0.04, 0.08, 0.18);
+    vec3 hor     = mix(vec3(0.12, 0.16, 0.28), vec3(0.55, 0.42, 0.16) * u_goldHorizon * 3.0, u_goldHorizon);
+    vec3 sky = mix(hor, zenith, smoothstep(0.0, 0.6, t));
+
+    // Stars (visible when dark)
+    float starBrightness = (1.0 - length(u_skyTint) * 2.0);
+    if (starBrightness > 0.0) {
+      vec2 starUV = uv * vec2(res.x, res.y * 0.65) / 8.0;
+      float starHash = hash1v(floor(starUV));
+      float starAlpha = step(0.97, starHash) * starBrightness * 0.8;
+      float starSize = fract(starHash * 31.7);
+      vec2 starFrac = fract(starUV) - 0.5;
+      float starDist = length(starFrac);
+      float starGlow = exp(-starDist * (12.0 + starSize * 8.0));
+      sky += vec3(0.9, 0.95, 1.0) * starGlow * starAlpha;
+    }
+
+    // Sun
+    vec2 sunPos = vec2(0.62, horizonY + 0.08);
+    float sunDist = length(uv - sunPos);
+    float sunGlow = exp(-sunDist * 4.0) * 0.18 * u_goldHorizon;
+    sky += vec3(1.0, 0.80, 0.45) * sunGlow;
+
+    fragColor = vec4(sky, 1.0);
+    return;
+  }
+
+  // ── WATER RAY-MARCH ─────────────────────────────────────
+  // Project screen UV → world XZ via perspective approximation
+  // Water depth below horizon determines world-space distance
+  float waterT = clamp(-aboveHorizon / (1.0 - horizonY + 0.001), 0.0, 1.0);
+  // Perspective: near = top of water, far = bottom of screen
+  float dist = mix(0.5, 90.0, pow(waterT, 1.6));
+
+  // Camera position and viewing geometry
+  vec3 camPos = vec3(0.0, 2.2, 0.0);
+  vec3 rayDir = normalize(vec3(ndc.x * 0.7, -0.3 - waterT * 0.7, -1.0));
+
+  // World position on water plane (y=0)
+  float planeT = -camPos.y / rayDir.y;
+  vec2 worldPos = camPos.xz + rayDir.xz * planeT;
+  worldPos *= 0.08; // world scale
+  worldPos += vec2(u_time * 0.01, u_time * 0.008); // drift
+
+  float h = oceanHeight(worldPos, u_time, u_wind, u_chop);
+  vec3  N = oceanNormal(worldPos, u_time, u_wind, u_chop);
+  float lap = laplacian(worldPos, u_time, u_wind, u_chop);
+
+  // ── View and reflected directions ──────────────────
+  vec3 V = normalize(-rayDir);
+  vec3 R = reflect(-V, N);
+
+  // ── Fresnel ─────────────────────────────────────────
+  float NdotV = max(dot(N, V), 0.0);
+  float fresnel = fresnelSchlick(NdotV);
+
+  // ── Sky reflection ───────────────────────────────────
+  vec3 reflectedSky = skyColor(R, u_skyTint, u_goldHorizon);
+
+  // ── Water depth color ────────────────────────────────
+  // Normalize height to [0,1]
+  float hNorm = h * 0.4 + 0.5; // centered on 0
+  hNorm = clamp(hNorm, 0.0, 1.0);
+  // Deep navy in troughs, bright cyan on crests
+  vec3 waterDeep  = vec3(0.01, 0.04, 0.12);
+  vec3 waterShallow = vec3(0.08, 0.38, 0.55);
+  vec3 waterCrest = vec3(0.30, 0.72, 0.90);
+  vec3 waterBody = mix(waterDeep, waterShallow, hNorm);
+  waterBody = mix(waterBody, waterCrest, pow(hNorm, 3.0) * 0.7);
+
+  // ── Subsurface scatter ───────────────────────────────
+  // Where curvature > 0 (concave up) = focusing → bright SSS
+  float sss = clamp(lap * 0.15, 0.0, 1.0);
+  vec3 sssColor = vec3(0.0, 0.55, 0.60); // teal/cyan
+  waterBody += sssColor * sss * 0.4;
+
+  // ── Blinn-Phong specular (sun) ───────────────────────
+  vec3 sunDir = normalize(vec3(0.5, 0.35, 0.6));
+  vec3 halfV  = normalize(V + sunDir);
+  float spec  = pow(max(dot(N, halfV), 0.0), 120.0) * 2.5;
+  vec3 specColor = vec3(1.0, 0.95, 0.80) * spec * u_goldHorizon * 2.0;
+  specColor += vec3(0.8, 0.92, 1.0) * pow(max(dot(N, halfV), 0.0), 48.0) * 0.4;
+
+  // ── Blend water body + reflection via Fresnel ────────
+  vec3 water = mix(waterBody, reflectedSky, fresnel * 0.85);
+  water += specColor;
+
+  // ── Foam ─────────────────────────────────────────────
+  // White speckle where |h| > foamThresh
+  float foamH = abs(h);
+  float foam = smoothstep(u_foamT * 0.8, u_foamT * 1.2, foamH);
+  // Turbulent foam noise
+  vec2 foamUV = worldPos * 12.0 + vec2(u_time * 0.03, -u_time * 0.025);
+  float foamNoise = hash1v(floor(foamUV * 8.0) + floor(u_time * 1.5));
+  float foamDensity = foam * smoothstep(0.35, 0.75, foamNoise);
+  vec3 foamColor = vec3(0.88, 0.94, 0.98);
+
+  // Chromatic dispersion on foam edges
+  float foamEdge = abs(foam - foamDensity);
+  vec3 dispR = vec3(0.0);
+  vec3 dispB = vec3(0.0);
+  if (foamEdge > 0.05) {
+    float dr = oceanHeight(worldPos + vec2(0.002, 0.0), u_time, u_wind, u_chop);
+    float db = oceanHeight(worldPos - vec2(0.002, 0.0), u_time, u_wind, u_chop);
+    dispR = vec3(0.04, 0.0, 0.0) * abs(h - dr) * foamEdge * 12.0;
+    dispB = vec3(0.0, 0.0, 0.06) * abs(h - db) * foamEdge * 12.0;
+  }
+
+  water = mix(water, foamColor, foamDensity * 0.9);
+  water += dispR + dispB;
+
+  // ── Distance fog / depth ──────────────────────────────
+  float fogT = clamp((dist - 5.0) / 75.0, 0.0, 1.0);
+  vec3 fogColor = u_skyTint + vec3(0.06, 0.10, 0.20);
+  water = mix(water, fogColor, pow(fogT, 1.4));
+
+  // ── Horizon blend (sky→water seam) ────────────────────
+  float horizonBlend = 1.0 - clamp(-aboveHorizon * 18.0, 0.0, 1.0);
+  vec3 horizonCol = mix(fogColor * 1.1, vec3(0.55, 0.42, 0.16) * u_goldHorizon * 2.5, u_goldHorizon * 0.5);
+  water = mix(water, horizonCol, horizonBlend * 0.5);
+
+  // ── Vignette ──────────────────────────────────────────
+  float vignette = 1.0 - dot(v_uv - 0.5, (v_uv - 0.5) * 2.2);
+  water *= clamp(vignette, 0.0, 1.0);
+
+  // ── Tone map ──────────────────────────────────────────
+  // Reinhard
+  water = water / (water + vec3(1.0));
+  water = pow(water, vec3(1.0 / 2.2));
+
+  fragColor = vec4(water, 1.0);
+}`;
+
+// ── Compile shaders ─────────────────────────────────────────
+function compileShader(gl, type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    console.error('Shader compile error:', gl.getShaderInfoLog(s));
+    return null;
+  }
+  return s;
+}
+
+function buildProgram(gl, vs, fs) {
+  const prog = gl.createProgram();
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    console.error('Program link error:', gl.getProgramInfoLog(prog));
+    return null;
+  }
+  return prog;
+}
+
+let program = null;
+let uniforms = {};
+let vao = null;
+
+function initGL() {
+  if (!gl) return;
+
+  const vs = compileShader(gl, gl.VERTEX_SHADER, VERT_SRC);
+  const fs = compileShader(gl, gl.FRAGMENT_SHADER, FRAG_SRC);
+  if (!vs || !fs) return;
+
+  program = buildProgram(gl, vs, fs);
+  if (!program) return;
+
+  // Full-screen quad
+  const verts = new Float32Array([-1,-1, 1,-1, -1,1, 1,1]);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+
+  vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  const loc = gl.getAttribLocation(program, 'a_pos');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  gl.bindVertexArray(null);
+
+  // Cache uniform locations
+  ['u_time','u_resolution','u_wind','u_chop','u_foamT','u_skyTint','u_goldHorizon'].forEach(name => {
+    uniforms[name] = gl.getUniformLocation(program, name);
+  });
+}
+
+function resizeCanvas() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  canvas.width  = Math.floor(w * dpr);
+  canvas.height = Math.floor(h * dpr);
+  canvas.style.width  = w + 'px';
+  canvas.style.height = h + 'px';
+  if (gl) gl.viewport(0, 0, canvas.width, canvas.height);
+}
+
+// ── Render loop ─────────────────────────────────────────────
+let startTime = performance.now();
+let animRunning = true;
+
+function render() {
+  if (!gl || !program) { if(animRunning) requestAnimationFrame(render); return; }
+
+  const t = (performance.now() - startTime) * 0.001;
+  const p = currentPreset;
+
+  gl.clearColor(0, 0, 0, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+
+  gl.useProgram(program);
+  gl.bindVertexArray(vao);
+
+  gl.uniform1f(uniforms.u_time, t);
+  gl.uniform2f(uniforms.u_resolution, canvas.width, canvas.height);
+  gl.uniform1f(uniforms.u_wind, p.wind);
+  gl.uniform1f(uniforms.u_chop, p.choppiness);
+  gl.uniform1f(uniforms.u_foamT, p.foamThresh);
+  gl.uniform3fv(uniforms.u_skyTint, p.skyTint);
+  gl.uniform1f(uniforms.u_goldHorizon, p.horizonGold);
+
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  gl.bindVertexArray(null);
+
+  if (animRunning) requestAnimationFrame(render);
+}
+
+// ── Init ─────────────────────────────────────────────────────
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+initGL();
+if (gl) requestAnimationFrame(render);
+
+/* ══ OCEAN SOUND (synthesized locally via Web Audio API — no samples) ══ */
+let audioCtx = null, oceanMaster = null;
+
+function initOcean() {
+  if (audioCtx) return;
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const sr = audioCtx.sampleRate;
+    const buf = audioCtx.createBuffer(1, sr*8, sr);
+    const data = buf.getChannelData(0);
+    let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+    for (let i=0; i<data.length; i++) {
+      const w = Math.random()*2-1;
+      b0=0.99886*b0+w*0.0555179; b1=0.99332*b1+w*0.0750759;
+      b2=0.96900*b2+w*0.1538520; b3=0.86650*b3+w*0.3104856;
+      b4=0.55000*b4+w*0.5329522; b5=-0.7616*b5-w*0.0168980;
+      data[i]=(b0+b1+b2+b3+b4+b5+b6+w*0.5362)*0.11;
+      b6=w*0.115926;
+    }
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf; src.loop = true;
+    const lp = audioCtx.createBiquadFilter();
+    lp.type='lowpass'; lp.frequency.value=320; lp.Q.value=0.4;
+    const lfo = audioCtx.createOscillator();
+    lfo.frequency.value=0.11;
+    const lfoG = audioCtx.createGain(); lfoG.gain.value=140;
+    lfo.connect(lfoG); lfoG.connect(lp.frequency); lfo.start();
+    const lfo2 = audioCtx.createOscillator();
+    lfo2.frequency.value=0.04;
+    const lfoG2 = audioCtx.createGain(); lfoG2.gain.value=70;
+    lfo2.connect(lfoG2); lfoG2.connect(lp.frequency); lfo2.start();
+    oceanMaster = audioCtx.createGain();
+    oceanMaster.gain.setValueAtTime(0, audioCtx.currentTime);
+    oceanMaster.gain.linearRampToValueAtTime(0.38, audioCtx.currentTime+5);
+    src.connect(lp); lp.connect(oceanMaster); oceanMaster.connect(audioCtx.destination);
+    src.start();
+  } catch(e) { /* silent */ }
+}
+
+/* ══ INTRO → GREETING PHASE ═════════════════════════════════ */
+let entered = false;
+
+setTimeout(() => document.getElementById('hello-text').classList.add('visible'), 1200);
+setTimeout(() => document.getElementById('touch-prompt').classList.add('visible'), 3800);
+
+function enterOasis() {
+  if (entered) return;
+  entered = true;
+  initOcean();
+  const intro = document.getElementById('intro');
+  intro.classList.add('out');
+  setTimeout(() => {
+    intro.style.display = 'none';
+    document.getElementById('greeting').classList.add('visible');
+    document.getElementById('scene-picker').classList.add('visible');
+  }, 700);
+}
+
+function closeGreeting() {
+  document.getElementById('greeting').classList.remove('visible');
+  document.getElementById('reopen-tab').classList.add('visible');
+}
+function openGreeting() {
+  document.getElementById('greeting').classList.add('visible');
+  document.getElementById('reopen-tab').classList.remove('visible');
+}
+
+/* ══ SCENE SWITCHER (wind presets) ════════════════════════ */
+const SCENES = ['beach','forest','aurora','mountain','desert','meadow'];
+
+// Smooth wind transition
+let targetPreset = { ...currentPreset };
+let interpT = 1.0;
+let fromPreset = { ...currentPreset };
+
+function setScene(name, save=true) {
+  if (!SCENES.includes(name)) name = 'beach';
+  document.documentElement.setAttribute('data-scene', name);
+  document.querySelectorAll('.sp-dot').forEach(d => {
+    d.classList.toggle('active', d.dataset.scene === name);
+  });
+  if (save) localStorage.setItem('paradise_scene', name);
+
+  // Interpolate to new preset
+  fromPreset = { ...currentPreset };
+  targetPreset = { ...WIND_PRESETS[name] };
+  interpT = 0.0;
+
+  // Animate the transition
+  const startMs = performance.now();
+  const dur = 2200;
+  function lerp3(a, b, t) { return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t]; }
+  function lerp1(a, b, t) { return a + (b - a) * t; }
+  function easeInOut(x) { return x < 0.5 ? 2*x*x : 1-Math.pow(-2*x+2,2)/2; }
+
+  (function tick() {
+    const elapsed = performance.now() - startMs;
+    const frac = Math.min(elapsed / dur, 1.0);
+    const e = easeInOut(frac);
+    currentPreset = {
+      wind:        lerp1(fromPreset.wind, targetPreset.wind, e),
+      choppiness:  lerp1(fromPreset.choppiness, targetPreset.choppiness, e),
+      foamThresh:  lerp1(fromPreset.foamThresh, targetPreset.foamThresh, e),
+      skyTint:     lerp3(fromPreset.skyTint, targetPreset.skyTint, e),
+      horizonGold: lerp1(fromPreset.horizonGold, targetPreset.horizonGold, e),
+    };
+    if (frac < 1.0) requestAnimationFrame(tick);
+    else currentPreset = { ...targetPreset };
+  })();
+}
+
+const savedScene = localStorage.getItem('paradise_scene') || 'beach';
+setScene(savedScene, false);
+
+document.querySelectorAll('.sp-dot').forEach(dot => {
+  dot.addEventListener('click', e => {
+    e.stopPropagation();
+    setScene(dot.dataset.scene);
+  });
+});
+</script>
+</body>
+</html>
