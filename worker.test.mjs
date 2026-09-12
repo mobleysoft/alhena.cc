@@ -531,6 +531,59 @@ test(
   })
 );
 
+test(
+  "GET /api/checkin/history: real bug fix - an explicit days=0 clamps to 1, it does not silently fall back to the 30-day default",
+  withMockedAuthFor({ id: "u1", email: "real-user@example.com", name: "Real User" }, async () => {
+    const env = makeEnv();
+    const today = new Date();
+    const twoDaysAgo = new Date(today.getTime() - 2 * 86400000);
+    env.ALHENA_KV.store.set(
+      "checkin2:real-user@example.com",
+      JSON.stringify([
+        { date: twoDaysAgo.toISOString(), mood: 5, energy: 5 },
+        { date: today.toISOString(), mood: 7, energy: 6 },
+      ])
+    );
+
+    const get = await worker.fetch(
+      new Request("https://alhena.cc/api/checkin/history?days=0", { headers: { Authorization: "Bearer real-token" } }),
+      env,
+      makeCtx()
+    );
+    const getBody = await get.json();
+    // Old bug: `parseInt("0") || 30` treated 0 as falsy and returned all
+    // entries within a 30-day window (2). Fixed behavior: days=0 clamps to
+    // the real minimum of 1, so only today's entry is in range.
+    assert.equal(getBody.checkins.length, 1);
+  })
+);
+
+test(
+  "GET /api/chat/history: real bug fix - an explicit limit=0 clamps to 1, it does not silently fall back to the 100-message default",
+  withMockedAuthFor({ id: "u1", email: "real-user@example.com", name: "Real User" }, async () => {
+    const env = makeEnv();
+    env.ALHENA_KV.store.set(
+      "chat:real-user@example.com",
+      JSON.stringify([
+        { role: "user", content: "first", timestamp: new Date().toISOString() },
+        { role: "assistant", content: "second", timestamp: new Date().toISOString() },
+      ])
+    );
+
+    const get = await worker.fetch(
+      new Request("https://alhena.cc/api/chat/history?limit=0", { headers: { Authorization: "Bearer real-token" } }),
+      env,
+      makeCtx()
+    );
+    const getBody = await get.json();
+    // Old bug: `parseInt("0") || 100` treated 0 as falsy and returned both
+    // stored messages. Fixed behavior: limit=0 clamps to the real minimum
+    // of 1, so only the single most recent message comes back.
+    assert.equal(getBody.messages.length, 1);
+    assert.equal(getBody.messages[0].content, "second");
+  })
+);
+
 // Real gap found 2026-09-12 (endpoint audit, feature-completeness pass):
 // app.html (the real chat/journal/goals/check-in UI whose backend routes
 // are exercised above) was never actually served in production - GET

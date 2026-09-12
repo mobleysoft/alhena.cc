@@ -882,7 +882,13 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
     if (url.pathname === '/api/chat/history' && request.method === 'GET') {
       try {
         const identity = await authenticateViaAuthFor(request);
-        const limit = Math.max(1, Math.min(1000, parseInt(url.searchParams.get('limit'), 10) || 100));
+        // Real bug found 2026-09-12 (same class as the /api/checkin/history
+        // `days` bug above and salesfactorai.com's days=0 bug found earlier
+        // this session): `parseInt(...) || 100` silently overrode an
+        // explicit, valid `limit=0` to the 100-message default instead of
+        // clamping it to the real minimum of 1.
+        const rawLimit = parseInt(url.searchParams.get('limit'), 10);
+        const limit = Math.max(1, Math.min(1000, Number.isNaN(rawLimit) ? 100 : rawLimit));
         const list = await readKvList(env, `chat:${identity.email}`);
         return new Response(JSON.stringify({ success: true, messages: list.slice(-limit) }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -939,7 +945,15 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
     if (url.pathname === '/api/checkin/history' && request.method === 'GET') {
       try {
         const identity = await authenticateViaAuthFor(request);
-        const days = Math.max(1, Math.min(365, parseInt(url.searchParams.get('days'), 10) || 30));
+        // Real bug found 2026-09-12 (same class as salesfactorai.com's
+        // days=0 bug found earlier this session): `parseInt(...) || 30`
+        // treats an explicit, valid `days=0` the same as a missing/NaN
+        // value, silently overriding it to the 30-day default instead of
+        // clamping it to the real minimum of 1 like every other value
+        // already goes through Math.max/Math.min for. A caller explicitly
+        // asking for "just today" got a full 30-day window back instead.
+        const rawDays = parseInt(url.searchParams.get('days'), 10);
+        const days = Math.max(1, Math.min(365, Number.isNaN(rawDays) ? 30 : rawDays));
         const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
         const list = await readKvList(env, `checkin2:${identity.email}`);
         const inRange = list.filter(c => new Date(c.date).getTime() >= cutoff);
