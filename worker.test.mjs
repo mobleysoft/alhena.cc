@@ -530,3 +530,42 @@ test(
     assert.equal(getBody.summary.streak, 2); // today + yesterday consecutive; the 3-days-ago entry breaks the run
   })
 );
+
+// Real gap found 2026-09-12 (endpoint audit, feature-completeness pass):
+// app.html (the real chat/journal/goals/check-in UI whose backend routes
+// are exercised above) was never actually served in production - GET
+// /app and /app.html both fell through to the generic marketing-page
+// fallback (confirmed live via curl before this fix: byte-identical to
+// GET /). These tests assert the real app shell is served, not just that
+// *some* 200 comes back, and that the marketing page's own "CONNECT WITH
+// ALHENA" button was repointed at it instead of the dead external
+// authfor-gateway-worker redirect (confirmed live before this fix: it
+// resolves to an unrelated generic "AuthFor Vault" page and never returns
+// the visitor to Alhena at all).
+test("GET /app serves the real app shell, not the marketing-page fallback", async () => {
+  const env = makeEnv();
+  const res = await worker.fetch(new Request("https://alhena.cc/app"), env, makeCtx());
+  assert.equal(res.status, 200);
+  const body = await res.text();
+  // A string that only exists in the real app shell's own config block,
+  // not in the marketing fallback page.
+  assert.match(body, /const AUTHFOR_API = 'https:\/\/authfor\.com'/);
+  assert.doesNotMatch(body, /CONNECT WITH ALHENA/);
+});
+
+test("GET /app.html serves the same real app shell as GET /app", async () => {
+  const env = makeEnv();
+  const res = await worker.fetch(new Request("https://alhena.cc/app.html"), env, makeCtx());
+  assert.equal(res.status, 200);
+  const body = await res.text();
+  assert.match(body, /const AUTHFOR_API = 'https:\/\/authfor\.com'/);
+});
+
+test("GET / (marketing page) links its call-to-action at the real /app, not the dead external gateway redirect", async () => {
+  const env = makeEnv();
+  const res = await worker.fetch(new Request("https://alhena.cc/"), env, makeCtx());
+  assert.equal(res.status, 200);
+  const body = await res.text();
+  assert.match(body, /window\.location\.href = '\/app'/);
+  assert.doesNotMatch(body, /authfor-gateway-worker/);
+});
