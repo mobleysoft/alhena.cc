@@ -72,6 +72,18 @@ const MAX_STORED_JOURNAL_ENTRIES = 500;
 const MAX_STORED_GOALS = 200;
 const MAX_STORED_CHAT_MESSAGES = 500;
 const MAX_STORED_DAILY_CHECKINS = 365;
+// Real gap found 2026-09-11 (route-vs-reality audit): /api/v1/companion/
+// guidance - the core "companion" endpoint this venture's spec describes
+// ("AI companion for life guidance, decision support, and wellness
+// coaching") - called no auth function at all and persisted nothing, so
+// every call was stateless even for a signed-in AuthFor user: a "companion"
+// that forgets every prior conversation the instant the response is sent.
+// Same optional-auth pattern as tryAuthenticateViaAuthFor's own checkin fix
+// (anonymous try-it-first UX preserved, persistence + continuity only for
+// a real identified user), same bounded-list KV pattern as journal/goals/
+// chat above (guidance:${email}, capped so history can't grow unbounded).
+const MAX_STORED_GUIDANCE_SESSIONS = 200;
+const GUIDANCE_HISTORY_TURNS_INJECTED = 5; // how many prior Q&A pairs get fed back into the prompt as real context
 
 async function readKvList(env, key) {
   const raw = await env.ALHENA_KV.get(key);
@@ -201,6 +213,21 @@ export default {
           });
         }
 
+        // Real conversation continuity (added 2026-09-11) - optional auth,
+        // same as tryAuthenticateViaAuthFor's checkin usage: an anonymous
+        // caller still gets a real answer, just no memory across calls.
+        // A signed-in user's prior guidance sessions are read back here so
+        // they can actually be fed into this call's prompt below, not just
+        // stored for later - a companion that saves history but never uses
+        // it isn't actually remembering the conversation.
+        const identity = await tryAuthenticateViaAuthFor(request);
+        const priorGuidanceHistory = identity ? await readKvList(env, `guidance:${identity.email}`) : [];
+        const recentGuidanceHistory = priorGuidanceHistory.slice(-GUIDANCE_HISTORY_TURNS_INJECTED);
+        const historyContext = recentGuidanceHistory.length > 0
+          ? `\n\nRecent conversation history with this user, oldest first (use this for real continuity - refer back to it naturally rather than treating this as a first-ever message):\n` +
+            recentGuidanceHistory.map((h, i) => `${i + 1}. [${h.decision_type || 'general'}] User asked: "${h.question}" - You responded: "${h.guidance}"`).join('\n')
+          : '';
+
         // Real inference gateway - env.ALHENA_INFERENCE_URL, if set, must
         // point at something that actually resolves. wrangler.toml's
         // default (core.jmobleyworks.com) does not resolve at all
@@ -237,7 +264,7 @@ export default {
         const inferenceConfigured = !!alhenaEndpoint && alhenaEndpoint !== 'https://core.jmobleyworks.com/v1/chat/completions';
 
         const systemPrompt = `You are Alhena, a supportive companion for talking through everyday decisions. You are not a therapist and do not provide medical or mental-health treatment.
-Decision type: ${decision_type || 'general_guidance'}`;
+Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
 
         let inferenceRes = null;
         let isFallback = !inferenceConfigured;
@@ -284,7 +311,7 @@ Decision type: ${decision_type || 'general_guidance'}`;
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               venture_id: 'alhena.cc',
-              user_id: 'companion_user',
+              user_id: identity ? identity.email : 'anonymous_companion_user',
               event: 'guidance_session',
               decision_type: decision_type || 'general',
               timestamp: Date.now()
@@ -292,15 +319,45 @@ Decision type: ${decision_type || 'general_guidance'}`;
           }).catch(e => console.error('VendyAI billing trace failed:', e))
         );
 
-        return new Response(JSON.stringify({
+        // Real persistence, only for a real identified user - same
+        // saved:true/false honesty as /api/v1/companion/checkin. Stored
+        // even in fallback_mode so continuity data (the user's own
+        // questions/context) already exists once real inference is wired
+        // up, rather than starting memory from zero at that point.
+        let guidanceSaved = false;
+        if (identity) {
+          const entry = {
+            timestamp: new Date().toISOString(),
+            question,
+            user_context,
+            decision_type: decision_type || 'general',
+            guidance,
+            fallback_mode: isFallback
+          };
+          await writeKvList(env, `guidance:${identity.email}`, [...priorGuidanceHistory, entry], MAX_STORED_GUIDANCE_SESSIONS);
+          guidanceSaved = true;
+        }
+
+        const response = {
           guidance,
           decision_type: decision_type || 'general',
           companion: 'Alhena',
           fallback_mode: isFallback,
           disclaimer: 'Alhena is a decision-support companion, not therapy or medical care. In a crisis, call or text 988 (Suicide & Crisis Lifeline) or text HOME to 741741 (Crisis Text Line).',
           session_id: `sess_${Date.now()}`,
-          next_check_in: new Date(Date.now() + 86400000).toISOString()
-        }), {
+          next_check_in: new Date(Date.now() + 86400000).toISOString(),
+          memory: {
+            signed_in: !!identity,
+            saved: guidanceSaved,
+            prior_sessions_considered: recentGuidanceHistory.length,
+            total_saved_sessions: guidanceSaved ? priorGuidanceHistory.length + 1 : 0
+          }
+        };
+        if (!identity) {
+          response.memory.note = 'Sign in to get guidance that remembers your prior conversations, and to save this session - see GET /api/v1/companion/guidance/history.';
+        }
+
+        return new Response(JSON.stringify(response), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
 
@@ -310,6 +367,25 @@ Decision type: ${decision_type || 'general_guidance'}`;
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
+    }
+
+    // Real guidance-history read-back, added 2026-09-11 alongside the
+    // continuity fix above - same shape as GET /api/v1/companion/checkins.
+    // Required (not optional) auth: there's no anonymous history to show.
+    if (url.pathname === '/api/v1/companion/guidance/history' && request.method === 'GET') {
+      let identity;
+      try {
+        identity = await authenticateViaAuthFor(request);
+      } catch (e) {
+        return new Response(JSON.stringify({ error: e.msg, code: e.code }), {
+          status: e.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      const history = await readKvList(env, `guidance:${identity.email}`);
+      return new Response(JSON.stringify({ email: identity.email, count: history.length, sessions: history }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     // Core Companion Wellness Check-in

@@ -184,6 +184,172 @@ test(
   })
 );
 
+// ── Guidance conversation memory (added 2026-09-11) ────────────────────
+// /api/v1/companion/guidance previously called no auth function at all and
+// persisted nothing - every call was stateless even for a signed-in
+// AuthFor user, a real gap against the venture's own "AI companion for
+// life guidance" promise. These exercise the real fix: optional auth (an
+// anonymous caller still gets an answer, just no memory), and a real
+// identified user's prior sessions are both persisted and fed back into
+// the next call's prompt.
+
+test(
+  "POST /api/v1/companion/guidance: anonymous (no Authorization header) still gets a real answer, honestly reports no memory",
+  withMockedAuthFor(null, async () => {
+    const env = makeEnv();
+    const res = await worker.fetch(
+      new Request("https://alhena.cc/api/v1/companion/guidance", {
+        method: "POST",
+        body: JSON.stringify({ question: "Should I take the new job?", user_context: { situation: "career" } }),
+      }),
+      env,
+      makeCtx()
+    );
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.memory.signed_in, false);
+    assert.equal(body.memory.saved, false);
+    assert.match(body.memory.note, /Sign in to get guidance that remembers/);
+    assert.equal(env.ALHENA_KV.store.size, 0);
+  })
+);
+
+test(
+  "POST /api/v1/companion/guidance: a real AuthFor identity persists the session and reports it was saved",
+  withMockedAuthFor({ id: "u1", email: "real-user@example.com", name: "Real User" }, async () => {
+    const env = makeEnv();
+    const res = await worker.fetch(
+      new Request("https://alhena.cc/api/v1/companion/guidance", {
+        method: "POST",
+        headers: { Authorization: "Bearer real-token" },
+        body: JSON.stringify({ question: "Should I take the new job?", user_context: { situation: "career" } }),
+      }),
+      env,
+      makeCtx()
+    );
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.memory.signed_in, true);
+    assert.equal(body.memory.saved, true);
+    assert.equal(body.memory.total_saved_sessions, 1);
+    assert.equal(body.memory.note, undefined);
+    const stored = JSON.parse(env.ALHENA_KV.store.get("guidance:real-user@example.com"));
+    assert.equal(stored.length, 1);
+    assert.equal(stored[0].question, "Should I take the new job?");
+  })
+);
+
+test(
+  "POST /api/v1/companion/guidance twice as the same real user: second call's prompt is built from the first call's real stored history",
+  withMockedAuthFor({ id: "u1", email: "real-user@example.com", name: "Real User" }, async () => {
+    const env = makeEnv();
+    env.ALHENA_INFERENCE_URL = "https://fake-inference.example.com/v1/chat/completions";
+    let capturedBodies = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async (url, opts) => {
+      const u = String(url);
+      if (u.includes("authfor.com/api/v1/verify")) {
+        return new Response(JSON.stringify({ id: "u1", email: "real-user@example.com", name: "Real User" }), { status: 200 });
+      }
+      if (u.includes("vendyai.com/api/billing/event")) {
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }
+      if (u === "https://fake-inference.example.com/v1/chat/completions") {
+        capturedBodies.push(JSON.parse(opts.body));
+        return new Response(JSON.stringify({ choices: [{ message: { content: "Real model reply." } }] }), { status: 200 });
+      }
+      return realFetch(url, opts);
+    };
+    try {
+      await worker.fetch(
+        new Request("https://alhena.cc/api/v1/companion/guidance", {
+          method: "POST",
+          headers: { Authorization: "Bearer real-token" },
+          body: JSON.stringify({ question: "Should I take the new job?", user_context: { situation: "career" }, decision_type: "career" }),
+        }),
+        env,
+        makeCtx()
+      );
+      await worker.fetch(
+        new Request("https://alhena.cc/api/v1/companion/guidance", {
+          method: "POST",
+          headers: { Authorization: "Bearer real-token" },
+          body: JSON.stringify({ question: "What if it doesn't work out?", user_context: { situation: "career" }, decision_type: "career" }),
+        }),
+        env,
+        makeCtx()
+      );
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+    assert.equal(capturedBodies.length, 2);
+    // First call has no prior history to inject.
+    assert.doesNotMatch(capturedBodies[0].system, /Recent conversation history/);
+    // Second call's system prompt carries real context from the first call's stored Q&A.
+    assert.match(capturedBodies[1].system, /Recent conversation history/);
+    assert.match(capturedBodies[1].system, /Should I take the new job\?/);
+    assert.match(capturedBodies[1].system, /Real model reply\./);
+
+    const stored = JSON.parse(env.ALHENA_KV.store.get("guidance:real-user@example.com"));
+    assert.equal(stored.length, 2);
+    assert.equal(stored[1].question, "What if it doesn't work out?");
+  })
+);
+
+test(
+  "GET /api/v1/companion/guidance/history: 401 with no Authorization header - no anonymous history to show",
+  withMockedAuthFor(null, async () => {
+    const env = makeEnv();
+    const res = await worker.fetch(new Request("https://alhena.cc/api/v1/companion/guidance/history"), env, makeCtx());
+    assert.equal(res.status, 401);
+  })
+);
+
+test(
+  "GET /api/v1/companion/guidance/history: a real identified user reads back only their own stored sessions",
+  withMockedAuthFor({ id: "u1", email: "real-user@example.com", name: "Real User" }, async () => {
+    const env = makeEnv();
+    env.ALHENA_KV.store.set(
+      "guidance:real-user@example.com",
+      JSON.stringify([{ timestamp: "2026-09-10T00:00:00.000Z", question: "Q1", guidance: "A1" }])
+    );
+    env.ALHENA_KV.store.set("guidance:someone-else@example.com", JSON.stringify([{ question: "Other" }]));
+    const res = await worker.fetch(
+      new Request("https://alhena.cc/api/v1/companion/guidance/history", { headers: { Authorization: "Bearer real-token" } }),
+      env,
+      makeCtx()
+    );
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.email, "real-user@example.com");
+    assert.equal(body.count, 1);
+    assert.equal(body.sessions[0].question, "Q1");
+  })
+);
+
+test(
+  "POST /api/v1/companion/guidance: MAX_STORED_GUIDANCE_SESSIONS caps history at 200 entries, dropping the oldest",
+  withMockedAuthFor({ id: "u1", email: "real-user@example.com", name: "Real User" }, async () => {
+    const env = makeEnv();
+    const seeded = Array.from({ length: 200 }, (_, i) => ({ timestamp: `t${i}`, question: `q${i}`, guidance: `a${i}` }));
+    env.ALHENA_KV.store.set("guidance:real-user@example.com", JSON.stringify(seeded));
+    const res = await worker.fetch(
+      new Request("https://alhena.cc/api/v1/companion/guidance", {
+        method: "POST",
+        headers: { Authorization: "Bearer real-token" },
+        body: JSON.stringify({ question: "newest question", user_context: {} }),
+      }),
+      env,
+      makeCtx()
+    );
+    assert.equal(res.status, 200);
+    const stored = JSON.parse(env.ALHENA_KV.store.get("guidance:real-user@example.com"));
+    assert.equal(stored.length, 200);
+    assert.equal(stored[0].question, "q1");
+    assert.equal(stored[199].question, "newest question");
+  })
+);
+
 // ── Companion app-shell routes (reference/legacy-roots/alhena/app.html) ──
 // app.html itself calls AuthFor directly for signup/login, so there is no
 // local user store to test here - every route below just needs a real
