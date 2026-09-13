@@ -373,8 +373,8 @@ vec3 oceanNormal(vec2 pos, float t, float windSpeed, float chop) {
   float hc  = oceanHeight(pos, t, windSpeed, chop);
   float hx  = oceanHeight(pos + vec2(eps, 0.0), t, windSpeed, chop);
   float hy  = oceanHeight(pos + vec2(0.0, eps), t, windSpeed, chop);
-  vec3 N = normalize(vec3(-(hx - hc) / eps, 1.0, -(hy - hc) / eps));
-  return N;
+  vec3 nrm = normalize(vec3(-(hx - hc) / eps, 1.0, -(hy - hc) / eps));
+  return nrm;
 }
 
 /* ── Laplacian (for SSS) ─────────────────────────── */
@@ -476,15 +476,15 @@ void main() {
   worldPos += vec2(u_time * 0.01, u_time * 0.008); // drift
 
   float h = oceanHeight(worldPos, u_time, u_wind, u_chop);
-  vec3  N = oceanNormal(worldPos, u_time, u_wind, u_chop);
+  vec3  nrm = oceanNormal(worldPos, u_time, u_wind, u_chop);
   float lap = laplacian(worldPos, u_time, u_wind, u_chop);
 
   // ── View and reflected directions ──────────────────
   vec3 V = normalize(-rayDir);
-  vec3 R = reflect(-V, N);
+  vec3 R = reflect(-V, nrm);
 
   // ── Fresnel ─────────────────────────────────────────
-  float NdotV = max(dot(N, V), 0.0);
+  float NdotV = max(dot(nrm, V), 0.0);
   float fresnel = fresnelSchlick(NdotV);
 
   // ── Sky reflection ───────────────────────────────────
@@ -510,9 +510,9 @@ void main() {
   // ── Blinn-Phong specular (sun) ───────────────────────
   vec3 sunDir = normalize(vec3(0.5, 0.35, 0.6));
   vec3 halfV  = normalize(V + sunDir);
-  float spec  = pow(max(dot(N, halfV), 0.0), 120.0) * 2.5;
+  float spec  = pow(max(dot(nrm, halfV), 0.0), 120.0) * 2.5;
   vec3 specColor = vec3(1.0, 0.95, 0.80) * spec * u_goldHorizon * 2.0;
-  specColor += vec3(0.8, 0.92, 1.0) * pow(max(dot(N, halfV), 0.0), 48.0) * 0.4;
+  specColor += vec3(0.8, 0.92, 1.0) * pow(max(dot(nrm, halfV), 0.0), 48.0) * 0.4;
 
   // ── Blend water body + reflection via Fresnel ────────
   vec3 water = mix(waterBody, reflectedSky, fresnel * 0.85);
