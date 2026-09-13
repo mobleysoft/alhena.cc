@@ -36,8 +36,13 @@
     }
 
     /* ── Auth Screen ───────────────────────────────── */
+    /* Real 2026-09-13 product decision: no signup/login required to use
+       Alhena - see the anonymous-identity comment near init() below.
+       This is no longer the default first screen (hidden by default,
+       shown only via showSignInScreen() for a visitor who wants a real
+       account) - display:flex is applied by JS when it's opened. */
     #auth-screen {
-      display: flex;
+      display: none;
       align-items: center;
       justify-content: center;
       width: 100%;
@@ -853,6 +858,9 @@
         <span id="auth-toggle-text">Don't have an account?</span>
         <a id="auth-toggle-link" onclick="toggleAuthMode()">Sign Up</a>
       </div>
+      <div class="auth-toggle">
+        <a onclick="cancelSignIn()">Continue without signing in</a>
+      </div>
     </div>
   </div>
 
@@ -944,7 +952,8 @@
 
       <div class="sidebar-footer">
         <a href="/" class="back-to-home">&larr; Back to alhena.cc</a>
-        <button class="logout-btn" onclick="logout()">Sign Out</button>
+        <a href="#" class="back-to-home" id="sign-in-link" style="display:none" onclick="showSignInScreen(); return false;">Sign in with a real account</a>
+        <button class="logout-btn" id="sign-out-btn" onclick="logout()">Sign Out</button>
       </div>
     </div>
 
@@ -1191,6 +1200,19 @@
     let authToken = localStorage.getItem('alhena_token');
     let currentUser = null;
     let isSignup = false;
+
+    // ── Anonymous, no-signup identity (added 2026-09-13) ────────────
+    // Real product decision, John's own words: "we are making what is
+    // currently texting Jim into the alhena.cc product users around the
+    // world can start using at this time for free... there should be no
+    // signup required, it should just name them color animal
+    // tradePersonType." A real anonymous UUID (worker.js's
+    // resolveIdentity()/getOrCreateAnonymousProfile()) is persisted here
+    // in localStorage and replayed on every API call via the
+    // X-Alhena-Anon-Id header - see api() below. Chosen over a cookie
+    // because this file's api() helper already attaches identity
+    // manually via headers, never `credentials: 'include'`.
+    let anonId = localStorage.getItem('alhena_anon_id');
     let selectedJournalMood = null;
     let selectedCheckinMood = null;
     let selectedCheckinEnergy = null;
@@ -1337,9 +1359,24 @@
     async function api(path, opts = {}) {
       const headers = { 'Content-Type': 'application/json' };
       if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+      else if (anonId) headers['X-Alhena-Anon-Id'] = anonId;
       const res = await fetch(`${API}${path}`, { ...opts, headers: { ...headers, ...opts.headers } });
       const data = await res.json();
-      if (!res.ok && res.status === 401) { logout(); throw new Error('Session expired'); }
+      if (!res.ok && res.status === 401) {
+        if (authToken) { logout(); throw new Error('Session expired'); }
+        // 2026-09-13: the free companion routes (chat/guidance/checkin)
+        // never 401 an anonymous caller anymore - this now only fires for
+        // a real AuthFor-only route (Journal/Goals) hit while anonymous,
+        // which is expected, not a broken session. No forced logout.
+        throw new Error(data.error || 'Sign in with a real account to use this feature');
+      }
+      // A response carrying a fresh/renewed anonymous id (any companion
+      // route can mint one on first contact) keeps this browser's stored
+      // id in sync, same identity every subsequent call.
+      if (data && data.identity && data.identity.anonymous && data.identity.id && data.identity.id !== anonId) {
+        anonId = data.identity.id;
+        localStorage.setItem('alhena_anon_id', anonId);
+      }
       return data;
     }
 
@@ -1395,12 +1432,31 @@
       btn.disabled = false;
     });
 
+    // Real, no-signup product decision (2026-09-13): signing out of a
+    // real AuthFor account no longer dead-ends at a mandatory login
+    // screen - it drops back to the same free anonymous experience
+    // everyone else gets (init() re-resolves/keeps the anonymous
+    // identity and re-enters the app directly).
     function logout() {
       authToken = null;
       currentUser = null;
       localStorage.removeItem('alhena_token');
-      document.getElementById('auth-screen').style.display = 'flex';
+      init();
+    }
+
+    // Reveals the real AuthFor sign-in screen for a visitor who wants a
+    // real account (cross-device history, or eventually payment) -
+    // opt-in now, never the mandatory first screen.
+    function showSignInScreen() {
       document.getElementById('app-screen').style.display = 'none';
+      document.getElementById('auth-screen').style.display = 'flex';
+    }
+
+    // "Continue without signing in" on the (now opt-in) auth screen -
+    // currentUser is already a real anonymous identity from init(), so
+    // this just goes back to the app.
+    function cancelSignIn() {
+      showApp();
     }
 
     // ── App Init ───────────────────────────────────
@@ -1410,6 +1466,15 @@
       document.getElementById('auth-screen').style.display = 'none';
       document.getElementById('app-screen').style.display = 'flex';
       document.getElementById('user-display-name').textContent = currentUser?.name || currentUser?.email || '';
+
+      // The sign-in/sign-out affordance reflects real state: an
+      // anonymous visitor has nothing to "sign out" of, but can opt into
+      // a real account; a real AuthFor user gets the familiar sign-out.
+      const isAnon = !!currentUser?.anonymous;
+      const signInLink = document.getElementById('sign-in-link');
+      const signOutBtn = document.getElementById('sign-out-btn');
+      if (signInLink) signInLink.style.display = isAnon ? 'block' : 'none';
+      if (signOutBtn) signOutBtn.style.display = isAnon ? 'none' : 'block';
 
       // Render badges
       renderBadges();
@@ -1431,11 +1496,17 @@
 
     function setTimeAwareGreeting() {
       const hour = new Date().getHours();
-      let greeting = 'Hello! I\'m Alhena';
-      if (hour >= 5 && hour < 12) greeting = 'Good morning! I\'m Alhena';
-      else if (hour >= 12 && hour < 17) greeting = 'Good afternoon! I\'m Alhena';
-      else if (hour >= 17 && hour < 22) greeting = 'Good evening! I\'m Alhena';
-      else greeting = 'Hello! I\'m Alhena';
+      let timeGreeting = 'Hello';
+      if (hour >= 5 && hour < 12) timeGreeting = 'Good morning';
+      else if (hour >= 12 && hour < 17) timeGreeting = 'Good afternoon';
+      else if (hour >= 17 && hour < 22) timeGreeting = 'Good evening';
+
+      // Real 2026-09-13 product decision: greet a no-signup visitor by
+      // their real generated "Color Animal TradePersonType" name (e.g.
+      // "Hey, Crimson Falcon Electrician") right in the chat welcome
+      // area - the first thing they see, no signup screen in between.
+      const name = currentUser?.name;
+      const greeting = name ? `${timeGreeting}, ${name}! I'm Alhena` : `${timeGreeting}! I'm Alhena`;
 
       const el = document.getElementById('chat-welcome-greeting');
       if (el) el.textContent = greeting;
@@ -1455,8 +1526,37 @@
             return;
           }
         } catch {}
-        logout();
+        // A stored token that no longer verifies - fall through to the
+        // real anonymous path below instead of forcing a login screen.
+        authToken = null;
+        localStorage.removeItem('alhena_token');
       }
+
+      // Real, direct product decision (2026-09-13, John): "there should
+      // be no signup required, it should just name them color animal
+      // tradePersonType, filling in a random choice for each of those
+      // from a list." Resolve (or mint) a real anonymous identity from
+      // worker.js's GET /api/v1/companion/identity and go straight into
+      // the app - no auth screen shown.
+      try {
+        const headers = {};
+        if (anonId) headers['X-Alhena-Anon-Id'] = anonId;
+        const res = await fetch(`${API}/api/v1/companion/identity`, { headers });
+        const data = await res.json();
+        if (data && data.id) {
+          anonId = data.id;
+          localStorage.setItem('alhena_anon_id', anonId);
+          currentUser = { name: data.name, anonymous: true };
+        } else {
+          currentUser = { name: 'Guest', anonymous: true };
+        }
+      } catch (err) {
+        // Even if identity provisioning fails (offline, etc.), still let
+        // the visitor start chatting - the backend mints a real identity
+        // on the first successful companion API call regardless.
+        currentUser = { name: 'Guest', anonymous: true };
+      }
+      showApp();
     }
 
     // ── View Switching ─────────────────────────────

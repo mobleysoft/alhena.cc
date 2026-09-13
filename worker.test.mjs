@@ -53,7 +53,12 @@ function withMockedAuthFor(verifyResponse, testFn) {
 }
 
 test(
-  "POST /api/v1/companion/checkin: anonymous (no Authorization header) is accepted but honestly reports saved:false",
+  // Updated 2026-09-13: John's real product decision ("free... no signup
+  // required") replaced the old "anonymous = nothing saved" behavior with
+  // a real, persistent anonymous identity (see resolveIdentity() in
+  // worker.js) - an anonymous caller now IS saved, keyed by a real
+  // generated anon:<uuid> identity, not silently dropped.
+  "POST /api/v1/companion/checkin: anonymous (no Authorization header) gets a real generated identity and IS saved",
   withMockedAuthFor(null, async () => {
     const env = makeEnv();
     const res = await worker.fetch(
@@ -66,9 +71,12 @@ test(
     );
     assert.equal(res.status, 200);
     const body = await res.json();
-    assert.equal(body.saved, false);
-    assert.match(body.note, /Sign in to save/);
-    assert.equal(env.ALHENA_KV.store.size, 0);
+    assert.equal(body.saved, true);
+    assert.equal(body.identity.anonymous, true);
+    assert.match(body.identity.id, /^[0-9a-f-]{36}$/i);
+    assert.equal(env.ALHENA_KV.store.size, 1);
+    const stored = JSON.parse(env.ALHENA_KV.store.get(`checkins:anon:${body.identity.id}`));
+    assert.equal(stored.length, 1);
   })
 );
 
@@ -96,7 +104,7 @@ test(
 );
 
 test(
-  "POST /api/v1/companion/checkin: an invalid bearer token is treated as anonymous, not a hard failure",
+  "POST /api/v1/companion/checkin: an invalid bearer token is treated as a real anonymous identity, not a hard failure",
   withMockedAuthFor(null, async () => {
     const env = makeEnv();
     const res = await worker.fetch(
@@ -110,16 +118,25 @@ test(
     );
     assert.equal(res.status, 200);
     const body = await res.json();
-    assert.equal(body.saved, false);
+    assert.equal(body.saved, true);
+    assert.equal(body.identity.anonymous, true);
   })
 );
 
 test(
-  "GET /api/v1/companion/checkins: 401 with no Authorization header - unlike the checkin POST, history has no anonymous mode",
+  // Updated 2026-09-13: this route now uses resolveIdentity() (see
+  // worker.js), which never throws - a missing Authorization header just
+  // means a fresh anonymous identity with (correctly) empty history, not
+  // a 401. Real signed-in-only behavior is still covered by the "reads
+  // back only their own real stored history" test below.
+  "GET /api/v1/companion/checkins: no Authorization header resolves a real anonymous identity with empty history, not a 401",
   withMockedAuthFor(null, async () => {
     const env = makeEnv();
     const res = await worker.fetch(new Request("https://alhena.cc/api/v1/companion/checkins"), env, makeCtx());
-    assert.equal(res.status, 401);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.count, 0);
+    assert.match(body.email, /^anon:[0-9a-f-]{36}$/i);
   })
 );
 
@@ -194,7 +211,11 @@ test(
 // the next call's prompt.
 
 test(
-  "POST /api/v1/companion/guidance: anonymous (no Authorization header) still gets a real answer, honestly reports no memory",
+  // Updated 2026-09-13: John's real product decision replaced "anonymous
+  // = stateless, nothing saved" with a real, persistent anonymous
+  // identity (resolveIdentity() in worker.js) - an anonymous caller now
+  // gets real continuity too, just tagged anonymous rather than signed in.
+  "POST /api/v1/companion/guidance: anonymous (no Authorization header) gets a real answer AND real persisted continuity",
   withMockedAuthFor(null, async () => {
     const env = makeEnv();
     const res = await worker.fetch(
@@ -208,9 +229,12 @@ test(
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.memory.signed_in, false);
-    assert.equal(body.memory.saved, false);
-    assert.match(body.memory.note, /Sign in to get guidance that remembers/);
-    assert.equal(env.ALHENA_KV.store.size, 0);
+    assert.equal(body.memory.saved, true);
+    assert.equal(body.identity.anonymous, true);
+    assert.match(body.identity.id, /^[0-9a-f-]{36}$/i);
+    assert.match(body.memory.note, /Chatting anonymously/);
+    const stored = JSON.parse(env.ALHENA_KV.store.get(`guidance:anon:${body.identity.id}`));
+    assert.equal(stored.length, 1);
   })
 );
 
@@ -297,11 +321,17 @@ test(
 );
 
 test(
-  "GET /api/v1/companion/guidance/history: 401 with no Authorization header - no anonymous history to show",
+  // Updated 2026-09-13: resolveIdentity() never throws - a missing
+  // Authorization header now resolves a real (empty-history) anonymous
+  // identity instead of a 401.
+  "GET /api/v1/companion/guidance/history: no Authorization header resolves a real anonymous identity with empty history, not a 401",
   withMockedAuthFor(null, async () => {
     const env = makeEnv();
     const res = await worker.fetch(new Request("https://alhena.cc/api/v1/companion/guidance/history"), env, makeCtx());
-    assert.equal(res.status, 401);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.count, 0);
+    assert.match(body.email, /^anon:[0-9a-f-]{36}$/i);
   })
 );
 
@@ -714,7 +744,11 @@ test(
 );
 
 test(
-  "POST /api/v1/companion/self-reflection: a real manual entry is appended and readable back from KV",
+  // Updated 2026-09-13: an unauthenticated caller now resolves a real
+  // generated anon:<uuid> identity (resolveIdentity()) instead of the
+  // literal string "anonymous" - a real, unique-per-visitor identity, not
+  // a placeholder label.
+  "POST /api/v1/companion/self-reflection: a real manual entry is appended and readable back from KV, tagged with a real anonymous identity",
   withMockedAuthFor(null, async () => {
     const env = makeEnv();
     const res = await worker.fetch(
@@ -731,7 +765,7 @@ test(
     assert.equal(body.total, 1);
     const log = JSON.parse(env.ALHENA_KV.store.get("self_reflection_log"));
     assert.equal(log.length, 1);
-    assert.equal(log[0].email, "anonymous");
+    assert.match(log[0].email, /^anon:[0-9a-f-]{36}$/i);
     assert.equal(log[0].note, "User pointed out I can't tell them which model answered.");
   })
 );
@@ -916,5 +950,212 @@ test(
     assert.equal(body.total_checkins, 4);
     assert.equal(body.avg_mood_7d, 8);
     assert.equal(body.trend_last_7d_vs_prior_7d, "improving");
+  })
+);
+
+// ── Real anonymous, no-signup identity (added 2026-09-13) ───────────────
+// John's real product decision: "we are making what is currently texting
+// Jim into the alhena.cc product users around the world can start using
+// at this time for free until we figure out what users will pay for and
+// have some users to worry about... there should be no signup required,
+// it should just name them color animal tradePersonType, filling in a
+// random choice for each of those from a list." These exercise the real
+// resolveIdentity()/getOrCreateAnonymousProfile() mechanism in worker.js,
+// not a reimplementation of it.
+
+test(
+  "GET /api/v1/companion/identity: a brand-new caller gets a real 'Color Animal TradePersonType' name and a real UUID",
+  withMockedAuthFor(null, async () => {
+    const env = makeEnv();
+    const res = await worker.fetch(new Request("https://alhena.cc/api/v1/companion/identity"), env, makeCtx());
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.anonymous, true);
+    assert.equal(body.isNew, true);
+    assert.match(body.id, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    // Exactly three space-separated real words: Color, Animal, TradePersonType.
+    const parts = body.name.split(" ");
+    assert.equal(parts.length, 3);
+    for (const part of parts) assert.match(part, /^[A-Z][a-z]+$/);
+  })
+);
+
+test(
+  "GET /api/v1/companion/identity: two fresh callers with no prior anon id get different real names/ids most of the time (real randomness, not a fixed constant)",
+  withMockedAuthFor(null, async () => {
+    const env = makeEnv();
+    const names = new Set();
+    const ids = new Set();
+    for (let i = 0; i < 20; i++) {
+      const res = await worker.fetch(new Request("https://alhena.cc/api/v1/companion/identity"), env, makeCtx());
+      const body = await res.json();
+      names.add(body.name);
+      ids.add(body.id);
+    }
+    // IDs are real crypto.randomUUID() values - always unique.
+    assert.equal(ids.size, 20);
+    // Names are drawn from a large combinatorial space (25*25*25) - 20
+    // draws landing on fewer than 2 distinct names would indicate the
+    // generator isn't actually random.
+    assert.ok(names.size > 1, "expected real variety across 20 generated names");
+  })
+);
+
+test(
+  "GET /api/v1/companion/identity: a returning caller (same X-Alhena-Anon-Id) gets back the SAME name, not a new random one",
+  withMockedAuthFor(null, async () => {
+    const env = makeEnv();
+    const first = await worker.fetch(new Request("https://alhena.cc/api/v1/companion/identity"), env, makeCtx());
+    const firstBody = await first.json();
+
+    const second = await worker.fetch(
+      new Request("https://alhena.cc/api/v1/companion/identity", {
+        headers: { "X-Alhena-Anon-Id": firstBody.id },
+      }),
+      env,
+      makeCtx()
+    );
+    const secondBody = await second.json();
+    assert.equal(secondBody.anonymous, true);
+    assert.equal(secondBody.isNew, false);
+    assert.equal(secondBody.id, firstBody.id);
+    assert.equal(secondBody.name, firstBody.name);
+  })
+);
+
+test(
+  "GET /api/v1/companion/identity: a real AuthFor Bearer token wins over any anon id header, matching the real signed-in identity",
+  withMockedAuthFor({ id: "u1", email: "real-user@example.com", name: "Real User" }, async () => {
+    const env = makeEnv();
+    const res = await worker.fetch(
+      new Request("https://alhena.cc/api/v1/companion/identity", {
+        headers: { Authorization: "Bearer real-token", "X-Alhena-Anon-Id": "11111111-1111-1111-1111-111111111111" },
+      }),
+      env,
+      makeCtx()
+    );
+    const body = await res.json();
+    assert.equal(body.anonymous, false);
+    assert.equal(body.id, "real-user@example.com");
+    assert.equal(body.name, "Real User");
+  })
+);
+
+test(
+  "POST /api/chat: works with NO Bearer token at all - the real free, no-signup companion chat",
+  withMockedAuthFor(null, async () => {
+    const env = makeEnv();
+    const res = await worker.fetch(
+      new Request("https://alhena.cc/api/chat", {
+        method: "POST",
+        body: JSON.stringify({ message: "Hello Alhena" }),
+      }),
+      env,
+      makeCtx()
+    );
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.success, true);
+    assert.equal(body.message.role, "assistant");
+    assert.equal(body.identity.anonymous, true);
+    assert.match(body.identity.id, /^[0-9a-f-]{36}$/i);
+  })
+);
+
+test(
+  "POST /api/chat twice with the SAME X-Alhena-Anon-Id header: real history persists across requests for an anonymous caller",
+  withMockedAuthFor(null, async () => {
+    const env = makeEnv();
+    const first = await worker.fetch(
+      new Request("https://alhena.cc/api/chat", {
+        method: "POST",
+        body: JSON.stringify({ message: "first message" }),
+      }),
+      env,
+      makeCtx()
+    );
+    const firstBody = await first.json();
+    const anonId = firstBody.identity.id;
+
+    await worker.fetch(
+      new Request("https://alhena.cc/api/chat", {
+        method: "POST",
+        headers: { "X-Alhena-Anon-Id": anonId },
+        body: JSON.stringify({ message: "second message, same visitor" }),
+      }),
+      env,
+      makeCtx()
+    );
+
+    const history = await worker.fetch(
+      new Request("https://alhena.cc/api/chat/history", { headers: { "X-Alhena-Anon-Id": anonId } }),
+      env,
+      makeCtx()
+    );
+    const historyBody = await history.json();
+    // 2 user messages + 2 assistant replies = 4, all under the one real
+    // anon:<uuid> identity - a genuinely returning visitor, not two
+    // strangers who happened to share a KV namespace.
+    assert.equal(historyBody.messages.length, 4);
+    assert.equal(historyBody.messages[0].content, "first message");
+    assert.equal(historyBody.messages[2].content, "second message, same visitor");
+    const stored = JSON.parse(env.ALHENA_KV.store.get(`chat:anon:${anonId}`));
+    assert.equal(stored.length, 4);
+  })
+);
+
+test(
+  "POST /api/chat: a DIFFERENT anonymous caller (no header, or a different id) never sees another visitor's history",
+  withMockedAuthFor(null, async () => {
+    const env = makeEnv();
+    const first = await worker.fetch(
+      new Request("https://alhena.cc/api/chat", {
+        method: "POST",
+        body: JSON.stringify({ message: "visitor one's message" }),
+      }),
+      env,
+      makeCtx()
+    );
+    const firstBody = await first.json();
+
+    const secondHistory = await worker.fetch(
+      new Request("https://alhena.cc/api/chat/history"), // no anon id header at all - a brand-new visitor
+      env,
+      makeCtx()
+    );
+    const secondBody = await secondHistory.json();
+    assert.equal(secondBody.messages.length, 0);
+  })
+);
+
+test(
+  "POST /api/v1/companion/guidance: an anonymous identity is tier 'anonymous' (real, unlimited, never counted against the free-tier cap) - not silently 'free' or fabricated 'premium'",
+  withMockedAuthFor(null, async () => {
+    const env = makeEnv();
+    const anonId = "22222222-2222-2222-2222-222222222222";
+    // One more than FREE_TIER_DAILY_SESSION_LIMIT (5) - a real free-tier
+    // user would be blocked on the 6th call (see the existing free-tier
+    // cap test above); an anonymous caller must not be.
+    let lastBody;
+    for (let i = 0; i < 6; i++) {
+      const res = await worker.fetch(
+        new Request("https://alhena.cc/api/v1/companion/guidance", {
+          method: "POST",
+          headers: { "X-Alhena-Anon-Id": anonId },
+          body: JSON.stringify({ question: `Question ${i}`, user_context: { situation: "career" } }),
+        }),
+        env,
+        makeCtx()
+      );
+      assert.equal(res.status, 200);
+      lastBody = await res.json();
+      assert.equal(lastBody.limit_reached, undefined, `anonymous call ${i + 1} must never be limit-blocked`);
+      assert.equal(lastBody.tier, "anonymous");
+    }
+    // Real, actually-saved continuity for all 6 calls under one anon identity.
+    const stored = JSON.parse(env.ALHENA_KV.store.get(`guidance:anon:${anonId}`));
+    assert.equal(stored.length, 6);
+    // Never counted toward the shared free-tier daily session counter.
+    assert.equal(env.ALHENA_KV.store.has(`session_count:anon:${anonId}:${new Date().toISOString().slice(0, 10)}`), false);
   })
 );
