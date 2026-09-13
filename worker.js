@@ -110,6 +110,60 @@ const GUIDANCE_HISTORY_TURNS_INJECTED = 5; // how many prior Q&A pairs get fed b
 // authenticated GET route below.
 const MAX_STORED_SELF_REFLECTIONS = 300;
 
+// Real tier-gating (added 2026-09-13, closing a genuine feature-
+// completeness gap found this pass: /api/vendyai/webhook below has
+// always written a real paying user's tier to `user:${email}` in KV on
+// checkout.session.completed, but until now NOTHING in this file ever
+// read that value back - a $0 free user and a $19.99/mo Elite subscriber
+// got byte-identical behavior on every single route. Free tier is now a
+// real, enforced daily cap on guidance+chat sessions combined; Premium/
+// Elite are genuinely unlimited; Elite additionally gets a longer
+// injected conversation-memory window and the new GET /api/insights
+// route below. The subscription-recommendations copy is corrected in
+// the same pass to only list what's real - "Priority responses" and
+// "Daily wellness tracking" as a paid-only perk are removed (neither was
+// ever implemented as a differentiator; wellness tracking is already
+// free for everyone), same precedent as the 2026-09-03/2026-09-11
+// removal of "Therapy integration" and "1:1 coaching calls" - a paid
+// feature with zero implementation gets removed, not faked.
+const FREE_TIER_DAILY_SESSION_LIMIT = 5;
+const GUIDANCE_HISTORY_TURNS_INJECTED_ELITE = 15;
+
+async function getUserTier(env, email) {
+  if (!email) return 'free';
+  const raw = await env.ALHENA_KV.get(`user:${email}`);
+  if (!raw) return 'free';
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && (parsed.tier === 'premium' || parsed.tier === 'elite') ? parsed.tier : 'free';
+  } catch (e) {
+    return 'free';
+  }
+}
+
+// One shared counter per user per real UTC calendar day - "a guidance
+// session" in this product's own marketing copy has always meant both
+// /api/v1/companion/guidance and /api/chat (the vendyai billing event
+// both routes fire is literally named 'guidance_session'), so both
+// routes below increment and check the same counter rather than each
+// enforcing its own separate cap.
+async function getDailySessionCount(env, email) {
+  const day = new Date().toISOString().slice(0, 10);
+  const raw = await env.ALHENA_KV.get(`session_count:${email}:${day}`);
+  return raw ? (parseInt(raw, 10) || 0) : 0;
+}
+
+async function incrementDailySessionCount(env, email) {
+  const day = new Date().toISOString().slice(0, 10);
+  const key = `session_count:${email}:${day}`;
+  const count = await getDailySessionCount(env, email);
+  // expirationTtl is a real Cloudflare KV option (ignored harmlessly by
+  // the fake in-memory KV worker.test.mjs uses) - a genuine reason not
+  // to leave these counters growing forever: 2 days is enough for the
+  // UTC-day cutover to fully pass before the key expires on its own.
+  await env.ALHENA_KV.put(key, String(count + 1), { expirationTtl: 172800 });
+}
+
 async function readKvList(env, key) {
   const raw = await env.ALHENA_KV.get(key);
   if (!raw) return [];
@@ -381,8 +435,32 @@ export default {
         // stored for later - a companion that saves history but never uses
         // it isn't actually remembering the conversation.
         const identity = await tryAuthenticateViaAuthFor(request);
+        const tier = identity ? await getUserTier(env, identity.email) : 'anonymous';
+
+        // Real free-tier cap, enforced before spending an inference call -
+        // an anonymous caller was never eligible for a paid tier anyway
+        // (no email to attach a subscription to), so this only applies to
+        // a signed-in free-tier user.
+        if (identity && tier === 'free') {
+          const sessionsUsedToday = await getDailySessionCount(env, identity.email);
+          if (sessionsUsedToday >= FREE_TIER_DAILY_SESSION_LIMIT) {
+            return new Response(JSON.stringify({
+              guidance: `You've used today's ${FREE_TIER_DAILY_SESSION_LIMIT} free guidance/chat sessions. Sessions reset at midnight UTC, or upgrade to Premium for unlimited sessions (see /api/v1/treasury/subscription-recommendations).`,
+              decision_type: decision_type || 'general',
+              companion: 'Alhena',
+              fallback_mode: false,
+              inference_source: 'tier_limit',
+              limit_reached: true,
+              tier,
+              disclaimer: 'Alhena is a decision-support companion, not therapy or medical care. In a crisis, call or text 988 (Suicide & Crisis Lifeline) or text HOME to 741741 (Crisis Text Line).',
+              memory: { signed_in: true, saved: false }
+            }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
+        }
+
         const priorGuidanceHistory = identity ? await readKvList(env, `guidance:${identity.email}`) : [];
-        const recentGuidanceHistory = priorGuidanceHistory.slice(-GUIDANCE_HISTORY_TURNS_INJECTED);
+        const guidanceHistoryTurns = tier === 'elite' ? GUIDANCE_HISTORY_TURNS_INJECTED_ELITE : GUIDANCE_HISTORY_TURNS_INJECTED;
+        const recentGuidanceHistory = priorGuidanceHistory.slice(-guidanceHistoryTurns);
         const historyContext = recentGuidanceHistory.length > 0
           ? `\n\nRecent conversation history with this user, oldest first (use this for real continuity - refer back to it naturally rather than treating this as a first-ever message):\n` +
             recentGuidanceHistory.map((h, i) => `${i + 1}. [${h.decision_type || 'general'}] User asked: "${h.question}" - You responded: "${h.guidance}"`).join('\n')
@@ -476,6 +554,12 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
           };
           await writeKvList(env, `guidance:${identity.email}`, [...priorGuidanceHistory, entry], MAX_STORED_GUIDANCE_SESSIONS);
           guidanceSaved = true;
+          // Real free-tier usage counter, incremented only for a real
+          // completed (not limit-blocked) free-tier session - premium/
+          // elite are genuinely never counted, so they never hit a cap.
+          if (tier === 'free') {
+            ctx.waitUntil(incrementDailySessionCount(env, identity.email));
+          }
         }
 
         const response = {
@@ -484,6 +568,7 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
           companion: 'Alhena',
           fallback_mode: isFallback,
           inference_source: inferenceResult.inferenceSource,
+          tier,
           disclaimer: 'Alhena is a decision-support companion, not therapy or medical care. In a crisis, call or text 988 (Suicide & Crisis Lifeline) or text HOME to 741741 (Crisis Text Line).',
           session_id: `sess_${Date.now()}`,
           next_check_in: new Date(Date.now() + 86400000).toISOString(),
@@ -824,10 +909,33 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
             status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
         }
+        // Real free-tier cap, shared with /api/v1/companion/guidance's
+        // counter (see getUserTier/getDailySessionCount above) - checked
+        // before spending an inference call, not after.
+        const tier = await getUserTier(env, identity.email);
+        if (tier === 'free') {
+          const sessionsUsedToday = await getDailySessionCount(env, identity.email);
+          if (sessionsUsedToday >= FREE_TIER_DAILY_SESSION_LIMIT) {
+            return new Response(JSON.stringify({
+              success: true,
+              message: {
+                role: 'assistant',
+                content: `You've used today's ${FREE_TIER_DAILY_SESSION_LIMIT} free guidance/chat sessions. Sessions reset at midnight UTC, or upgrade to Premium for unlimited sessions (see /api/v1/treasury/subscription-recommendations).`,
+                limit_reached: true,
+                inference_source: 'tier_limit',
+                timestamp: new Date().toISOString()
+              }
+            }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
+        }
+
         const key = `chat:${identity.email}`;
         const list = await readKvList(env, key);
         list.push({ role: 'user', content: body.message, timestamp: new Date().toISOString() });
         const inference = await generateChatReply(env, body.message);
+        if (tier === 'free') {
+          ctx.waitUntil(incrementDailySessionCount(env, identity.email));
+        }
         // Real fallback/inference_source metadata (added 2026-09-12,
         // matching what /api/v1/companion/guidance already exposed) - the
         // real UI's actual chat endpoint previously gave no signal at all
@@ -969,6 +1077,57 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
       }
     }
 
+    // Real Elite-tier feature (added 2026-09-13) - makes "Advanced
+    // wellness insights" in the subscription-recommendations copy below
+    // an actually-delivered capability instead of unenforced marketing
+    // text. Computed entirely from the same real checkin2:${email} data
+    // /api/checkin/history already reads - no fabricated numbers, no
+    // Math.random() (see the treasury removal note just below for what
+    // that class of mistake looked like last time).
+    if (url.pathname === '/api/insights' && request.method === 'GET') {
+      try {
+        const identity = await authenticateViaAuthFor(request);
+        const tier = await getUserTier(env, identity.email);
+        if (tier !== 'elite') {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Advanced wellness insights is an Elite-tier feature',
+            code: 'TIER_REQUIRED',
+            current_tier: tier
+          }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        const list = await readKvList(env, `checkin2:${identity.email}`);
+        const now = Date.now();
+        const daysAgoMs = n => now - n * 24 * 60 * 60 * 1000;
+        const windowSince = ms => list.filter(c => new Date(c.date).getTime() >= ms);
+        const avgMood = arr => arr.length ? arr.reduce((s, c) => s + c.mood, 0) / arr.length : null;
+        const last7 = windowSince(daysAgoMs(7));
+        const last30 = windowSince(daysAgoMs(30));
+        const prior7 = windowSince(daysAgoMs(14)).filter(c => new Date(c.date).getTime() < daysAgoMs(7));
+        const avgLast7 = avgMood(last7);
+        const avgPrior7 = avgMood(prior7);
+        let trend = 'not_enough_data';
+        if (avgLast7 !== null && avgPrior7 !== null) {
+          const diff = avgLast7 - avgPrior7;
+          trend = diff > 0.5 ? 'improving' : diff < -0.5 ? 'declining' : 'stable';
+        }
+        return new Response(JSON.stringify({
+          success: true,
+          tier,
+          total_checkins: list.length,
+          streak: checkinStreak(list),
+          avg_mood_7d: avgLast7,
+          avg_mood_30d: avgMood(last30),
+          trend_last_7d_vs_prior_7d: trend
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      } catch (e) {
+        if (e.status) return authForErrorResponse(e, corsHeaders);
+        return new Response(JSON.stringify({ success: false, error: e.message }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
     // Removed 2026-09-03: /api/v1/treasury/accounts and /api/v1/treasury/forecast
     // returned entirely fabricated data - hardcoded fake account balances
     // ($8,700.50 total) presented as reconciled real accounts, and a 90-day
@@ -986,11 +1145,20 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
         const recommendations = [];
 
         if (current_tier === 'free' && usage_pattern === 'active') {
+          // 'Daily wellness tracking' and 'Priority responses' removed
+          // 2026-09-13, same class of bug as the 2026-09-03/2026-09-11
+          // removals below: wellness tracking (/api/checkin,
+          // /api/v1/companion/checkin) has always been free for every
+          // tier, so listing it as a premium perk was never true, and
+          // "priority" responses were never implemented (there is no
+          // request-priority mechanism anywhere in this Worker). The one
+          // feature below is real and enforced as of the same pass -
+          // see FREE_TIER_DAILY_SESSION_LIMIT / getUserTier above.
           recommendations.push({
             tier: 'premium',
             monthly_cost: 9.99,
-            features: ['Unlimited guidance sessions', 'Daily wellness tracking', 'Priority responses'],
-            savings_estimate: 'Enable personalized coaching'
+            features: [`Unlimited guidance & chat sessions (free tier is capped at ${FREE_TIER_DAILY_SESSION_LIMIT}/day, enforced)`],
+            savings_estimate: 'No more waiting until tomorrow to keep talking with Alhena'
           });
         }
 
@@ -1005,11 +1173,18 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
           // could reasonably expect a real call and not get one. Not
           // replaced with an invented substitute; the two features below
           // are real, deliverable software capabilities.
+          // 'Extended session time' reworded 2026-09-13 to what it actually
+          // is now that it's real: a longer injected conversation-memory
+          // window (GUIDANCE_HISTORY_TURNS_INJECTED_ELITE), not literally
+          // more session duration.
           recommendations.push({
             tier: 'elite',
             monthly_cost: 19.99,
-            features: ['Advanced wellness insights', 'Extended session time'],
-            savings_estimate: 'For frequent users who want more from each session'
+            features: [
+              `Extended conversation memory (Alhena recalls the last ${GUIDANCE_HISTORY_TURNS_INJECTED_ELITE} exchanges vs ${GUIDANCE_HISTORY_TURNS_INJECTED} on Premium)`,
+              'Advanced wellness insights - GET /api/insights (mood trend, 7/30-day averages, real streak)'
+            ],
+            savings_estimate: 'For frequent users who want Alhena to remember more, and real insight into their own patterns'
           });
         }
 

@@ -748,3 +748,173 @@ test("POST /api/v1/companion/self-reflection: missing note is a real 400, not a 
   );
   assert.equal(res.status, 400);
 });
+
+// ── Real tier-gating (added 2026-09-13) ─────────────────────────────────
+// Closes a genuine gap: /api/vendyai/webhook has always written a real
+// paying user's tier to `user:${email}` in KV, but nothing ever read it
+// back - free and Elite users got byte-identical behavior everywhere.
+// These exercise the real free-tier daily cap, real unlimited premium/
+// elite, and the new GET /api/insights Elite-only route - against the
+// real worker.js logic, not a reimplementation of it.
+
+async function guidanceRequest(env, extra = {}) {
+  return worker.fetch(
+    new Request("https://alhena.cc/api/v1/companion/guidance", {
+      method: "POST",
+      headers: { Authorization: "Bearer real-token" },
+      body: JSON.stringify({ question: "Should I take the new job?", user_context: {}, ...extra }),
+    }),
+    env,
+    makeCtx()
+  );
+}
+
+test(
+  "POST /api/v1/companion/guidance: free tier gets FREE_TIER_DAILY_SESSION_LIMIT (5) real sessions, then a real limit_reached response - no 6th inference call",
+  withMockedAuthFor({ id: "u1", email: "free-user@example.com", name: "Free User" }, async () => {
+    const env = makeEnv();
+    for (let i = 0; i < 5; i++) {
+      const res = await guidanceRequest(env);
+      const body = await res.json();
+      assert.equal(res.status, 200);
+      assert.equal(body.limit_reached, undefined, `call ${i + 1} should not be limit-blocked`);
+      assert.equal(body.tier, "free");
+    }
+    const sixth = await guidanceRequest(env);
+    const sixthBody = await sixth.json();
+    assert.equal(sixth.status, 200);
+    assert.equal(sixthBody.limit_reached, true);
+    assert.equal(sixthBody.inference_source, "tier_limit");
+    assert.match(sixthBody.guidance, /free guidance\/chat sessions/);
+    // The blocked call must not have been persisted as a real session -
+    // history should still only have the first 5 real answers.
+    const stored = JSON.parse(env.ALHENA_KV.store.get("guidance:free-user@example.com"));
+    assert.equal(stored.length, 5);
+  })
+);
+
+test(
+  "POST /api/v1/companion/guidance: a real Premium subscriber (real user:email KV record) is genuinely unlimited",
+  withMockedAuthFor({ id: "u2", email: "premium-user@example.com", name: "Premium User" }, async () => {
+    const env = makeEnv();
+    env.ALHENA_KV.store.set("user:premium-user@example.com", JSON.stringify({ tier: "premium", activated_at: Date.now() }));
+    for (let i = 0; i < 8; i++) {
+      const res = await guidanceRequest(env);
+      const body = await res.json();
+      assert.equal(res.status, 200);
+      assert.equal(body.limit_reached, undefined, `premium call ${i + 1} should never be limit-blocked`);
+      assert.equal(body.tier, "premium");
+    }
+    const stored = JSON.parse(env.ALHENA_KV.store.get("guidance:premium-user@example.com"));
+    assert.equal(stored.length, 8);
+  })
+);
+
+test(
+  "POST /api/v1/companion/guidance: Elite tier gets a real extended conversation-memory window (15 turns vs 5)",
+  withMockedAuthFor({ id: "u3", email: "elite-user@example.com", name: "Elite User" }, async () => {
+    const env = makeEnv();
+    env.ALHENA_KV.store.set("user:elite-user@example.com", JSON.stringify({ tier: "elite", activated_at: Date.now() }));
+    const seeded = Array.from({ length: 20 }, (_, i) => ({ timestamp: `t${i}`, question: `q${i}`, guidance: `a${i}` }));
+    env.ALHENA_KV.store.set("guidance:elite-user@example.com", JSON.stringify(seeded));
+    const res = await guidanceRequest(env);
+    const body = await res.json();
+    assert.equal(res.status, 200);
+    assert.equal(body.tier, "elite");
+    assert.equal(body.memory.prior_sessions_considered, 15);
+  })
+);
+
+test(
+  "POST /api/v1/companion/guidance: free tier with only 20 prior sessions still gets the standard 5-turn window, not Elite's 15",
+  withMockedAuthFor({ id: "u4", email: "free-history-user@example.com", name: "Free History User" }, async () => {
+    const env = makeEnv();
+    const seeded = Array.from({ length: 20 }, (_, i) => ({ timestamp: `t${i}`, question: `q${i}`, guidance: `a${i}` }));
+    env.ALHENA_KV.store.set("guidance:free-history-user@example.com", JSON.stringify(seeded));
+    const res = await guidanceRequest(env);
+    const body = await res.json();
+    assert.equal(res.status, 200);
+    assert.equal(body.tier, "free");
+    assert.equal(body.memory.prior_sessions_considered, 5);
+  })
+);
+
+test(
+  "POST /api/chat: shares the same real free-tier daily cap as companion/guidance (combined counter)",
+  withMockedAuthFor({ id: "u5", email: "shared-cap-user@example.com", name: "Shared Cap User" }, async () => {
+    const env = makeEnv();
+    // 4 guidance sessions, then chat should only have 1 free session left.
+    for (let i = 0; i < 4; i++) await guidanceRequest(env);
+    const firstChat = await worker.fetch(
+      new Request("https://alhena.cc/api/chat", {
+        method: "POST",
+        headers: { Authorization: "Bearer real-token" },
+        body: JSON.stringify({ message: "hi" }),
+      }),
+      env,
+      makeCtx()
+    );
+    const firstBody = await firstChat.json();
+    assert.equal(firstChat.status, 200);
+    assert.equal(firstBody.message.limit_reached, undefined);
+
+    const secondChat = await worker.fetch(
+      new Request("https://alhena.cc/api/chat", {
+        method: "POST",
+        headers: { Authorization: "Bearer real-token" },
+        body: JSON.stringify({ message: "still here?" }),
+      }),
+      env,
+      makeCtx()
+    );
+    const secondBody = await secondChat.json();
+    assert.equal(secondChat.status, 200);
+    assert.equal(secondBody.message.limit_reached, true);
+    assert.equal(secondBody.message.inference_source, "tier_limit");
+  })
+);
+
+test(
+  "GET /api/insights: free and premium tiers get a real 403, not fabricated insights",
+  withMockedAuthFor({ id: "u6", email: "no-insights-user@example.com", name: "No Insights User" }, async () => {
+    const env = makeEnv();
+    const res = await worker.fetch(
+      new Request("https://alhena.cc/api/insights", { headers: { Authorization: "Bearer real-token" } }),
+      env,
+      makeCtx()
+    );
+    assert.equal(res.status, 403);
+    const body = await res.json();
+    assert.equal(body.code, "TIER_REQUIRED");
+    assert.equal(body.current_tier, "free");
+  })
+);
+
+test(
+  "GET /api/insights: a real Elite user gets real aggregated stats computed from their own checkin2 history",
+  withMockedAuthFor({ id: "u7", email: "elite-insights-user@example.com", name: "Elite Insights User" }, async () => {
+    const env = makeEnv();
+    env.ALHENA_KV.store.set("user:elite-insights-user@example.com", JSON.stringify({ tier: "elite", activated_at: Date.now() }));
+    const now = Date.now();
+    const day = (n) => new Date(now - n * 24 * 60 * 60 * 1000).toISOString();
+    const checkins = [
+      { date: day(1), mood: 8, energy: 7, note: null },
+      { date: day(2), mood: 8, energy: 7, note: null },
+      { date: day(10), mood: 3, energy: 4, note: null },
+      { date: day(11), mood: 3, energy: 4, note: null },
+    ];
+    env.ALHENA_KV.store.set("checkin2:elite-insights-user@example.com", JSON.stringify(checkins));
+    const res = await worker.fetch(
+      new Request("https://alhena.cc/api/insights", { headers: { Authorization: "Bearer real-token" } }),
+      env,
+      makeCtx()
+    );
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.success, true);
+    assert.equal(body.tier, "elite");
+    assert.equal(body.total_checkins, 4);
+    assert.equal(body.avg_mood_7d, 8);
+    assert.equal(body.trend_last_7d_vs_prior_7d, "improving");
+  })
+);
