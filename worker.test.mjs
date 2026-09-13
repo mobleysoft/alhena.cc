@@ -662,8 +662,13 @@ test("GET / (marketing page) links its call-to-action at the real /app, not the 
 // code-grounded answer instead of the normal model/fallback text, (2) that
 // answer honestly reports fallback_mode:true / inference_source:"none" in
 // this test env (no LLAMA_ACCESS_CLIENT_ID/SECRET, no ALHENA_INFERENCE_URL
-// configured - matching real production right now), and (3) the real
-// logging side effect actually lands in KV, not just a claimed side effect.
+// configured here, deliberately, so tests never make a real network call -
+// this stopped matching real production 2026-09-13, when those secrets were
+// provisioned on the live alhena-cc-worker and it started actually reaching
+// the llama bridge; buildSelfAwareAnswer's fallback-path wording was updated
+// to stop asserting "credentials haven't been provisioned" as the reason),
+// and (3) the real logging side effect actually lands in KV, not just a
+// claimed side effect.
 
 test(
   "POST /api/v1/companion/guidance: a self-reflection question gets the real code-grounded answer, not the generic fallback, and logs the moment",

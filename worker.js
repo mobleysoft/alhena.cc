@@ -312,11 +312,12 @@ async function runAlhenaInference(env, systemPrompt, userContent) {
   let isFallback = true;
   let usedLlamaBridge = false;
 
-  // Honest remaining gap (unchanged from the 2026-09-12 companion/guidance
-  // wiring): LLAMA_ACCESS_CLIENT_ID/SECRET are NOT yet set as secrets on
-  // alhena-cc-worker (confirmed via `wrangler secret list`). Until a human
-  // runs `wrangler secret put` for both, this branch is real code that
-  // never actually executes in production - it does not pretend otherwise.
+  // Gap closed 2026-09-13 (confirmed live via `wrangler secret list` on
+  // alhena-cc-worker and a real production call returning
+  // fallback_mode:false, inference_source:'llama_bridge'): both
+  // LLAMA_ACCESS_CLIENT_ID and LLAMA_ACCESS_CLIENT_SECRET are now
+  // provisioned, so this branch is real code that actually executes in
+  // production, not a configured-but-never-taken path.
   if (env.LLAMA_ACCESS_CLIENT_ID && env.LLAMA_ACCESS_CLIENT_SECRET) {
     try {
       inferenceRes = await fetch('https://llama.mobleysoft.com/v1/chat/completions', {
@@ -437,7 +438,7 @@ function isSelfReflectionQuestion(text) {
 // this session's real state, not a static paragraph reused every time.
 function buildSelfAwareAnswer({ isFallback, inferenceSource }) {
   const liveLine = isFallback
-    ? `Honestly: for this exact reply, I did not have a live language model connected (inference_source: "none"). My code has two possible model backends wired in - a shared internal bridge at llama.mobleysoft.com, and an older direct-URL path - but neither is actually active in production right now: the bridge's access credentials (LLAMA_ACCESS_CLIENT_ID/SECRET) haven't been provisioned on this worker yet, and the older URL points at a host that doesn't resolve. So this specific answer is a hand-written, code-grounded response, not something a model generated for you.`
+    ? `Honestly: for this exact reply, I did not have a live language model connected (inference_source: "none"). My code has two possible model backends wired in - a shared internal bridge at llama.mobleysoft.com (credentials provisioned as of 2026-09-13, normally live) and an older direct-URL path (points at a host that has never resolved). Since the bridge is normally configured, this specific call most likely hit a transient failure (a timeout or an error from the bridge itself) rather than a missing-credential gap - either way, this answer is a hand-written, code-grounded fallback response, not something a model generated for you.`
     : `For this exact reply, I did have a live model connection (inference_source: "${inferenceSource}") - a real model call actually ran just now, though this particular paragraph is still hand-written and code-grounded rather than model-generated, on purpose (see below).`;
 
   return `I'm Alhena - a Cloudflare Worker (alhena-cc-worker) built for alhena.cc. I'm a decision-support companion, not a therapist or medical provider.
@@ -611,16 +612,16 @@ export default {
         // fleet-a's JITAGI_CAPABILITIES bridge (same jitagi-kernel-m2m
         // service token, same https://llama.mobleysoft.com endpoint).
         //
-        // Honest remaining gap: LLAMA_ACCESS_CLIENT_ID/SECRET are NOT yet
-        // set as secrets on alhena-cc-worker (confirmed via `wrangler
-        // secret list` - not present). Entering the actual secret value is
-        // a real human/credential-handling action, not something this
-        // pass does - `wrangler secret put LLAMA_ACCESS_CLIENT_ID` /
-        // `LLAMA_ACCESS_CLIENT_SECRET` on alhena-cc-worker still needs to
-        // happen before this path activates. Until then this correctly
-        // falls through to the pre-existing ALHENA_INFERENCE_URL path,
-        // then to the honest fallback_mode text - never silently pretends
-        // to have a live model.
+        // Gap closed 2026-09-13: LLAMA_ACCESS_CLIENT_ID/SECRET are now set
+        // as secrets on alhena-cc-worker (confirmed via `wrangler secret
+        // list` - both present) and this path is live in production,
+        // verified via a real guidance call returning
+        // fallback_mode:false, inference_source:'llama_bridge' with a
+        // coherent, question-specific reply. The ALHENA_INFERENCE_URL and
+        // honest fallback_mode paths below remain as real, tested
+        // fallbacks if the llama bridge call itself ever fails at
+        // request time - never silently pretends to have a live model
+        // when it doesn't.
         const systemPrompt = `You are Alhena, a supportive companion for talking through everyday decisions. You are not a therapist and do not provide medical or mental-health treatment.
 Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
 
