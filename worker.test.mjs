@@ -386,11 +386,48 @@ test(
 // AuthFor Bearer token, exercised the same mocked-fetch way as above.
 
 test(
-  "GET /api/journal: 401 with no Authorization header",
+  // Real gap found and fixed 2026-09-13: the anonymous, no-signup pivot
+  // only ever reached /api/chat - journal/goals/checkin (the routes the
+  // real app.html UI actually calls for its core structured-journal/
+  // goal-tracking features) still required a full AuthFor sign-in,
+  // silently contradicting "no signup required" for most of the real
+  // app. Now resolveIdentity-backed like /api/chat, same as every other
+  // anonymous-capable route - a fresh anonymous caller gets a real,
+  // isolated journal, not a 401.
+  "GET /api/journal: works with NO Authorization header - a real, isolated anonymous journal",
   withMockedAuthFor(null, async () => {
     const env = makeEnv();
     const res = await worker.fetch(new Request("https://alhena.cc/api/journal"), env, makeCtx());
-    assert.equal(res.status, 401);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.success, true);
+    assert.deepEqual(body.entries, []);
+  })
+);
+
+test(
+  "POST /api/journal then GET /api/journal with the SAME anon id: a real anonymous entry round-trips",
+  withMockedAuthFor(null, async () => {
+    const env = makeEnv();
+    const anonHeaders = { "X-Alhena-Anon-Id": "11111111-1111-4111-8111-111111111111" };
+    const post = await worker.fetch(
+      new Request("https://alhena.cc/api/journal", {
+        method: "POST",
+        headers: { ...anonHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "A real anonymous journal entry" }),
+      }),
+      env,
+      makeCtx()
+    );
+    assert.equal(post.status, 200);
+    const get = await worker.fetch(
+      new Request("https://alhena.cc/api/journal", { headers: anonHeaders }),
+      env,
+      makeCtx()
+    );
+    const body = await get.json();
+    assert.equal(body.entries.length, 1);
+    assert.equal(body.entries[0].content, "A real anonymous journal entry");
   })
 );
 
@@ -476,6 +513,32 @@ test(
 );
 
 test(
+  "POST /api/goals then GET /api/goals with the SAME anon id: a real anonymous goal round-trips (2026-09-13 pivot fix)",
+  withMockedAuthFor(null, async () => {
+    const env = makeEnv();
+    const anonHeaders = { "X-Alhena-Anon-Id": "22222222-2222-4222-8222-222222222222" };
+    const post = await worker.fetch(
+      new Request("https://alhena.cc/api/goals", {
+        method: "POST",
+        headers: { ...anonHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Walk daily" }),
+      }),
+      env,
+      makeCtx()
+    );
+    assert.equal(post.status, 200);
+    const get = await worker.fetch(
+      new Request("https://alhena.cc/api/goals", { headers: anonHeaders }),
+      env,
+      makeCtx()
+    );
+    const body = await get.json();
+    assert.equal(body.goals.length, 1);
+    assert.equal(body.goals[0].title, "Walk daily");
+  })
+);
+
+test(
   "PUT /api/goals/:id: unknown goal id returns 404, not a silent success",
   withMockedAuthFor({ id: "u1", email: "real-user@example.com", name: "Real User" }, async () => {
     const env = makeEnv();
@@ -519,6 +582,32 @@ test(
     assert.equal(getBody.messages.length, 2);
     assert.equal(getBody.messages[0].role, "user"); // oldest first, matches chat UI append order
     assert.equal(getBody.messages[1].role, "assistant");
+  })
+);
+
+test(
+  "POST /api/checkin then GET /api/checkin/history with the SAME anon id: a real anonymous checkin round-trips (2026-09-13 pivot fix)",
+  withMockedAuthFor(null, async () => {
+    const env = makeEnv();
+    const anonHeaders = { "X-Alhena-Anon-Id": "33333333-3333-4333-8333-333333333333" };
+    const post = await worker.fetch(
+      new Request("https://alhena.cc/api/checkin", {
+        method: "POST",
+        headers: { ...anonHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ mood: 7 }),
+      }),
+      env,
+      makeCtx()
+    );
+    assert.equal(post.status, 200);
+    const get = await worker.fetch(
+      new Request("https://alhena.cc/api/checkin/history", { headers: anonHeaders }),
+      env,
+      makeCtx()
+    );
+    const body = await get.json();
+    assert.equal(body.checkins.length, 1);
+    assert.equal(body.checkins[0].mood, 7);
   })
 );
 

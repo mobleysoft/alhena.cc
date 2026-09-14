@@ -895,7 +895,18 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
     // ── Companion app-shell routes (app.html) ──────────────────────────
     if (url.pathname === '/api/journal' && request.method === 'POST') {
       try {
-        const identity = await authenticateViaAuthFor(request);
+        // 2026-09-13 pivot follow-up (real gap found during this pass):
+        // the anonymous, no-signup pivot only ever reached /api/chat and
+        // the separate /api/v1/companion/* surface app.html doesn't
+        // actually call - journal/goals/checkin, the routes the real app
+        // UI calls for its core structured-journal/goal-tracking
+        // features (this venture's own spec_draft mvp_feature), were
+        // left requiring a full AuthFor sign-in, silently contradicting
+        // "no signup required" for most of the real app. resolveIdentity
+        // (never throws, real anonymous identity or a real AuthFor user)
+        // is the same fix already proven on /api/chat - applied here
+        // consistently rather than leaving it half-migrated.
+        const identity = await resolveIdentity(request);
         const body = await request.json();
         if (!body.content) {
           return new Response(JSON.stringify({ success: false, error: 'Missing content' }), {
@@ -926,19 +937,24 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
 
     if (url.pathname === '/api/journal' && request.method === 'GET') {
       try {
-        const identity = await authenticateViaAuthFor(request);
+        const identity = await resolveIdentity(request);
         const list = await readKvList(env, `journal:${identity.email}`);
         return new Response(JSON.stringify({ success: true, entries: [...list].reverse() }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       } catch (e) {
-        return authForErrorResponse(e, corsHeaders);
+        // resolveIdentity never throws, so a real error reaching here is a
+        // genuine server-side failure (KV/parse), not an auth failure -
+        // authForErrorResponse would have mislabeled it a 401.
+        return new Response(JSON.stringify({ success: false, error: e.message }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
       }
     }
 
     if (url.pathname === '/api/goals' && request.method === 'POST') {
       try {
-        const identity = await authenticateViaAuthFor(request);
+        const identity = await resolveIdentity(request);
         const body = await request.json();
         if (!body.title) {
           return new Response(JSON.stringify({ success: false, error: 'Missing title' }), {
@@ -971,19 +987,21 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
 
     if (url.pathname === '/api/goals' && request.method === 'GET') {
       try {
-        const identity = await authenticateViaAuthFor(request);
+        const identity = await resolveIdentity(request);
         const list = await readKvList(env, `goals:${identity.email}`);
         return new Response(JSON.stringify({ success: true, goals: [...list].reverse() }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       } catch (e) {
-        return authForErrorResponse(e, corsHeaders);
+        return new Response(JSON.stringify({ success: false, error: e.message }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
       }
     }
 
     if (url.pathname.startsWith('/api/goals/') && request.method === 'PUT') {
       try {
-        const identity = await authenticateViaAuthFor(request);
+        const identity = await resolveIdentity(request);
         const goalId = url.pathname.slice('/api/goals/'.length);
         const body = await request.json();
         const key = `goals:${identity.email}`;
@@ -1141,7 +1159,7 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
     // above. Different data shape, different feature, same venture.
     if (url.pathname === '/api/checkin' && request.method === 'POST') {
       try {
-        const identity = await authenticateViaAuthFor(request);
+        const identity = await resolveIdentity(request);
         const body = await request.json();
         if (typeof body.mood !== 'number') {
           return new Response(JSON.stringify({ success: false, error: 'Missing mood' }), {
@@ -1181,7 +1199,7 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
 
     if (url.pathname === '/api/checkin/history' && request.method === 'GET') {
       try {
-        const identity = await authenticateViaAuthFor(request);
+        const identity = await resolveIdentity(request);
         // Real bug found 2026-09-12 (same class as salesfactorai.com's
         // days=0 bug found earlier this session): `parseInt(...) || 30`
         // treats an explicit, valid `days=0` the same as a missing/NaN
@@ -1202,7 +1220,9 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       } catch (e) {
-        return authForErrorResponse(e, corsHeaders);
+        return new Response(JSON.stringify({ success: false, error: e.message }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
       }
     }
 
