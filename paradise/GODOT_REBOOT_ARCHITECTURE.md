@@ -100,9 +100,10 @@ Water is the key visual gate.
 
 Minimum acceptable water for promotion:
 
-- Gerstner or FFT-inspired ocean surface.
-- Distinct near-shore foam.
-- Reflection/refraction approximation.
+- Dedicated full-screen WebGL ocean pass, not painted asset art.
+- JONSWAP-inspired spectral wave stack with analytical normals.
+- Fresnel sky reflection, subsurface scatter, fog, foam, glints, and ACES-style tone mapping.
+- Transparent 3D mesh carrier for perspective displacement instead of an opaque flat sheet.
 - Buoyant bobber/line behavior.
 - Day/weather presets that change color, chop, foam, and visibility.
 
@@ -135,3 +136,23 @@ The Godot version may replace the current page only when:
 - Alhena and dog no longer read as placeholders.
 - Screenshot evidence is captured and committed.
 
+## Runtime Asset Contract
+
+The live Three.js `/game/` route now exposes the same asset expectations in a
+deployable manifest:
+
+- `public/assets/paradise-asset-manifest.json`
+
+The manifest is intentionally small and production-safe. It lists the runtime
+slots that must be replaced by optimized assets:
+
+- `alhena_bartender_rig`
+- `black_lab_rig`
+- `shoreline_environment`
+- `spectral_ocean`
+
+The current `/game/` page fetches this manifest and reports the active/needed
+asset count in the hidden `Q` diagnostics panel. This is the bridge between the
+current live Three.js prototype and the later Godot/GLB asset pipeline: exports
+should satisfy the manifest first, then replace procedural placeholders one slot
+at a time.
