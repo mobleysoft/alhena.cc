@@ -40,6 +40,15 @@ Target source:
 - `godotengine/tps-demo`
 - Godot Asset Library: Third Person Shooter Demo
 
+Verified 2026-09-15:
+
+- Godot Asset Library page for the Third Person Shooter Demo describes it as a
+  complete TPS demo built for Godot Engine and suitable as an engine/sample
+  project seed: https://godotengine.org/asset-library/asset/2710
+- Godot's official documentation and site continue to describe web deployment as
+  a supported target through HTML5/WebAssembly/WebGL-style export paths:
+  https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_web.html
+
 Fallback/reference sources:
 
 - `godotengine/godot-demo-projects`
