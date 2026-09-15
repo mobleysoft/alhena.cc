@@ -31,7 +31,10 @@ for file in "${required_files[@]}"; do
 done
 
 markers=(
-  "v3-godot-glb-production-gate-runtime"
+  "v3-godot-authored-procedural-scene-runtime"
+  "v3_jonswap_carrier_ocean_grid"
+  "v3_black_lab_articulated_bone_proxy"
+  "v3_alhena_articulated_bartender_standin"
   "ShorelineEnvironmentSlot"
   "AlhenaSlot"
   "BlackLabSlot"
