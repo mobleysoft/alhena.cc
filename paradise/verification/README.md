@@ -147,6 +147,11 @@ taken with Playwright Chromium at `1440x900`.
   animation, a warmer planked bar front, reduced counter/canopy mass, and a
   pulled-back camera. It improves presentation readability while preserving the
   conclusion that a real rigged character asset is required for AAA quality.
+- `paradise-game-v2-atmosphere-depth.png`: live shore capture after adding a
+  lightweight Three.js atmosphere layer: camera-facing horizon haze, soft
+  cloud-bank cards, preset-driven cloud color/opacity, and subtle drift. This
+  improves horizon scale and scene depth without increasing the GLB asset budget,
+  but remains a bridge until a real skybox/HDRI/environment pipeline exists.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.

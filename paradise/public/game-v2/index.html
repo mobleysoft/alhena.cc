@@ -313,6 +313,26 @@ sunGlow.name = 'v2-volumetric-sun-glow';
 sunGlow.position.copy(sunDisk.position);
 scene.add(sunGlow);
 
+const cloudMat = new THREE.MeshBasicMaterial({ color: 0xf4fbff, transparent: true, opacity: .18, depthWrite: false, fog: false });
+const cloudBank = new THREE.Group();
+cloudBank.name = 'v2-layered-atmospheric-cloud-bank';
+scene.add(cloudBank);
+for (let i = 0; i < 18; i++) {
+  const cloud = new THREE.Mesh(new THREE.CircleGeometry(1, 28), cloudMat.clone());
+  cloud.name = 'v2-soft-horizon-cloud-lenticular';
+  cloud.position.set(-58 + i * 7.2, 16 + Math.sin(i * 1.7) * 3.2, -118 - (i % 4) * 6);
+  cloud.scale.set(5.5 + Math.sin(i) * 2.1, 1.0 + Math.cos(i * .7) * .32, 1);
+  cloud.rotation.z = Math.sin(i * 1.2) * .10;
+  cloudBank.add(cloud);
+}
+const horizonHaze = new THREE.Mesh(
+  new THREE.PlaneGeometry(240, 18, 1, 1),
+  new THREE.MeshBasicMaterial({ color: 0xe7f2ef, transparent: true, opacity: .18, depthWrite: false, fog: false })
+);
+horizonHaze.name = 'v2-ocean-horizon-haze-gradient-card';
+horizonHaze.position.set(0, 5.5, -120);
+scene.add(horizonHaze);
+
 function makeTexture(size, painter) {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
@@ -1350,6 +1370,12 @@ function applyEnvironment(timeName = activeTime, weatherName = activeWeather) {
   skyUniforms.uLower.value.setHex(time.lower);
   skyUniforms.uCloud.value = weather.cloud;
   skyUniforms.uSunBloom.value = time.bloom;
+  horizonHaze.material.color.setHex(time.fog);
+  horizonHaze.material.opacity = (activeTime === 'night' ? .08 : .16) + weather.cloud * .16;
+  cloudBank.children.forEach((cloud, i) => {
+    cloud.material.color.setHex(activeTime === 'sunset' ? 0xffd2b2 : activeTime === 'night' ? 0x4d6284 : 0xf4fbff);
+    cloud.material.opacity = ((activeTime === 'night' ? .08 : .13) + weather.cloud * .22) * (i % 3 === 0 ? .72 : 1);
+  });
   oceanUniforms.uSky.value.setHex(time.sky);
   oceanUniforms.uHorizon.value.setHex(time.waterHorizon);
   oceanUniforms.uFogTint.value.setHex(time.fog);
@@ -1400,6 +1426,12 @@ function animate() {
   waterOpticsUniforms.uTime.value = t;
   sunDisk.lookAt(camera.position);
   sunGlow.lookAt(camera.position);
+  horizonHaze.lookAt(camera.position);
+  cloudBank.children.forEach((cloud, i) => {
+    cloud.lookAt(camera.position);
+    cloud.position.x += Math.sin(t * .07 + i) * .0018;
+    cloud.position.y += Math.sin(t * .05 + i * 1.7) * .0009;
+  });
   controls.update();
   alhena.rotation.y = Math.sin(t * .45) * .06;
   alhena.userData.torso.scale.y = 1.0 + Math.sin(t * 1.2) * .018;
