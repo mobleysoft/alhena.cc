@@ -265,7 +265,7 @@ document.body.classList.toggle('clean', query.get('clean') === '1');
 document.body.dataset.waterArchitecture = canonicalPandoraWaterOnly
   ? 'v2-canonical-pandorachat-webgl2-ocean-shader'
   : 'v2-debug-pandorachat-plus-three-water-mesh';
-document.body.dataset.waterRefinement = 'v2-pandorachat-parallax-reflection-caustic-horizon-breakup';
+document.body.dataset.waterRefinement = 'v2-pandorachat-jonswap-analytical-ocean-optics-v2';
 document.body.dataset.shoreStaging = 'v2-ocean-first-shore-composition-scaled-billboard-depth';
 const oceanCanvas = document.getElementById('ocean-pass');
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, premultipliedAlpha: false, powerPreference: 'high-performance' });
@@ -777,6 +777,25 @@ function makePandoraOceanPass(canvas) {
       ) * 0.026;
       return normalize(macro + vec3(capillary.x + windRipple.x, 0.0, capillary.y + windRipple.y) * (0.14 + uWind * 0.018));
     }
+    float spectralStreak(vec2 p, float d) {
+      float aligned = fbm(vec2(p.x * 0.055 + uTime * 0.018, p.y * 0.46 - uTime * 0.042));
+      float cross = fbm(vec2(p.x * 0.34 - uTime * 0.060, p.y * 1.72 + uTime * 0.18));
+      float cap = fbm(vec2(p.x * 8.2 + uTime * 0.74, p.y * 2.6 - uTime * 0.28));
+      return smoothstep(0.36, 0.82, aligned) * 0.44
+        + smoothstep(0.58, 0.91, cross) * 0.36
+        + smoothstep(0.78, 0.985, cap) * smoothstep(0.02, 0.55, d) * 0.20;
+    }
+    vec3 scatterVolume(vec3 base, vec3 n, vec3 viewDir, float h, float d, float curvature) {
+      float nearShore = smoothstep(0.48, 1.0, d);
+      float facingSun = max(dot(n, normalize(vec3(-0.32, 0.86, 0.38))), 0.0);
+      float backScatter = pow(max(dot(n, normalize(vec3(0.22, 0.72, -0.66))), 0.0), 1.7);
+      float forwardScatter = pow(max(dot(viewDir, normalize(vec3(-0.20, 0.16, 0.96))), 0.0), 3.6);
+      vec3 sss = vec3(0.00, 0.36, 0.32) * (0.20 + uGold * 0.09) * nearShore * smoothstep(-0.32, 0.42, h);
+      sss += vec3(0.05, 0.23, 0.20) * facingSun * (1.0 - d) * 0.18;
+      sss += vec3(0.03, 0.19, 0.18) * backScatter * nearShore * 0.24;
+      sss += vec3(0.10, 0.37, 0.33) * forwardScatter * smoothstep(0.02, 0.56, d) * 0.16;
+      return base + sss + vec3(0.0, 0.12, 0.14) * curvature * 0.20;
+    }
     vec3 skyColor(vec2 uv, vec3 rd) {
       vec3 zenith = mix(uSkyTint * 2.5 + vec3(0.035, 0.08, 0.15), vec3(0.12, 0.18, 0.22), uStorm * .72);
       vec3 horizonCol = mix(vec3(0.36, 0.54, 0.58), vec3(0.64, 0.50, 0.36), uGold * 0.24);
@@ -812,58 +831,60 @@ function makePandoraOceanPass(canvas) {
     }
     vec3 oceanColor(vec2 uv, vec2 q, float horizon) {
       float d = clamp((horizon - uv.y) / horizon, 0.0, 1.0);
-      float farField = smoothstep(0.060, 0.30, d);
-      float range = min(96.0, 1.0 / max(0.048, pow(d + 0.040, 1.58)));
-      vec2 p = vec2(q.x * range * 2.42, range * 3.95 - uTime * (0.34 + uWind * 0.017));
-      p += vec2(sampleJonswapSurface(p * 0.21 + 8.0).h, sampleJonswapSurface(p * 0.17 - 4.0).h) * 0.028 * uChop;
+      float farField = smoothstep(0.045, 0.34, d);
+      float nearShore = smoothstep(0.52, 1.0, d);
+      float invDepth = 1.0 / max(0.050, pow(d + 0.038, 1.74));
+      float range = min(132.0, invDepth);
+      vec2 p = vec2(q.x * range * 2.72, range * 4.58 - uTime * (0.31 + uWind * 0.016));
+      WaveSample low = sampleJonswapSurface(p * 0.145 + vec2(8.0, -2.0));
+      WaveSample midSample = sampleJonswapSurface(p * 0.31 + vec2(-4.0, 6.0));
+      p += vec2(low.h, midSample.h) * 0.036 * uChop;
       WaveSample sample = sampleJonswapSurface(p);
       vec3 n = waterNormal(p, range * 0.010);
       float h = sample.h;
-      float curvature = clamp(abs(sample.curvature) * 0.105 + sample.energy * 0.36, 0.0, 1.0);
-      float slope = clamp(length(sample.grad) * 0.82 + (1.0 - n.y) * 2.2, 0.0, 1.0);
-      vec3 viewDir = normalize(vec3(q.x * .48, d * .42 + .13, 1.0));
+      float curvature = clamp(abs(sample.curvature) * 0.120 + sample.energy * 0.40, 0.0, 1.0);
+      float slope = clamp(length(sample.grad) * 0.92 + (1.0 - n.y) * 2.55, 0.0, 1.0);
+      vec3 viewDir = normalize(vec3(q.x * .52, d * .48 + .12, 1.0));
       float fresnel = 0.0204 + 0.9796 * pow(1.0 - clamp(dot(n, viewDir), 0.0, 1.0), 5.0);
       vec3 reflectedDir = reflect(-viewDir, n);
-      vec3 refl = skyColor(vec2(uv.x + n.x * .095, horizon + d * .60 + n.z * .075), reflectedDir);
+      vec2 reflectUv = vec2(uv.x + n.x * .135 + h * .0025, horizon + d * .62 + n.z * .095);
+      vec3 refl = skyColor(reflectUv, reflectedDir);
       refl += vec3(0.10, 0.18, 0.22) * pow(clamp(reflectedDir.y * 0.5 + 0.5, 0.0, 1.0), 2.4) * (1.0 - uStorm * .45);
-      vec3 deep = mix(vec3(0.001, 0.020, 0.085), vec3(0.001, 0.014, 0.026), uStorm);
-      vec3 mid = mix(vec3(0.004, 0.112, 0.185), vec3(0.018, 0.080, 0.105), uStorm);
-      vec3 shallow = mix(vec3(0.018, 0.215, 0.285), vec3(0.070, 0.165, 0.180), uStorm);
-      float nearShore = smoothstep(0.55, 1.0, d);
-      float farDepth = smoothstep(0.07, 0.42, d) * (1.0 - nearShore * 0.44);
+      vec3 deep = mix(vec3(0.000, 0.013, 0.055), vec3(0.001, 0.010, 0.024), uStorm);
+      vec3 mid = mix(vec3(0.002, 0.086, 0.150), vec3(0.014, 0.065, 0.092), uStorm);
+      vec3 shallow = mix(vec3(0.025, 0.245, 0.300), vec3(0.065, 0.145, 0.160), uStorm);
+      float farDepth = smoothstep(0.055, 0.48, d) * (1.0 - nearShore * 0.48);
       vec3 body = mix(mid, shallow, nearShore);
       body = mix(body, deep, farDepth * 0.70);
-      float transmission = smoothstep(-0.22, 0.38, h) * smoothstep(0.14, 0.94, d);
-      float sss = pow(max(dot(n, normalize(vec3(-0.34, 0.84, 0.40))), 0.0), 2.0);
-      body += vec3(0.00, 0.42, 0.36) * transmission * 0.22;
-      body += vec3(0.08, 0.30, 0.26) * sss * nearShore * (0.18 + uGold * 0.08);
-      body += vec3(0.0, 0.20, 0.23) * curvature * 0.16;
+      body = scatterVolume(body, n, viewDir, h, d, curvature);
       float signedCurvature = sample.curvature;
-      float crestEnergy = smoothstep(0.10, 0.48, abs(h)) * max(slope, curvature);
-      float folding = smoothstep(0.08, 0.38, -signedCurvature) * smoothstep(0.05, 0.46, slope);
-      float foamNoise = fbm(p * 5.6 + vec2(uTime * .08, -uTime * .05));
-      float microFoam = smoothstep(uFoamT * .42, uFoamT * 1.04, abs(h)) * smoothstep(.42 - uStorm * .10, .84, foamNoise) * farField;
-      float shoreLine = 0.218 + 0.012 * sin(q.x * 3.4 + uTime * .18);
-      float shoreFoam = smoothstep(0.030, 0.0, abs(uv.y - shoreLine)) * smoothstep(.34, .82, fbm(vec2(q.x * 24.0, uTime * .42))) * farField;
-      float foam = clamp(crestEnergy * microFoam + folding * .30 + shoreFoam * .50, 0.0, .86);
-      vec3 water = mix(body, refl, fresnel * mix(.36, .68, smoothstep(0.0, 0.18, d)));
-      float windLines = smoothstep(.42, .88, fbm(vec2(p.x * .08 + h * 1.7, p.y * .18 - uTime * .26)));
-      water += vec3(.025, .185, .205) * pow(clamp(slope * .62 + curvature * .32, 0.0, 1.0), 1.35) * windLines * smoothstep(.02, .78, d) * farField * 1.45;
-      float swellShadow = smoothstep(.38, .76, fbm(vec2(p.x * .030 - uTime * .012, p.y * .105 + uTime * .032)));
-      float reflectedClouds = smoothstep(.48, .84, fbm(vec2(p.x * .020 + n.x * 2.2 - uTime * .006, p.y * .055 + n.z * 1.4 + 2.7)));
-      water = mix(water, water * vec3(.72, .82, .86), swellShadow * smoothstep(.04, .78, d) * farField * (.16 + uStorm * .10));
-      water = mix(water, vec3(.58, .70, .72), reflectedClouds * fresnel * smoothstep(.03, .55, d) * farField * (.11 + uStorm * .16));
-      float caustics = causticField(p * mix(.20, .62, nearShore));
-      water += vec3(.18, .74, .66) * caustics * nearShore * (1.0 - uStorm * .38) * .18;
+      float crestEnergy = smoothstep(0.08, 0.44, abs(h)) * max(slope, curvature);
+      float folding = smoothstep(0.06, 0.34, -signedCurvature) * smoothstep(0.04, 0.44, slope);
+      float streakField = spectralStreak(p, d);
+      float foamNoise = fbm(p * 5.9 + vec2(uTime * .08, -uTime * .05));
+      float microFoam = smoothstep(uFoamT * .36, uFoamT * 1.02, abs(h) + slope * .08) * smoothstep(.38 - uStorm * .10, .84, foamNoise) * farField;
+      float shoreLine = 0.218 + 0.012 * sin(q.x * 3.4 + uTime * .18) + 0.007 * fbm(vec2(q.x * 8.0, uTime * .18));
+      float shoreFoam = smoothstep(0.034, 0.0, abs(uv.y - shoreLine)) * smoothstep(.32, .82, fbm(vec2(q.x * 27.0, uTime * .44))) * farField;
+      float foam = clamp(crestEnergy * microFoam * (.58 + streakField * .64) + folding * .38 + shoreFoam * .56, 0.0, .90);
+      float reflectWeight = fresnel * mix(.30, .76, smoothstep(0.0, 0.22, d)) + slope * .045;
+      vec3 water = mix(body, refl, clamp(reflectWeight, 0.0, .78));
+      water += vec3(.020, .180, .205) * pow(clamp(slope * .64 + curvature * .34, 0.0, 1.0), 1.28) * streakField * smoothstep(.02, .82, d) * farField * 1.72;
+      float swellShadow = smoothstep(.36, .78, fbm(vec2(p.x * .028 - uTime * .011, p.y * .112 + uTime * .033)));
+      float reflectedClouds = smoothstep(.46, .86, fbm(vec2(p.x * .017 + n.x * 2.6 - uTime * .006, p.y * .050 + n.z * 1.7 + 2.7)));
+      water = mix(water, water * vec3(.62, .78, .83), swellShadow * smoothstep(.035, .82, d) * farField * (.20 + uStorm * .13));
+      water = mix(water, vec3(.60, .72, .73), reflectedClouds * fresnel * smoothstep(.025, .58, d) * farField * (.12 + uStorm * .18));
+      float caustics = causticField(p * mix(.22, .72, nearShore));
+      water += vec3(.18, .76, .66) * caustics * nearShore * (1.0 - uStorm * .42) * .22;
       vec3 sunDir = normalize(vec3(-0.34, .86, .38));
-      float spec = pow(max(dot(n, normalize(viewDir + sunDir)), 0.0), mix(58.0, 220.0, smoothstep(0.10, 0.92, d)));
-      float glints = smoothstep(.62, .96, fbm(p * 31.0 + vec2(uTime * .55, -uTime * .21)));
-      water += vec3(1.0, .84, .46) * spec * glints * (0.9 + uGold * 1.6) * farField;
-      water = mix(water, vec3(.88, .97, .99), foam * .46);
+      float spec = pow(max(dot(n, normalize(viewDir + sunDir)), 0.0), mix(44.0, 260.0, smoothstep(0.08, 0.92, d)));
+      float glints = smoothstep(.60, .975, fbm(p * 34.0 + vec2(uTime * .55, -uTime * .21)));
+      float sparkle = pow(max(dot(reflect(-sunDir, n), viewDir), 0.0), 18.0) * smoothstep(.74, .99, fbm(p * vec2(16.0, 44.0) + uTime * .28));
+      water += vec3(1.0, .84, .46) * (spec * glints + sparkle * .45) * (0.9 + uGold * 1.7) * farField;
+      water = mix(water, vec3(.88, .97, .99), foam * .50);
       water += vec3(.12, .03, .18) * foam * curvature * 0.08;
       float farHaze = smoothstep(0.24, 0.0, d);
-      water = mix(water, mix(vec3(.20, .33, .39), vec3(.58, .67, .67), uGold * .14), farHaze * (.28 + uStorm * .20));
-      water = mix(water, vec3(.52, .64, .66), smoothstep(0.30, 0.0, d) * (.72 + uStorm * .10));
+      water = mix(water, mix(vec3(.18, .31, .38), vec3(.58, .67, .67), uGold * .14), farHaze * (.30 + uStorm * .20));
+      water = mix(water, vec3(.50, .63, .66), smoothstep(0.30, 0.0, d) * (.70 + uStorm * .10));
       water = mix(water, vec3(.03,.09,.105), uStorm * smoothstep(.08, .78, d) * .22);
       return water;
     }
