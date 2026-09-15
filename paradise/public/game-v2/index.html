@@ -987,16 +987,28 @@ function makeDog() {
   tail.rotation.z = 1.0;
   const legs = [];
   const paws = [];
+  const joints = [];
   for (const x of [-.42, .42]) for (const z of [-.18, .18]) {
     const leg = new THREE.Mesh(new THREE.CapsuleGeometry(.055, .42, 6, 10), furMat);
     leg.position.set(x, -.34, z);
+    const hock = new THREE.Mesh(new THREE.CapsuleGeometry(.045, .26, 6, 8), furRimMat);
+    hock.name = 'v2-black-lab-hock-segment';
+    hock.position.set(x + .04, -.50, z);
+    hock.rotation.z = x < 0 ? -.16 : .16;
     const paw = new THREE.Mesh(new THREE.SphereGeometry(.075, 12, 6), furRimMat);
     paw.name = 'v2-black-lab-paw';
     paw.position.set(x + .05, -.57, z);
     paw.scale.set(1.35, .45, .8);
+    const shoulder = new THREE.Mesh(new THREE.SphereGeometry(.070, 12, 6), furRimMat);
+    shoulder.name = 'v2-black-lab-shoulder-hip-joint';
+    shoulder.position.set(x, -.16, z);
+    shoulder.scale.set(1.0, .72, .82);
     legs.push(leg);
+    joints.push({ hock, shoulder });
     paws.push(paw);
     g.add(leg);
+    g.add(hock);
+    g.add(shoulder);
     g.add(paw);
   }
   const earL = new THREE.Mesh(new THREE.CapsuleGeometry(.045, .22, 6, 10), furMat);
@@ -1028,7 +1040,7 @@ function makeDog() {
   backRim.position.set(-.03, .22, -.24);
   backRim.rotation.set(Math.PI / 2, 0, Math.PI / 2);
   g.add(body, chest, haunch, head, muzzle, nose, tail, earL, earR, collar, tag, backRim);
-  g.userData = { head, tail, legs, paws, ears: [earL, earR] };
+  g.userData = { body, chest, haunch, head, tail, legs, paws, joints, ears: [earL, earR] };
   g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   scene.add(g);
   return g;
@@ -1362,17 +1374,26 @@ function animate() {
   dog.position.x = 1.6 + Math.sin(t * .55) * .42;
   dog.position.y = .43 + Math.max(0, Math.sin(t * 2.2)) * .025;
   dog.rotation.y = -.16 + Math.sin(t * .55 + .7) * .28;
-  dog.userData.head.rotation.y = Math.sin(t * 1.1) * .22;
-  dog.userData.head.rotation.x = -.08 + Math.sin(t * .74) * .06;
-  dog.userData.tail.rotation.z = 1.0 + Math.sin(t * 5.2) * .34;
+  dog.userData.body.scale.y = .82 + Math.sin(t * 1.6) * .018;
+  dog.userData.chest.position.y = .02 + Math.sin(t * 1.6 + .4) * .012;
+  dog.userData.haunch.position.y = Math.sin(t * 1.6 + 1.1) * .010;
+  dog.userData.head.rotation.y = Math.sin(t * 1.1) * .22 + (play.bite ? .18 : 0);
+  dog.userData.head.rotation.x = -.08 + Math.sin(t * .74) * .06 + (play.bite ? -.10 : 0);
+  dog.userData.tail.rotation.z = 1.0 + Math.sin(t * (play.bite ? 7.4 : 5.2)) * (play.bite ? .48 : .34);
+  dog.userData.tail.rotation.y = Math.sin(t * 3.2) * .14;
   dog.userData.ears.forEach((ear, i) => {
-    ear.rotation.z = Math.sin(t * 2.1 + i) * .06;
+    ear.rotation.z = Math.sin(t * 2.1 + i) * .06 + (play.bite ? (i ? -.06 : .06) : 0);
   });
   dog.userData.legs.forEach((leg, i) => {
     const gait = Math.sin(t * 4.3 + i * Math.PI * .5);
-    leg.rotation.x = gait * .26;
-    dog.userData.paws[i].position.y = -.57 + Math.max(0, gait) * .045;
-    dog.userData.paws[i].position.x = (i < 2 ? -.42 : .42) + .05 + Math.cos(t * 4.3 + i) * .025;
+    const lift = Math.max(0, gait);
+    leg.rotation.x = gait * .34;
+    leg.rotation.z = (i < 2 ? -.08 : .08) + Math.sin(t * 2.1 + i) * .035;
+    dog.userData.joints[i].hock.rotation.x = -gait * .22;
+    dog.userData.joints[i].hock.position.y = -.50 + lift * .032;
+    dog.userData.joints[i].shoulder.position.y = -.16 + Math.sin(t * 4.3 + i * Math.PI * .5) * .015;
+    dog.userData.paws[i].position.y = -.57 + lift * .060;
+    dog.userData.paws[i].position.x = (i < 2 ? -.42 : .42) + .05 + Math.cos(t * 4.3 + i) * .038;
   });
   if (play.cast && !play.bite && now > play.biteAt) {
     play.bite = true;

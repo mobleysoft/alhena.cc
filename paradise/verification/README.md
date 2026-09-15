@@ -137,6 +137,11 @@ taken with Playwright Chromium at `1440x900`.
   `/game-v2/?view=shore&time=dawn&weather=breeze&quality=cinematic` with a
   rendered canvas and zero browser/runtime errors. The older canvas prototype is
   still preserved as a legacy link.
+- `paradise-game-v2-articulated-dog.png`: live focused dog capture after adding
+  procedural hock/shoulder joint markers, richer paw lift, body breathing, head
+  attention shifts, ear flops, and bite-reactive tail motion. This improves the
+  black-lab placeholder's readability but also reinforces that true quality now
+  requires an imported rigged dog model with authored skeletal animation.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.
