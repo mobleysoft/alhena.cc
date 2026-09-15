@@ -343,7 +343,7 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.02;
-renderer.shadowMap.enabled = false;
+renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 renderer.setClearColor(0x000000, 0);
@@ -353,7 +353,9 @@ scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffe0a4, 2.4);
 sun.position.set(-9, 14, 6);
 sun.castShadow = true;
-sun.shadow.mapSize.set(1024, 1024);
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.00045;
+sun.shadow.normalBias = 0.026;
 sun.shadow.camera.near = 1;
 sun.shadow.camera.far = 80;
 sun.shadow.camera.left = -28;
@@ -767,6 +769,48 @@ function makeSandTexture() {
   return texture;
 }
 
+function makeMaterialTexture({ base = '#ffffff', fleck = '#000000', line = null, count = 900, width = 256, height = 256, repeat = [1, 1] } = {}) {
+  const c = document.createElement('canvas');
+  c.width = width;
+  c.height = height;
+  const x = c.getContext('2d');
+  x.fillStyle = base;
+  x.fillRect(0, 0, width, height);
+  for (let i = 0; i < count; i++) {
+    const alpha = 0.025 + Math.random() * 0.12;
+    x.fillStyle = fleck.replace('ALPHA', alpha.toFixed(3));
+    x.beginPath();
+    x.ellipse(Math.random() * width, Math.random() * height, 0.4 + Math.random() * 2.8, 0.25 + Math.random() * 1.4, Math.random() * Math.PI, 0, Math.PI * 2);
+    x.fill();
+  }
+  if (line) {
+    x.globalAlpha = line.alpha ?? 0.18;
+    x.strokeStyle = line.color;
+    x.lineWidth = line.width ?? 2;
+    for (let y = -height; y < height * 2; y += line.gap ?? 22) {
+      x.beginPath();
+      x.moveTo(-20, y + Math.random() * 8);
+      x.bezierCurveTo(width * 0.32, y + 8, width * 0.64, y - 8, width + 20, y + Math.random() * 8);
+      x.stroke();
+    }
+    x.globalAlpha = 1;
+  }
+  const texture = new THREE.CanvasTexture(c);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(repeat[0], repeat[1]);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  return texture;
+}
+
+const materialMaps = {
+  sand: makeMaterialTexture({ base: '#d7b978', fleck: 'rgba(72,48,24,ALPHA)', count: 2200, repeat: [9, 3] }),
+  wetSand: makeMaterialTexture({ base: '#8d886c', fleck: 'rgba(22,40,36,ALPHA)', count: 1600, repeat: [5, 2] }),
+  wood: makeMaterialTexture({ base: '#6b4328', fleck: 'rgba(24,12,5,ALPHA)', line: { color: '#32180b', alpha: 0.20, gap: 18, width: 2 }, count: 600, repeat: [3, 1] }),
+  fur: makeMaterialTexture({ base: '#090908', fleck: 'rgba(120,130,120,ALPHA)', line: { color: '#1e1f1b', alpha: 0.26, gap: 9, width: 1 }, count: 1200, repeat: [2, 1] }),
+  cloth: makeMaterialTexture({ base: '#249bbb', fleck: 'rgba(245,255,255,ALPHA)', line: { color: '#0e6072', alpha: 0.14, gap: 14, width: 1 }, count: 500, repeat: [2, 2] }),
+};
+
 const sandMat = new THREE.ShaderMaterial({
   uniforms: {
     uTime: { value: 0 },
@@ -881,13 +925,13 @@ for (let i = 0; i < 10; i++) {
   makeWaveLine(i * 1.73, -54 + d * 56, 26 + d * 84, 0.012 + d * 0.025);
 }
 
-const bar = new THREE.Mesh(new THREE.BoxGeometry(5.2, 1.1, 1.55), new THREE.MeshStandardMaterial({ color: 0x6c4326, roughness: 0.72 }));
+const bar = new THREE.Mesh(new THREE.BoxGeometry(5.2, 1.1, 1.55), new THREE.MeshStandardMaterial({ color: 0x6c4326, map: materialMaps.wood, roughness: 0.82, metalness: 0.0 }));
 bar.position.set(6.2, 0.25, 4.8);
 bar.castShadow = true;
 bar.receiveShadow = true;
 bar.visible = false;
 scene.add(bar);
-const roof = new THREE.Mesh(new THREE.ConeGeometry(3.1, 1.15, 4), new THREE.MeshStandardMaterial({ color: 0x9a5129, roughness: 0.84 }));
+const roof = new THREE.Mesh(new THREE.ConeGeometry(3.1, 1.15, 4), new THREE.MeshStandardMaterial({ color: 0x9a5129, map: materialMaps.wood, roughness: 0.88 }));
 roof.position.set(6.2, 1.35, 4.8);
 roof.rotation.y = Math.PI / 4;
 roof.castShadow = true;
@@ -1104,12 +1148,14 @@ function makeContactShadow(x, z, sx, sz, opacity = 0.28) {
 const shoreAccents = [];
 const shoreAccentMat = new THREE.MeshStandardMaterial({
   color: 0xd0b16f,
+  map: materialMaps.sand,
   roughness: 0.88,
   metalness: 0.0,
 });
 const wetSandMat = new THREE.MeshStandardMaterial({
   color: 0x8f8566,
-  roughness: 0.66,
+  map: materialMaps.wetSand,
+  roughness: 0.48,
   metalness: 0.02,
   transparent: true,
   opacity: 0.78,
@@ -1123,16 +1169,17 @@ const foamDecalMat = new THREE.MeshBasicMaterial({
 });
 const grassMat = new THREE.MeshStandardMaterial({
   color: 0x2d5f3d,
+  map: makeMaterialTexture({ base: '#285a38', fleck: 'rgba(188,226,142,ALPHA)', line: { color: '#15371f', alpha: 0.18, gap: 12, width: 1 }, count: 500, repeat: [2, 4] }),
   roughness: 0.78,
   side: THREE.DoubleSide,
 });
 const rockMats = [
-  new THREE.MeshStandardMaterial({ color: 0x7a6b58, roughness: 0.9 }),
-  new THREE.MeshStandardMaterial({ color: 0x4c524c, roughness: 0.92 }),
-  new THREE.MeshStandardMaterial({ color: 0x9b815e, roughness: 0.86 }),
+  new THREE.MeshStandardMaterial({ color: 0x7a6b58, map: makeMaterialTexture({ base: '#786b5a', fleck: 'rgba(25,22,18,ALPHA)', count: 1300, repeat: [2, 2] }), roughness: 0.9 }),
+  new THREE.MeshStandardMaterial({ color: 0x4c524c, map: makeMaterialTexture({ base: '#4e5550', fleck: 'rgba(180,188,168,ALPHA)', count: 1300, repeat: [2, 2] }), roughness: 0.92 }),
+  new THREE.MeshStandardMaterial({ color: 0x9b815e, map: makeMaterialTexture({ base: '#9b815e', fleck: 'rgba(42,28,18,ALPHA)', count: 1300, repeat: [2, 2] }), roughness: 0.86 }),
 ];
-const shellMat = new THREE.MeshStandardMaterial({ color: 0xf1dcc2, roughness: 0.74, metalness: 0.02 });
-const driftwoodMat = new THREE.MeshStandardMaterial({ color: 0x6a472b, roughness: 0.88, metalness: 0.0 });
+const shellMat = new THREE.MeshStandardMaterial({ color: 0xf1dcc2, roughness: 0.54, metalness: 0.02 });
+const driftwoodMat = new THREE.MeshStandardMaterial({ color: 0x6a472b, map: materialMaps.wood, roughness: 0.90, metalness: 0.0 });
 const footprintMat = new THREE.MeshBasicMaterial({ color: 0x5b4731, transparent: true, opacity: 0.16, depthWrite: false });
 const highlightSandMat = new THREE.MeshBasicMaterial({ color: 0xffedbb, transparent: true, opacity: 0.10, depthWrite: false, blending: THREE.AdditiveBlending });
 
@@ -1320,37 +1367,68 @@ function makeDriftwood(x, z, scale = 1, rotation = 0) {
 }
 
 const dog = new THREE.Group();
-const dogMat = new THREE.MeshStandardMaterial({ color: 0x0b0b0a, roughness: 0.58, metalness: 0.02 });
+const dogMat = new THREE.MeshStandardMaterial({ color: 0x0b0b0a, map: materialMaps.fur, roughness: 0.72, metalness: 0.0, transparent: true, opacity: 0.42 });
+const dogNoseMat = new THREE.MeshStandardMaterial({ color: 0x050504, roughness: 0.34, metalness: 0.0 });
+const dogEyeMat = new THREE.MeshStandardMaterial({ color: 0x140f09, roughness: 0.22, metalness: 0.0 });
 const dogBody = new THREE.Mesh(new THREE.CapsuleGeometry(0.55, 1.55, 6, 12), dogMat);
 dogBody.rotation.z = Math.PI / 2;
+dogBody.castShadow = true;
 dog.add(dogBody);
 const dogHead = new THREE.Mesh(new THREE.SphereGeometry(0.45, 18, 12), dogMat);
 dogHead.position.set(1.03, 0.13, 0.18);
+dogHead.scale.set(1.06, 0.86, 0.92);
+dogHead.castShadow = true;
 dog.add(dogHead);
+const dogSnout = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.34, 6, 10), dogNoseMat);
+dogSnout.rotation.z = Math.PI / 2;
+dogSnout.position.set(1.42, 0.07, 0.18);
+dogSnout.scale.set(1.0, 0.72, 0.72);
+dog.add(dogSnout);
+const dogTail = new THREE.Mesh(new THREE.CapsuleGeometry(0.065, 0.82, 5, 10), dogMat);
+dogTail.position.set(-1.12, 0.24, 0.17);
+dogTail.rotation.set(0.1, 0.0, -0.88);
+dogTail.castShadow = true;
+dog.add(dogTail);
+const dogLegs = [];
 for (let i = 0; i < 4; i++) {
   const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.58, 4, 8), dogMat);
   leg.position.set(i < 2 ? -0.48 : 0.42, -0.52, i % 2 ? -0.28 : 0.28);
+  leg.castShadow = true;
   dog.add(leg);
+  dogLegs.push(leg);
 }
-dog.position.set(-3.8, 0.18, 8.4);
-dog.scale.setScalar(0.74);
-dog.visible = false;
+for (let i = 0; i < 2; i++) {
+  const ear = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.42, 8), dogMat);
+  ear.position.set(0.86, 0.40, i ? -0.16 : 0.50);
+  ear.rotation.set(0.36, i ? -0.42 : 0.42, i ? -0.16 : 0.16);
+  ear.castShadow = true;
+  dog.add(ear);
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.038, 8, 6), dogEyeMat);
+  eye.position.set(1.36, 0.23, i ? 0.02 : 0.34);
+  dog.add(eye);
+}
+dog.position.set(-2.95, 0.40, 6.82);
+dog.scale.setScalar(0.38);
+dog.visible = true;
 scene.add(dog);
 
 const person = new THREE.Group();
-const dress = new THREE.Mesh(new THREE.ConeGeometry(0.58, 1.75, 28), new THREE.MeshStandardMaterial({ color: 0x2a9fc0, roughness: 0.56 }));
+const dress = new THREE.Mesh(new THREE.ConeGeometry(0.58, 1.75, 28), new THREE.MeshStandardMaterial({ color: 0x2a9fc0, map: materialMaps.cloth, roughness: 0.62 }));
 dress.position.y = 1.08;
+dress.castShadow = true;
 person.add(dress);
 const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 22, 16), new THREE.MeshStandardMaterial({ color: 0x8b5b42, roughness: 0.5 }));
 head.position.y = 2.18;
+head.castShadow = true;
 person.add(head);
 const hair = new THREE.Mesh(new THREE.SphereGeometry(0.38, 22, 16), new THREE.MeshStandardMaterial({ color: 0x1b130f, roughness: 0.72 }));
 hair.scale.set(1.08, 0.9, 1.05);
 hair.position.set(0, 2.22, -0.03);
+hair.castShadow = true;
 person.add(hair);
 person.position.set(6.2, 0.18, 3.75);
 person.scale.setScalar(0.72);
-person.visible = false;
+person.visible = true;
 scene.add(person);
 
 const houseSprite = makeSprite('/assets/beach-house-billboard.png', -8.7, 1.2, 7.3, 5.9, 4.9);
@@ -1412,7 +1490,7 @@ const grassClusters = [
 ];
 for (const cluster of grassClusters) cluster.visible = false;
 
-const dockMat = new THREE.MeshStandardMaterial({ color: 0x5d3a22, roughness: 0.82 });
+const dockMat = new THREE.MeshStandardMaterial({ color: 0x5d3a22, map: materialMaps.wood, roughness: 0.86 });
 for (let i = 0; i < 7; i++) {
   const plank = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.10, 6.2), dockMat);
   plank.position.set(8.1 + i * 0.44, -0.05, 2.1 - i * 0.34);
@@ -1590,9 +1668,12 @@ new GLTFLoader().load('/assets/models/paradise-shoreline.glb', gltf => {
   gltf.scene.scale.setScalar(0.62);
   gltf.scene.traverse(obj => {
     if (obj.isMesh) {
-      obj.castShadow = false;
-      obj.receiveShadow = false;
-      if (obj.material) obj.material.roughness = Math.max(obj.material.roughness || 0.7, 0.62);
+      obj.castShadow = true;
+      obj.receiveShadow = true;
+      if (obj.material) {
+        obj.material.roughness = Math.max(obj.material.roughness || 0.7, 0.62);
+        obj.material.envMapIntensity = 0.45;
+      }
     }
   });
   gltf.scene.visible = false;
@@ -1701,8 +1782,16 @@ function animate() {
     }
     position.needsUpdate = true;
   }
-  dog.position.x = -4.2 + Math.sin(elapsed * 0.55) * 0.42;
+  dog.position.x = -3.10 + Math.sin(elapsed * 0.55) * 0.42;
+  dog.position.y = 0.42 + Math.sin(elapsed * 1.15) * 0.018;
   dog.rotation.y = Math.sin(elapsed * 0.55) * 0.12;
+  dogBody.rotation.y = Math.sin(elapsed * 1.05) * 0.025;
+  dogHead.rotation.z = Math.sin(elapsed * 0.92 + 1.1) * 0.045;
+  dogTail.rotation.z = -0.88 + Math.sin(elapsed * 4.6) * 0.22;
+  for (let i = 0; i < dogLegs.length; i++) {
+    dogLegs[i].rotation.z = Math.sin(elapsed * 2.6 + i * Math.PI) * 0.15;
+    dogLegs[i].position.y = -0.52 + Math.max(0, Math.sin(elapsed * 2.6 + i * Math.PI)) * 0.035;
+  }
   labSprite.position.x = -2.8 + Math.sin(elapsed * 0.55) * 0.38;
   labSprite.material.rotation = Math.sin(elapsed * 1.1) * 0.015;
   if (articulatedLab.ready) {
