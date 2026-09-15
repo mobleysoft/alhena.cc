@@ -470,14 +470,14 @@ function canvasTexture(size, painter) {
 
 const sandTex = canvasTexture(768, (ctx, s) => {
   const g = ctx.createLinearGradient(0, 0, s, s);
-  g.addColorStop(0, '#efd99d');
-  g.addColorStop(.52, '#caa66d');
-  g.addColorStop(1, '#8d6b45');
+  g.addColorStop(0, '#ead6a4');
+  g.addColorStop(.52, '#c9ae78');
+  g.addColorStop(1, '#8f7650');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, s, s);
   for (let i = 0; i < 9000; i++) {
     const a = .04 + Math.random() * .17;
-    ctx.fillStyle = Math.random() > .55 ? `rgba(255,246,198,${a})` : `rgba(69,45,27,${a})`;
+    ctx.fillStyle = Math.random() > .55 ? `rgba(255,244,202,${a})` : `rgba(75,58,39,${a})`;
     ctx.fillRect(Math.random() * s, Math.random() * s, 1 + Math.random() * 1.6, 1);
   }
   ctx.strokeStyle = 'rgba(80,57,34,.15)';
@@ -492,10 +492,10 @@ const sandTex = canvasTexture(768, (ctx, s) => {
 sandTex.repeat.set(7, 4);
 
 const woodTex = canvasTexture(512, (ctx, s) => {
-  ctx.fillStyle = '#8b552f';
+  ctx.fillStyle = '#6f5639';
   ctx.fillRect(0, 0, s, s);
   for (let y = 0; y < s; y += 12) {
-    ctx.strokeStyle = `rgba(${120 + y % 60},${66 + y % 38},${28 + y % 28},.36)`;
+    ctx.strokeStyle = `rgba(${96 + y % 42},${75 + y % 32},${46 + y % 24},.38)`;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(0, y);
@@ -568,9 +568,9 @@ const causticTex = canvasTexture(512, (ctx, s) => {
 });
 causticTex.repeat.set(8, 2);
 
-const sandMat = new THREE.MeshStandardMaterial({ map: sandTex, bumpMap: sandTex, bumpScale: .075, color: 0xe2c17d, roughness: .97 });
-const woodMat = new THREE.MeshStandardMaterial({ map: woodTex, bumpMap: woodTex, bumpScale: .045, color: 0xae6e39, roughness: .78 });
-const darkWoodMat = new THREE.MeshStandardMaterial({ map: woodTex, bumpMap: woodTex, bumpScale: .035, color: 0x563019, roughness: .82 });
+const sandMat = new THREE.MeshStandardMaterial({ map: sandTex, bumpMap: sandTex, bumpScale: .075, color: 0xd2bd83, roughness: .97 });
+const woodMat = new THREE.MeshStandardMaterial({ map: woodTex, bumpMap: woodTex, bumpScale: .045, color: 0x8b6843, roughness: .82 });
+const darkWoodMat = new THREE.MeshStandardMaterial({ map: woodTex, bumpMap: woodTex, bumpScale: .035, color: 0x4f3a27, roughness: .86 });
 const roofMat = new THREE.MeshStandardMaterial({ color: 0x6d2419, roughness: .72 });
 const leafMat = new THREE.MeshStandardMaterial({ color: 0x245f3f, roughness: .82 });
 const grassMat = new THREE.MeshStandardMaterial({ color: 0x4e6f36, roughness: .88, side: THREE.DoubleSide });
@@ -1041,7 +1041,26 @@ for (let i = 0; i < 11; i++) {
   const plank = box('dock-plank-' + i, [1.9, .16, .42], [-6.9 + i * 1.25, .1, -.55 - i * .38], woodMat);
   plank.rotation.y = -.16;
 }
-for (let i = 0; i < 8; i++) cyl('dock-post-' + i, .1, 1.4, [-7.4 + i * 1.72, -.42, -.46 - i * .5], [0,0,0], darkWoodMat, 14);
+const dockPosts = [];
+for (let i = 0; i < 8; i++) {
+  const post = cyl('dock-post-' + i, .1, 1.4, [-7.4 + i * 1.72, -.42, -.46 - i * .5], [0,0,0], darkWoodMat, 14);
+  dockPosts.push(post);
+}
+const beamA = box('dock-weathered-side-beam-a', [15.2, .14, .16], [-.95, -.02, -2.48], darkWoodMat);
+beamA.rotation.y = -.16;
+const beamB = box('dock-weathered-side-beam-b', [15.2, .14, .16], [-.65, -.08, -3.15], darkWoodMat);
+beamB.rotation.y = -.16;
+const ropeMat = new THREE.LineBasicMaterial({ color: 0xd1b982, transparent: true, opacity: .72 });
+for (const offset of [.34, -.34]) {
+  const pts = dockPosts.map((post, i) => new THREE.Vector3(
+    post.position.x,
+    .58 + Math.sin(i * .75) * .08,
+    post.position.z + offset
+  ));
+  const rope = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), ropeMat);
+  rope.name = 'dock-sagging-rope-rail';
+  scene.add(rope);
+}
 
 const foamMat = new THREE.LineBasicMaterial({ color: 0xdff7f7, transparent: true, opacity: .34 });
 const goldFoamMat = new THREE.LineBasicMaterial({ color: 0xffd47c, transparent: true, opacity: .22 });
