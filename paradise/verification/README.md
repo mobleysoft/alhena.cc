@@ -106,6 +106,10 @@ taken with Playwright Chromium at `1440x900`.
 - `paradise-game-v2-lit-dog.png`: live V2 dog capture from the same lighting and
   environment pass. It verifies better material readability and beach context,
   while preserving the conclusion that the dog must become a skeletal GLB.
+- `paradise-game-v2-mobile-controls.png`: live V2 mobile-landscape capture after
+  adding a touch control rail. Playwright verified the controls render as a grid,
+  Cast/Reel update game state, and View cycles to the water camera without
+  runtime errors.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.
