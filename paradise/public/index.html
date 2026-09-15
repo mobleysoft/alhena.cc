@@ -1,793 +1,1070 @@
 <!DOCTYPE html>
-<html lang="en" data-scene="beach">
+<html lang="en">
 <head>
-<meta property="og:title" content="Paradise — a small ocean for James.">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#06101d">
+<meta property="og:title" content="Paradise">
+<meta property="og:description" content="A small ocean world for fishing at the edge of Alhena.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://paradise.alhena.cc">
-<meta property="og:description" content="A small, real ocean world. No accounts. No ads.">
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#060d1a">
 <title>Paradise</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=DM+Sans:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;1,500&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-/* ── RESET ───────────────────────────────────────────────── */
-*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-html, body { height:100%; overflow:hidden; font-family:'DM Sans',sans-serif; background:#020810; }
+:root {
+  --paper: #f7edce;
+  --glass: rgba(5, 14, 25, 0.56);
+}
 
-/* ── WebGL CANVAS (full-screen behind everything) ────────── */
-#ocean-canvas {
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #050a12; color: var(--paper); font-family: "DM Sans", sans-serif; }
+button { font: inherit; color: inherit; }
+
+#water, #world {
   position: fixed;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
+  width: 100vw;
+  height: 100vh;
   display: block;
 }
 
-/* ── SCENE PICKER (wind/wave controls) ───────────────────── */
-.scene-picker {
-  position: fixed;
-  bottom: 24px; left: 50%;
-  transform: translateX(-50%);
-  display: flex; gap: 10px; align-items: center;
-  z-index: 20;
-  opacity: 0; pointer-events: none;
-  transition: opacity 0.8s ease;
-  background: rgba(4,10,20,0.55);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(125,207,239, 0.65);
-  border-radius: 24px;
-  padding: 8px 14px;
+#water {
+  z-index: 1;
+  background: #050a12;
 }
-.scene-picker.visible { opacity: 1; pointer-events: auto; }
 
-.sp-dot {
-  width: 10px; height: 10px;
-  border-radius: 50%; border: none;
-  cursor: pointer; padding: 0;
-  opacity: 0.35;
-  transition: opacity 0.3s, transform 0.3s;
+#world {
+  z-index: 2;
+  pointer-events: auto;
 }
-.sp-dot:active { transform: scale(1.5); }
-.sp-dot.active { opacity: 1; transform: scale(1.3); }
-.sp-label {
-  font-size: 9px; color: rgba(125,207,239,0.4);
-  letter-spacing: 0.14em; text-transform: uppercase;
-  padding: 0 4px;
+
+.veil {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 35%, transparent 0 45%, rgba(0,0,0,0.13) 78%, rgba(0,0,0,0.38) 100%),
+    linear-gradient(180deg, rgba(255,255,255,0.04), transparent 18%, rgba(0,0,0,0.12) 100%);
+  mix-blend-mode: multiply;
+}
+
+.intro {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  z-index: 10;
+  background: radial-gradient(circle at 50% 55%, rgba(71,158,188,0.13), rgba(4,8,15,0.68) 58%, rgba(4,8,15,0.9));
+  transition: opacity 650ms ease, visibility 650ms ease;
+}
+.intro.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+.intro-card {
+  max-width: 600px;
+  text-align: center;
+  padding: 34px;
+  border: 1px solid rgba(255,240,190,0.22);
+  border-radius: 28px;
+  background: var(--glass);
+  box-shadow: 0 30px 120px rgba(0,0,0,0.42), inset 0 1px rgba(255,255,255,0.11);
+  backdrop-filter: blur(18px) saturate(1.25);
+}
+.intro-kicker {
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(255,229,162,0.68);
+  margin-bottom: 18px;
+}
+.intro-title {
+  font-family: "Cormorant Garamond", serif;
+  font-size: clamp(54px, 13vw, 108px);
+  line-height: 0.86;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  text-shadow: 0 0 40px rgba(87,173,204,0.2);
+}
+.intro-copy {
+  max-width: 460px;
+  margin: 22px auto 0;
+  color: rgba(247,237,206,0.72);
+  font-size: 15px;
+  line-height: 1.65;
+}
+.start {
+  margin-top: 28px;
+  border: 1px solid rgba(255,240,190,0.35);
+  border-radius: 999px;
+  padding: 13px 22px;
+  background: rgba(255,240,190,0.12);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 11px;
+}
+
+.hint {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(5,14,25,0.48);
+  border: 1px solid rgba(255,240,190,0.18);
+  color: rgba(247,237,206,0.58);
+  backdrop-filter: blur(14px);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   pointer-events: none;
 }
 
-/* ── INTRO ───────────────────────────────────────────────── */
-#intro {
-  position: fixed; inset: 0; z-index: 10;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  gap: 40px;
-  cursor: pointer;
-  -webkit-user-select: none; user-select: none;
+.hud {
+  position: fixed;
+  inset: auto 18px 18px 18px;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: minmax(240px, 420px) 1fr minmax(230px, 340px);
+  gap: 14px;
+  align-items: end;
+  pointer-events: none;
 }
-#hello-text {
-  font-family: 'Lora', serif;
-  font-style: italic;
-  font-size: clamp(36px, 12vw, 56px);
-  color: rgba(200,221,232,0.9);
-  letter-spacing: 0.08em;
-  opacity: 0;
-  transform: translateY(12px) scale(0.97);
-  transition: opacity 2.2s cubic-bezier(0.16,1,0.3,1), transform 2.2s cubic-bezier(0.16,1,0.3,1);
-  text-shadow: 0 0 40px rgba(125,207,239, 0.65);
+.panel, .tray, .log {
+  pointer-events: auto;
+  background: var(--glass);
+  border: 1px solid rgba(255,240,190,0.2);
+  border-radius: 22px;
+  box-shadow: 0 22px 80px rgba(0,0,0,0.32), inset 0 1px rgba(255,255,255,0.08);
+  backdrop-filter: blur(18px) saturate(1.2);
 }
-#hello-text.visible { opacity: 1; transform: none; }
-#touch-prompt {
-  display: flex; flex-direction: column; align-items: center; gap: 14px;
-  opacity: 0; transition: opacity 1.4s ease;
+.panel { padding: 18px; }
+.brand {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: baseline;
+  margin-bottom: 12px;
 }
-#touch-prompt.visible { opacity: 1; }
-.pulse-ring {
-  width: 20px; height: 20px; border-radius: 50%;
-  border: 1.5px solid rgba(125,207,239,0.6);
-  opacity: 0.5;
-  animation: pulse-expand 2.4s ease-out infinite;
+.brand h1 {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
 }
-@keyframes pulse-expand {
-  0%  { transform:scale(1);   opacity:0.5; }
-  80% { transform:scale(2.8); opacity:0; }
-  100%{ transform:scale(2.8); opacity:0; }
+.count, .log-title, .readout {
+  color: rgba(255,229,162,0.78);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
-.touch-label {
-  font-size: 11px; letter-spacing: 0.22em;
-  color: rgba(74,112,136,0.9); font-style: italic;
-  animation: blink-fade 3s ease-in-out infinite;
+.status {
+  min-height: 48px;
+  color: rgba(247,237,206,0.78);
+  line-height: 1.5;
+  font-size: 14px;
 }
-@keyframes blink-fade { 0%,100%{opacity:0.4;} 50%{opacity:0.9;} }
-#intro.out { opacity: 0; pointer-events: none; transition: opacity 0.8s cubic-bezier(0.4,0,1,1); }
-
-/* ── GREETING CARD ───────────────────────────────────────── */
-#greeting {
-  position: fixed; inset: 0; z-index: 5;
-  display: flex; align-items: center; justify-content: center;
-  padding: 24px;
-  opacity: 0; pointer-events: none;
-  transition: opacity 1.2s cubic-bezier(0.16,1,0.3,1);
-}
-#greeting.visible { opacity: 1; pointer-events: auto; }
-
-.card {
-  width: 100%;
-  max-width: 460px;
-  max-height: calc(100vh - 120px);
-  background: rgba(6,13,26,0.72);
-  backdrop-filter: blur(18px) saturate(1.4);
-  -webkit-backdrop-filter: blur(18px) saturate(1.4);
-  border: 1px solid rgba(125,207,239, 0.65);
-  border-radius: 24px;
+.status strong { color: #fff2b6; }
+.meter {
+  margin: 12px 0 14px;
+  height: 8px;
   overflow: hidden;
-  box-shadow: 0 24px 80px rgba(0,0,0,0.55), 0 0 0 0.5px rgba(255,255,255, 0.65) inset;
+  border-radius: 99px;
+  background: rgba(255,255,255,0.08);
 }
-
-.card-header {
-  padding: 22px 24px 16px;
-  border-bottom: 1px solid rgba(125,207,239, 0.65);
-  display: flex; align-items: center; gap: 14px;
+.meter span {
+  display: block;
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4ad0f1, #f1c45d, #f16f5d);
+  transition: width 170ms ease;
 }
-.card-orb {
-  width: 38px; height: 38px; flex-shrink: 0;
-  border-radius: 40% 60% 55% 45% / 45% 55% 45% 55%;
-  background: radial-gradient(circle at 38% 32%, #b8eeff, #4ab0d8 45%, #1a3a5a);
-  box-shadow: 0 0 14px rgba(74,176,216, 0.65);
-  animation: orb-breathe 4s ease-in-out infinite, orb-morph 9s ease-in-out infinite;
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 86px;
+  gap: 8px;
 }
-@keyframes orb-breathe { 0%,100%{transform:scale(1);} 50%{transform:scale(1.04);} }
-@keyframes orb-morph {
-  0%,100%{border-radius:42% 58% 52% 48%/48% 52% 48% 52%;}
-  25%    {border-radius:56% 44% 43% 57%/53% 47% 53% 47%;}
-  50%    {border-radius:44% 56% 58% 42%/42% 58% 42% 58%;}
-  75%    {border-radius:58% 42% 46% 54%/56% 44% 56% 44%;}
-}
-.card-title { font-family: 'Lora', serif; font-size: 18px; font-weight: 500; color: rgba(200,221,232,0.95); margin-bottom: 2px; }
-.card-sub { font-size: 11px; color: rgba(74,112,136,0.9); font-style: italic; }
-
-.card-body { padding: 20px 24px 8px; }
-.card-body p {
-  font-size: 14px; line-height: 1.75; color: rgba(200,221,232,0.88);
-  margin-bottom: 14px; font-weight: 300;
-}
-.card-body p:last-child { margin-bottom: 0; }
-.card-body em { font-style: italic; color: rgba(125,207,239,0.95); }
-
-.card-footer {
-  padding: 16px 24px 20px;
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px;
-}
-.into-water-btn {
-  font-size: 11px; color: rgba(125,207,239,0.85); letter-spacing:0.14em; text-transform:uppercase;
-  cursor:pointer; border: 1px solid rgba(125,207,239,0.5);
-  padding: 9px 16px; border-radius: 999px;
-  background: rgba(125,207,239,0.08);
-  font-family: 'DM Sans', sans-serif;
-  transition: background 0.25s, border-color 0.25s;
-}
-.into-water-btn:hover { background: rgba(125,207,239,0.18); border-color: rgba(125,207,239,0.85); }
-.footer-note { font-size: 9px; color: rgba(74,112,136,0.4); letter-spacing: 0.1em; white-space: nowrap; }
-
-/* Small re-open tab, shown once the greeting card is dismissed */
-#reopen-tab {
-  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-  z-index: 15;
-  font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
-  color: rgba(125,207,239,0.75);
-  background: rgba(4,10,20,0.5);
-  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(125,207,239,0.5);
-  border-radius: 999px;
-  padding: 8px 16px;
+.actions button, .pill-row button {
+  border: 1px solid rgba(255,240,190,0.24);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.06);
+  padding: 12px 10px;
   cursor: pointer;
-  opacity: 0; pointer-events: none;
-  transition: opacity 0.6s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 10px;
 }
-#reopen-tab.visible { opacity: 1; pointer-events: auto; }
+.actions button:hover, .pill-row button:hover, .actions button.active, .pill-row button.active {
+  background: rgba(255,229,162,0.16);
+  border-color: rgba(255,229,162,0.48);
+}
+.tray {
+  justify-self: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  min-width: min(580px, 100%);
+}
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.pill-row button {
+  padding: 9px 12px;
+  border-radius: 999px;
+  color: rgba(247,237,206,0.66);
+}
+.pill-row button.active { color: #fff2b6; }
+.log {
+  padding: 16px;
+  max-height: 172px;
+  overflow: hidden;
+}
+.log-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.fish-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+.fish-chip {
+  min-width: 0;
+  padding: 8px 9px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.06);
+  color: rgba(247,237,206,0.37);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fish-chip.caught {
+  color: rgba(247,237,206,0.88);
+  border-color: rgba(255,229,162,0.28);
+  background: rgba(255,229,162,0.1);
+}
+.catch {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.92);
+  z-index: 6;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 240ms ease, transform 240ms ease;
+  padding: 18px 22px;
+  border-radius: 22px;
+  background: rgba(5,14,25,0.66);
+  border: 1px solid rgba(255,229,162,0.38);
+  box-shadow: 0 18px 80px rgba(0,0,0,0.48);
+  text-align: center;
+}
+.catch.visible { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.catch-fish {
+  width: 116px;
+  height: 42px;
+  margin: 0 auto 10px;
+  border-radius: 62% 38% 42% 58% / 54% 44% 56% 46%;
+  background: var(--catch-color, linear-gradient(90deg, #d7f8ff, #5ab9d8));
+  position: relative;
+  box-shadow: 0 0 30px var(--catch-glow, rgba(125,207,239,0.32));
+}
+.catch-fish::before {
+  content: "";
+  position: absolute;
+  left: -20px;
+  top: 8px;
+  width: 28px;
+  height: 26px;
+  background: var(--catch-tail, rgba(215,248,255,0.74));
+  clip-path: polygon(100% 50%, 0 0, 18% 50%, 0 100%);
+}
+.catch-name {
+  color: #fff1b6;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 11px;
+}
+
+@media (max-width: 900px) {
+  .hud {
+    grid-template-columns: 1fr;
+    inset: auto 10px 10px 10px;
+    gap: 8px;
+  }
+  .panel { padding: 14px; }
+  .tray { order: -1; min-width: 0; width: 100%; padding: 8px; }
+  .log { display: none; }
+  .brand h1 { font-size: 24px; }
+  .status { min-height: 36px; font-size: 13px; }
+  .hint { top: 10px; width: calc(100vw - 20px); text-align: center; }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .hud {
+    grid-template-columns: minmax(260px, 360px) 1fr minmax(210px, 300px);
+    inset: auto 12px 10px 12px;
+  }
+  .log { display: block; max-height: 140px; }
+  .intro-card { padding: 24px; }
+  .intro-title { font-size: clamp(44px, 10vw, 76px); }
+}
 </style>
 </head>
 <body>
+<canvas id="water" aria-hidden="true"></canvas>
+<canvas id="world" aria-label="Paradise ocean fishing game"></canvas>
+<div class="veil"></div>
+<div class="hint">Tap/click to cast · space reels · motion can cast on mobile</div>
 
-<!-- ── WebGL2 OCEAN CANVAS ──────────────────────────────────── -->
-<canvas id="ocean-canvas"></canvas>
-
-<!-- ── INTRO ──────────────────────────────────────────────── -->
-<div id="intro" onclick="enterOasis()">
-  <p id="hello-text">hello, James</p>
-  <div id="touch-prompt">
-    <div class="pulse-ring"></div>
-    <span class="touch-label">touch anywhere</span>
+<section class="intro" id="intro">
+  <div class="intro-card">
+    <div class="intro-kicker">Alhena presents</div>
+    <div class="intro-title">Paradise</div>
+    <p class="intro-copy">A quiet shoreline, a fishing rod, a black lab in the sand, and an ocean whose color follows the day and the weather.</p>
+    <button class="start" id="start">Enter the shore</button>
   </div>
-</div>
+</section>
 
-<!-- ── GREETING CARD ─────────────────────────────────────── -->
-<div id="greeting">
-  <div class="card">
-    <div class="card-header">
-      <div class="card-orb"></div>
-      <div>
-        <div class="card-title">Paradise</div>
-        <div class="card-sub">a small world, built for you</div>
-      </div>
+<main class="hud" aria-label="Paradise controls">
+  <section class="panel">
+    <div class="brand">
+      <h1>Paradise Fishing</h1>
+      <div class="count" id="count">0 / 8 logged</div>
     </div>
-    <div class="card-body">
-      <p>Hi James — this is a small ocean Alhena made for you. It's a real wave simulation running live in your browser, not a video: 32 wave components layered together the way real swell actually forms out at sea, drawn fresh every frame.</p>
-      <p>There's nothing to sign up for and nothing being sold here. Touch the dots at the bottom to move through different sea states, from a calm morning to a real storm. Otherwise, just let it run.</p>
-      <p><em>Hope it's a nice place to sit for a minute.</em></p>
+    <div class="status" id="status">Cast beyond the foam line. When the bobber drops, reel before the tension breaks.</div>
+    <div class="meter"><span id="meter"></span></div>
+    <div class="actions">
+      <button id="cast">cast line</button>
+      <button id="clear">clear</button>
+      <button id="motion">enable motion</button>
+      <button id="face">Alhena</button>
     </div>
-    <div class="card-footer">
-      <button class="into-water-btn" onclick="closeGreeting()">into the water</button>
-      <span class="footer-note">no accounts · no ads</span>
-    </div>
-  </div>
-</div>
+  </section>
 
-<div id="reopen-tab" onclick="openGreeting()">read again</div>
+  <section class="tray" aria-label="time and weather controls">
+    <div class="pill-row" id="time-controls">
+      <button data-time="dawn">dawn</button>
+      <button data-time="noon">noon</button>
+      <button data-time="sunset">sunset</button>
+      <button data-time="night">night</button>
+    </div>
+    <div class="pill-row" id="weather-controls">
+      <button data-weather="calm">calm</button>
+      <button data-weather="breeze">breeze</button>
+      <button data-weather="overcast">overcast</button>
+      <button data-weather="storm">storm</button>
+    </div>
+  </section>
 
-<!-- ── SCENE PICKER (wind/wave presets) ───────────────────── -->
-<div class="scene-picker" id="scene-picker">
-  <span class="sp-label">sea</span>
-  <button class="sp-dot" data-scene="beach"    title="Calm (Beaufort 2)"   style="background:#4ab0d8"></button>
-  <button class="sp-dot" data-scene="forest"   title="Breeze (Beaufort 3)" style="background:#4aab68"></button>
-  <button class="sp-dot" data-scene="aurora"   title="Fresh (Beaufort 5)"  style="background:#a060d0"></button>
-  <button class="sp-dot" data-scene="mountain" title="Strong (Beaufort 7)" style="background:#6080c0"></button>
-  <button class="sp-dot" data-scene="desert"   title="Gale (Beaufort 9)"   style="background:#d06820"></button>
-  <button class="sp-dot" data-scene="meadow"   title="Storm (Beaufort 11)" style="background:#c03060"></button>
-  <span class="sp-label">storm</span>
+  <section class="log">
+    <div class="log-title">
+      <span>catch log</span>
+      <span id="weather-readout">dawn / calm</span>
+    </div>
+    <div class="fish-grid" id="catalog"></div>
+  </section>
+</main>
+
+<div class="catch" id="catch-card">
+  <div class="catch-fish" id="catch-fish"></div>
+  <div class="catch-name" id="catch-name">glass minnow</div>
 </div>
 
 <script>
-/* ══════════════════════════════════════════════════════════════
-   WEBGL2 PHOTO-REALISTIC OCEAN RENDERER
-   ψ(x,t) = Σ A_k · sin(k_k·(x·cos(θ_k) + y·sin(θ_k)) − ω_k·t + φ_k)
-   JONSWAP spectrum, Fresnel reflectance, subsurface scatter, foam
+const waterCanvas = document.getElementById('water');
+const canvas = document.getElementById('world');
+const ctx = canvas.getContext('2d', { alpha: true });
+const intro = document.getElementById('intro');
+const startBtn = document.getElementById('start');
+const castBtn = document.getElementById('cast');
+const clearBtn = document.getElementById('clear');
+const motionBtn = document.getElementById('motion');
+const faceBtn = document.getElementById('face');
+const statusEl = document.getElementById('status');
+const countEl = document.getElementById('count');
+const meterEl = document.getElementById('meter');
+const catalogEl = document.getElementById('catalog');
+const weatherReadout = document.getElementById('weather-readout');
+const catchCard = document.getElementById('catch-card');
+const catchFish = document.getElementById('catch-fish');
+const catchName = document.getElementById('catch-name');
+let waterProgram = null;
 
-   Adapted from the sovereign WebGL2 ocean renderer originally built for
-   PandoraChat's oasis.html (reference/legacy-roots/pandorachat/oasis.html).
-   Same wave-physics/shader core, zero third-party libraries. The chat/
-   "beings" chooser UI has been removed and replaced with a simple
-   greeting card for this single-purpose page.
-   ══════════════════════════════════════════════════════════════ */
-
-// ── Wind/wave presets per scene ─────────────────────────────
-const WIND_PRESETS = {
-  beach:    { wind: 4.0,  choppiness: 1.2,  foamThresh: 0.55, skyTint: [0.08, 0.18, 0.32], horizonGold: 0.12 },
-  forest:   { wind: 7.0,  choppiness: 1.6,  foamThresh: 0.50, skyTint: [0.06, 0.20, 0.28], horizonGold: 0.10 },
-  aurora:   { wind: 12.0, choppiness: 2.0,  foamThresh: 0.44, skyTint: [0.04, 0.14, 0.26], horizonGold: 0.08 },
-  mountain: { wind: 18.0, choppiness: 2.6,  foamThresh: 0.38, skyTint: [0.03, 0.10, 0.22], horizonGold: 0.06 },
-  desert:   { wind: 26.0, choppiness: 3.2,  foamThresh: 0.30, skyTint: [0.10, 0.08, 0.14], horizonGold: 0.20 },
-  meadow:   { wind: 36.0, choppiness: 4.0,  foamThresh: 0.20, skyTint: [0.02, 0.04, 0.12], horizonGold: 0.05 },
+const TIMES = {
+  dawn: {
+    skyTop: '#203a5b', skyMid: '#6ca4ca', horizon: '#f4c77a', sun: '#ffe6a7',
+    seaNear: '#1e6f88', seaFar: '#80b7c5', sand: '#c5a66e', light: 0.82, sunX: 0.22, sunY: 0.34, stars: 0
+  },
+  noon: {
+    skyTop: '#3386db', skyMid: '#77c7ee', horizon: '#d7eff7', sun: '#fff5c9',
+    seaNear: '#1f83a3', seaFar: '#62c3d6', sand: '#d4b879', light: 1, sunX: 0.58, sunY: 0.18, stars: 0
+  },
+  sunset: {
+    skyTop: '#241b3d', skyMid: '#df765e', horizon: '#ffd182', sun: '#ffb15f',
+    seaNear: '#153d58', seaFar: '#a75f62', sand: '#aa8358', light: 0.72, sunX: 0.75, sunY: 0.38, stars: 0.08
+  },
+  night: {
+    skyTop: '#040918', skyMid: '#102342', horizon: '#314968', sun: '#d9ecff',
+    seaNear: '#071524', seaFar: '#1c435d', sand: '#5d563f', light: 0.38, sunX: 0.68, sunY: 0.24, stars: 0.92
+  },
 };
 
-let currentPreset = WIND_PRESETS.beach;
+const WEATHER = {
+  calm: { wave: 0.55, chop: 0.25, foam: 0.26, cloud: 0.04, haze: 0.05, rain: 0, label: 'calm' },
+  breeze: { wave: 0.9, chop: 0.5, foam: 0.36, cloud: 0.12, haze: 0.09, rain: 0, label: 'breeze' },
+  overcast: { wave: 0.72, chop: 0.42, foam: 0.32, cloud: 0.54, haze: 0.28, rain: 0.04, label: 'overcast' },
+  storm: { wave: 1.55, chop: 1.08, foam: 0.62, cloud: 0.86, haze: 0.44, rain: 0.52, label: 'storm' },
+};
 
-// ── WebGL2 setup ────────────────────────────────────────────
-const canvas = document.getElementById('ocean-canvas');
-let gl = canvas.getContext('webgl2', { antialias: false, alpha: false, powerPreference: 'high-performance' });
-if (!gl) {
-  // Fallback: solid dark background
-  canvas.style.background = 'linear-gradient(180deg,#030812 0%,#060d1a 50%,#040a10 100%)';
+const ALHENA = [
+  { skin: '#7f5138', hair: '#1d1512', dress: '#2a9fc0' },
+  { skin: '#b77754', hair: '#21150f', dress: '#c68c4b' },
+  { skin: '#6d4737', hair: '#070708', dress: '#2d687c' },
+  { skin: '#95604a', hair: '#704021', dress: '#4ca6a1' },
+];
+
+const FISH = [
+  { name: 'glass minnow', rarity: 36, color: '#d7f8ff' },
+  { name: 'tide perch', rarity: 24, color: '#86d896' },
+  { name: 'moon mackerel', rarity: 16, color: '#cbd7ff' },
+  { name: 'blue runner', rarity: 10, color: '#54bdf0' },
+  { name: 'goldfin jack', rarity: 7, color: '#f1c45d' },
+  { name: 'storm eel', rarity: 4, color: '#a86bc8' },
+  { name: 'opal marlin', rarity: 2, color: '#e9fbff' },
+  { name: 'James starfish', rarity: 1, color: '#ff9b68' },
+];
+
+const state = {
+  started: false,
+  time: localStorage.getItem('paradise_time') || 'dawn',
+  weather: localStorage.getItem('paradise_weather') || 'calm',
+  alhena: Number(localStorage.getItem('paradise_alhena') || 0),
+  mode: 'idle',
+  tension: 0,
+  bobber: null,
+  lastCastAt: 0,
+  biteAt: 0,
+  biteEndsAt: 0,
+  fish: null,
+  catches: JSON.parse(localStorage.getItem('paradise_fish_log') || '{}'),
+  motion: false,
+  lastMotionAt: 0,
+  dpr: 1,
+  w: 0,
+  h: 0,
+};
+
+function resize() {
+  state.dpr = Math.min(window.devicePixelRatio || 1, 2);
+  state.w = window.innerWidth;
+  state.h = window.innerHeight;
+  canvas.width = Math.floor(state.w * state.dpr);
+  canvas.height = Math.floor(state.h * state.dpr);
+  canvas.style.width = state.w + 'px';
+  canvas.style.height = state.h + 'px';
+  ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
 }
 
-// ── Vertex shader (full-screen quad) ───────────────────────
-const VERT_SRC = `#version 300 es
-precision highp float;
-in vec2 a_pos;
-out vec2 v_uv;
-void main() {
-  v_uv = a_pos * 0.5 + 0.5;
-  gl_Position = vec4(a_pos, 0.0, 1.0);
-}`;
-
-// ── Fragment shader — JONSWAP ocean ────────────────────────
-// N=32 wave components, full physical model
-const FRAG_SRC = `#version 300 es
-precision highp float;
-
-in vec2 v_uv;
-out vec4 fragColor;
-
-uniform float u_time;
-uniform vec2  u_resolution;
-uniform float u_wind;        // wind speed m/s
-uniform float u_chop;        // choppiness scale
-uniform float u_foamT;       // foam threshold
-uniform vec3  u_skyTint;     // deep sky color
-uniform float u_goldHorizon; // gold horizon intensity
-
-#define PI  3.14159265359
-#define TAU 6.28318530718
-#define N   32
-
-/* ── PRNG ──────────────────────────────────────────── */
-float hash1(float n) { return fract(sin(n) * 43758.5453123); }
-float hash1v(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
-
-/* ── JONSWAP peak frequency (Pierson-Moskowitz) ──── */
-// f_p = 0.13g/U (Hz), ω_p = 2π f_p
-// Deep-water dispersion: ω² = g·k → k = ω²/g
-float gravity = 9.81;
-
-/* ── Wave component parameters from spectrum ──────── */
-// index i in [0, N)
-// frequencies: geometric spread from 0.5ωp to 3ωp
-vec2 waveDir(int i) {
-  float t = float(i) / float(N);
-  // spread directions ±45° around wind direction (0°=+x)
-  float theta = (t - 0.5) * PI * 0.9;
-  return vec2(cos(theta), sin(theta));
+function hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
-float waveParms(int i, float windSpeed, out float freq, out float amp, out float phase) {
-  float omegaP = 0.13 * gravity / max(windSpeed, 1.0) * TAU;
-  float t = float(i) / float(N - 1);
-  // log-spaced frequencies
-  float omegaMin = omegaP * 0.5;
-  float omegaMax = omegaP * 3.5;
-  freq = omegaMin * pow(omegaMax / omegaMin, t);
-
-  // JONSWAP spectrum S(omega)
-  float sigma = (freq <= omegaP) ? 0.07 : 0.09;
-  float r = exp(-pow((freq - omegaP), 2.0) / (2.0 * sigma * sigma * omegaP * omegaP));
-  float alpha = 0.0081;
-  float gamma = 3.3;
-  float S = alpha * gravity * gravity / pow(freq, 5.0)
-            * exp(-1.25 * pow(omegaP / freq, 4.0))
-            * pow(gamma, r);
-
-  // amplitude from spectrum: A = sqrt(2·S·Δω)
-  float dOmega = (omegaMax - omegaMin) / float(N);
-  amp = sqrt(2.0 * S * dOmega) * 0.35 * windSpeed / 12.0;
-  amp = clamp(amp, 0.0, 1.8);
-
-  // random phase
-  phase = hash1(float(i) * 17.31 + 0.73) * TAU;
-  return freq;
+function rgbToHex(rgb) {
+  return '#' + rgb.map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
 }
 
-/* ── Surface height h(x,y,t) ──────────────────────── */
-float oceanHeight(vec2 pos, float t, float windSpeed, float chop) {
-  float h = 0.0;
-  float omegaP = 0.13 * gravity / max(windSpeed, 1.0) * TAU;
+function mix(a, b, t) {
+  const ar = hexToRgb(a), br = hexToRgb(b);
+  return rgbToHex(ar.map((v, i) => v + (br[i] - v) * t));
+}
 
-  for (int i = 0; i < N; i++) {
-    float freq, amp, phase;
-    waveParms(i, windSpeed, freq, amp, phase);
-    float k = freq * freq / gravity;  // deep-water dispersion
-    vec2 dir = waveDir(i);
-    float proj = dot(dir, pos) * k;
-    h += amp * sin(proj - freq * t + phase);
+function pulse(pattern) {
+  if (navigator.vibrate) navigator.vibrate(pattern);
+}
+
+function status(html) {
+  statusEl.innerHTML = html;
+}
+
+function saveLog() {
+  localStorage.setItem('paradise_fish_log', JSON.stringify(state.catches));
+}
+
+function setTension(v) {
+  state.tension = Math.max(0, Math.min(100, v));
+  meterEl.style.width = state.tension + '%';
+}
+
+function renderCatalog() {
+  catalogEl.innerHTML = '';
+  const caught = FISH.filter(f => state.catches[f.name]).length;
+  countEl.textContent = `${caught} / ${FISH.length} logged`;
+  FISH.forEach(f => {
+    const chip = document.createElement('div');
+    const n = state.catches[f.name] || 0;
+    chip.className = 'fish-chip' + (n ? ' caught' : '');
+    chip.textContent = n ? `${f.name} x${n}` : 'unknown';
+    catalogEl.appendChild(chip);
+  });
+}
+
+function setTime(name) {
+  if (!TIMES[name]) name = 'dawn';
+  state.time = name;
+  localStorage.setItem('paradise_time', name);
+  updateControlState();
+}
+
+function setWeather(name) {
+  if (!WEATHER[name]) name = 'calm';
+  state.weather = name;
+  localStorage.setItem('paradise_weather', name);
+  updateControlState();
+}
+
+function updateControlState() {
+  document.querySelectorAll('[data-time]').forEach(b => b.classList.toggle('active', b.dataset.time === state.time));
+  document.querySelectorAll('[data-weather]').forEach(b => b.classList.toggle('active', b.dataset.weather === state.weather));
+  weatherReadout.textContent = `${state.time} / ${WEATHER[state.weather].label}`;
+}
+
+function chooseFish() {
+  const rareBonus = state.weather === 'storm' ? 1.8 : state.weather === 'overcast' ? 1.22 : 1;
+  const weighted = FISH.map((fish, i) => ({ fish, weight: fish.rarity * (i >= 4 ? rareBonus : 1) }));
+  const total = weighted.reduce((sum, x) => sum + x.weight, 0);
+  let roll = Math.random() * total;
+  for (const item of weighted) {
+    roll -= item.weight;
+    if (roll <= 0) return item.fish;
   }
-  return h * chop;
+  return FISH[0];
 }
 
-/* ── Analytical gradient → normal ────────────────── */
-vec3 oceanNormal(vec2 pos, float t, float windSpeed, float chop) {
-  float eps = 0.04;
-  float hc  = oceanHeight(pos, t, windSpeed, chop);
-  float hx  = oceanHeight(pos + vec2(eps, 0.0), t, windSpeed, chop);
-  float hy  = oceanHeight(pos + vec2(0.0, eps), t, windSpeed, chop);
-  vec3 nrm = normalize(vec3(-(hx - hc) / eps, 1.0, -(hy - hc) / eps));
-  return nrm;
+function cast() {
+  if (state.mode === 'bite') return reel();
+  if (state.mode !== 'idle') return;
+  state.mode = 'waiting';
+  state.lastCastAt = performance.now();
+  state.fish = chooseFish();
+  state.biteAt = state.lastCastAt + 1600 + Math.random() * 3000;
+  state.bobber = { x: state.w * (0.42 + Math.random() * 0.24), y: state.h * (0.56 + Math.random() * 0.11), dip: 0 };
+  castBtn.textContent = 'waiting';
+  setTension(16);
+  status('Line out past the foam. Watch the bobber.');
+  pulse(18);
 }
 
-/* ── Laplacian (for SSS) ─────────────────────────── */
-float laplacian(vec2 pos, float t, float windSpeed, float chop) {
-  float eps = 0.08;
-  float hc = oceanHeight(pos, t, windSpeed, chop);
-  float hx1 = oceanHeight(pos + vec2( eps, 0.0), t, windSpeed, chop);
-  float hx2 = oceanHeight(pos + vec2(-eps, 0.0), t, windSpeed, chop);
-  float hy1 = oceanHeight(pos + vec2(0.0,  eps), t, windSpeed, chop);
-  float hy2 = oceanHeight(pos + vec2(0.0, -eps), t, windSpeed, chop);
-  return (hx1 + hx2 + hy1 + hy2 - 4.0 * hc) / (eps * eps);
+function bite(now) {
+  state.mode = 'bite';
+  state.biteEndsAt = now + 1500 + Math.random() * 900;
+  castBtn.textContent = 'reel';
+  status('<strong>Bite.</strong> Reel now.');
+  pulse([40, 55, 40, 55, 80]);
 }
 
-/* ── Fresnel (Schlick) ───────────────────────────── */
-float fresnelSchlick(float cosTheta) {
-  float F0 = 0.02; // water
-  return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+function miss() {
+  state.mode = 'idle';
+  state.bobber = null;
+  castBtn.textContent = 'cast line';
+  setTension(0);
+  status('The fish slipped the hook. Cast again when the water settles.');
+  pulse(20);
 }
 
-/* ── Sky color at reflected direction ────────────── */
-vec3 skyColor(vec3 R, vec3 skyTint, float horizonGold) {
-  // R.y is the vertical component of the reflected ray
-  float t = clamp(R.y * 0.5 + 0.5, 0.0, 1.0);
-  // Deep sky
-  vec3 zenith  = skyTint * 2.5 + vec3(0.04, 0.08, 0.18);
-  vec3 horizon = mix(vec3(0.12, 0.16, 0.28), vec3(0.65, 0.50, 0.20) * horizonGold, horizonGold);
-  vec3 sky = mix(horizon, zenith, smoothstep(0.0, 0.55, t));
-  // Sun disc (low horizon sun)
-  vec3 sunDir = normalize(vec3(0.5, 0.08, 0.6));
-  float sunDot = dot(normalize(R), sunDir);
-  float sun = smoothstep(0.993, 0.999, sunDot);
-  float sunGlow = smoothstep(0.90, 0.996, sunDot) * 0.3;
-  sky += vec3(1.0, 0.85, 0.5) * sun * 2.0;
-  sky += vec3(0.9, 0.7, 0.3) * sunGlow * horizonGold;
-  return sky;
+function reel() {
+  if (state.mode !== 'bite') return;
+  const fish = state.fish || chooseFish();
+  state.catches[fish.name] = (state.catches[fish.name] || 0) + 1;
+  saveLog();
+  renderCatalog();
+  state.mode = 'idle';
+  state.bobber = null;
+  castBtn.textContent = 'cast line';
+  setTension(100);
+  setTimeout(() => setTension(0), 520);
+  status(`Caught a <strong>${fish.name}</strong>. Saved locally in this browser.`);
+  catchFish.style.setProperty('--catch-color', `linear-gradient(90deg, #fff, ${fish.color})`);
+  catchFish.style.setProperty('--catch-tail', fish.color);
+  catchName.textContent = fish.name;
+  catchCard.classList.add('visible');
+  setTimeout(() => catchCard.classList.remove('visible'), 1300);
+  pulse([30, 42, 30]);
 }
 
-/* ── Main ────────────────────────────────────────── */
-void main() {
-  vec2 uv = v_uv;
-  vec2 res = u_resolution;
+function clearLog() {
+  state.catches = {};
+  saveLog();
+  renderCatalog();
+  status('Catch log cleared. The shoreline is reset.');
+}
 
-  // ── Screen-space ray ────────────────────────────────────
-  // Camera: slightly above water, looking slightly down
-  float aspect = res.x / res.y;
-  vec2 ndc = uv * 2.0 - 1.0;
-  ndc.x *= aspect;
-
-  // Horizon is at ~40% from top
-  float horizonY = 0.20; // ndc space — above center
-  float aboveHorizon = ndc.y - horizonY;
-
-  // Sky vs water split
-  if (aboveHorizon > 0.0) {
-    // ── SKY ────────────────────────────────────────
-    float t = clamp(aboveHorizon / (1.0 - horizonY), 0.0, 1.0);
-    vec3 zenith  = u_skyTint * 2.8 + vec3(0.04, 0.08, 0.18);
-    vec3 hor     = mix(vec3(0.12, 0.16, 0.28), vec3(0.55, 0.42, 0.16) * u_goldHorizon * 3.0, u_goldHorizon);
-    vec3 sky = mix(hor, zenith, smoothstep(0.0, 0.6, t));
-
-    // Stars (visible when dark)
-    float starBrightness = (1.0 - length(u_skyTint) * 2.0);
-    if (starBrightness > 0.0) {
-      vec2 starUV = uv * vec2(res.x, res.y * 0.65) / 8.0;
-      float starHash = hash1v(floor(starUV));
-      float starAlpha = step(0.97, starHash) * starBrightness * 0.8;
-      float starSize = fract(starHash * 31.7);
-      vec2 starFrac = fract(starUV) - 0.5;
-      float starDist = length(starFrac);
-      float starGlow = exp(-starDist * (12.0 + starSize * 8.0));
-      sky += vec3(0.9, 0.95, 1.0) * starGlow * starAlpha;
+async function enableMotion() {
+  try {
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+      const permission = await DeviceMotionEvent.requestPermission();
+      if (permission !== 'granted') throw new Error('motion permission denied');
     }
+    window.addEventListener('devicemotion', onMotion, { passive: true });
+    state.motion = true;
+    motionBtn.textContent = 'motion on';
+    motionBtn.classList.add('active');
+    status('Motion enabled. Flick forward to cast. Pull back during a bite to reel.');
+  } catch (err) {
+    status('Motion was not available. Tap to cast and reel.');
+  }
+}
 
-    // Sun
-    vec2 sunPos = vec2(0.62, horizonY + 0.08);
-    float sunDist = length(uv - sunPos);
-    float sunGlow = exp(-sunDist * 4.0) * 0.18 * u_goldHorizon;
-    sky += vec3(1.0, 0.80, 0.45) * sunGlow;
+function onMotion(event) {
+  if (!state.motion) return;
+  const a = event.accelerationIncludingGravity || event.acceleration || {};
+  const impulse = Math.abs(a.x || 0) + Math.abs(a.y || 0) + Math.abs(a.z || 0);
+  const now = performance.now();
+  if (impulse < 18 || now - state.lastMotionAt < 900) return;
+  state.lastMotionAt = now;
+  if (state.mode === 'idle') cast();
+  else if (state.mode === 'bite') reel();
+}
 
-    fragColor = vec4(sky, 1.0);
+function drawSky(t, time, weather) {
+  const w = state.w, h = state.h;
+  const skyH = h * 0.54;
+  const haze = weather.haze + weather.cloud * 0.13;
+  const top = mix(time.skyTop, '#7c8592', haze);
+  const mid = mix(time.skyMid, '#9aa1a7', haze);
+  const horizon = mix(time.horizon, '#b8aea0', haze * 0.7);
+  const g = ctx.createLinearGradient(0, 0, 0, skyH);
+  g.addColorStop(0, top);
+  g.addColorStop(0.62, mid);
+  g.addColorStop(1, horizon);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, skyH);
+
+  if (time.stars > 0) {
+    ctx.save();
+    ctx.fillStyle = '#eef7ff';
+    for (let i = 0; i < 80; i++) {
+      const x = (i * 193.7) % w;
+      const y = (i * 71.3) % (skyH * 0.72);
+      const r = ((i * 17) % 3) * 0.35 + 0.45;
+      ctx.globalAlpha = time.stars * (0.35 + 0.65 * Math.sin(t * 0.001 + i));
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  const sx = w * time.sunX;
+  const sy = h * time.sunY;
+  const sunR = state.time === 'night' ? 22 : 44;
+  const rg = ctx.createRadialGradient(sx, sy, 2, sx, sy, sunR * 3.6);
+  rg.addColorStop(0, time.sun);
+  rg.addColorStop(0.24, state.time === 'night' ? 'rgba(225,241,255,0.56)' : 'rgba(255,229,150,0.72)');
+  rg.addColorStop(1, 'rgba(255,229,150,0)');
+  ctx.fillStyle = rg;
+  ctx.beginPath();
+  ctx.arc(sx, sy, sunR * 3.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = time.sun;
+  ctx.beginPath();
+  ctx.arc(sx, sy, sunR, 0, Math.PI * 2);
+  ctx.fill();
+
+  drawClouds(t, weather, skyH);
+}
+
+function drawClouds(t, weather, skyH) {
+  if (weather.cloud <= 0.02) return;
+  const w = state.w;
+  ctx.save();
+  ctx.globalAlpha = weather.cloud;
+  ctx.fillStyle = 'rgba(245,242,225,0.42)';
+  for (let i = 0; i < 8; i++) {
+    const baseX = ((i * 287 + t * (0.006 + i * 0.001)) % (w + 320)) - 160;
+    const y = skyH * (0.16 + ((i * 37) % 38) / 100);
+    const scale = 0.7 + ((i * 19) % 44) / 100;
+    blob(baseX, y, 92 * scale, 18 * scale);
+    blob(baseX + 60 * scale, y + 8 * scale, 118 * scale, 28 * scale);
+    blob(baseX + 145 * scale, y + 2 * scale, 88 * scale, 20 * scale);
+  }
+  ctx.restore();
+}
+
+function blob(x, y, w, h) {
+  ctx.beginPath();
+  ctx.ellipse(x, y, w, h, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function waveY(x, base, amp, freq, phase) {
+  return base + Math.sin(x * freq + phase) * amp + Math.sin(x * freq * 0.43 + phase * 1.7) * amp * 0.42;
+}
+
+function drawWater(t, time, weather) {
+  const w = state.w, h = state.h;
+  const top = h * 0.54;
+  const bottom = h * 0.88;
+  const g = ctx.createLinearGradient(0, top, 0, bottom);
+  const far = mix(time.seaFar, '#66737b', weather.haze);
+  const near = mix(time.seaNear, '#243441', weather.haze + weather.cloud * 0.12);
+  g.addColorStop(0, far);
+  g.addColorStop(0.42, mix(far, near, 0.46));
+  g.addColorStop(1, near);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, top, w, bottom - top + 2);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, top, w, bottom - top);
+  ctx.clip();
+
+  for (let layer = 0; layer < 16; layer++) {
+    const depth = layer / 15;
+    const y = top + depth * (bottom - top);
+    const amp = (2 + depth * 14) * weather.wave;
+    const freq = 0.006 + depth * 0.016;
+    const speed = t * (0.0012 + depth * 0.0015);
+    ctx.beginPath();
+    for (let x = -10; x <= w + 10; x += 12) {
+      const yy = waveY(x, y, amp, freq, speed + layer * 1.8);
+      if (x === -10) ctx.moveTo(x, yy);
+      else ctx.lineTo(x, yy);
+    }
+    ctx.strokeStyle = `rgba(236,253,255,${0.035 + depth * 0.09 * weather.foam})`;
+    ctx.lineWidth = 1 + depth * 1.2;
+    ctx.stroke();
+  }
+
+  const foamY = h * 0.85 + Math.sin(t * 0.0016) * 4;
+  const foam = ctx.createLinearGradient(0, foamY - 12, 0, foamY + 18);
+  foam.addColorStop(0, 'rgba(255,255,255,0)');
+  foam.addColorStop(0.48, `rgba(243,251,255,${0.34 + weather.foam * 0.26})`);
+  foam.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = foam;
+  ctx.fillRect(0, foamY - 18, w, 42);
+
+  drawFishShadows(t, top, bottom);
+  drawBobber(t);
+  ctx.restore();
+}
+
+function drawFishShadows(t, top, bottom) {
+  const w = state.w;
+  ctx.save();
+  ctx.globalAlpha = 0.13;
+  for (let i = 0; i < 7; i++) {
+    const x = (w - ((t * (0.018 + i * 0.004) + i * 221) % (w + 260))) + 130;
+    const y = top + ((i * 47) % 100) / 100 * (bottom - top) * 0.82;
+    const s = 0.55 + ((i * 13) % 60) / 100;
+    ctx.fillStyle = i % 3 === 0 ? '#d8c378' : '#9fc3d3';
+    ctx.beginPath();
+    ctx.ellipse(x, y, 34 * s, 8 * s, Math.sin(i) * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x + 31 * s, y);
+    ctx.lineTo(x + 52 * s, y - 10 * s);
+    ctx.lineTo(x + 49 * s, y + 10 * s);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawShore(t, time) {
+  const w = state.w, h = state.h;
+  const y = h * 0.84;
+  const g = ctx.createLinearGradient(0, y, 0, h);
+  g.addColorStop(0, mix(time.sand, '#ffffff', 0.09));
+  g.addColorStop(1, mix(time.sand, '#4d3926', 0.24));
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(0, h);
+  ctx.lineTo(0, y + 30);
+  ctx.bezierCurveTo(w * 0.25, y + 12, w * 0.58, y + 34, w, y + 10);
+  ctx.lineTo(w, h);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.save();
+  ctx.globalAlpha = 0.12 * time.light;
+  ctx.strokeStyle = '#fff3c6';
+  for (let i = 0; i < 24; i++) {
+    const yy = y + 34 + i * 8;
+    ctx.beginPath();
+    ctx.moveTo(0, yy);
+    ctx.bezierCurveTo(w * 0.3, yy - 12, w * 0.65, yy + 10, w, yy - 8);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  drawBeachHouse(w * 0.1, h * 0.83, 0.92, time);
+  drawBlackLab(w * 0.47, h * 0.91, 1);
+  drawBarAndAlhena(w * 0.84, h * 0.84);
+  drawRod(t);
+}
+
+function drawBeachHouse(x, y, s, time) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  ctx.fillStyle = mix('#9e613b', '#201512', 1 - time.light);
+  ctx.fillRect(0, 0, 118, 54);
+  ctx.fillStyle = '#6b2819';
+  ctx.beginPath();
+  ctx.moveTo(-10, 0);
+  ctx.lineTo(58, -34);
+  ctx.lineTo(130, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = state.time === 'night' ? 'rgba(255,211,105,0.92)' : 'rgba(255,218,121,0.5)';
+  ctx.fillRect(48, 18, 24, 29);
+  ctx.restore();
+}
+
+function drawBlackLab(x, y, s) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  ctx.fillStyle = '#050506';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 30, 12, -0.08, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(29, -12, 12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#070707';
+  ctx.lineWidth = 8;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-26, -4);
+  ctx.quadraticCurveTo(-45, -22, -58, -12);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawBarAndAlhena(x, y) {
+  const a = ALHENA[state.alhena % ALHENA.length];
+  ctx.save();
+  ctx.translate(x, y);
+  const barGrad = ctx.createLinearGradient(-80, 0, 80, 80);
+  barGrad.addColorStop(0, '#5b351e');
+  barGrad.addColorStop(1, '#1b100b');
+  ctx.fillStyle = barGrad;
+  roundRect(-86, 32, 150, 58, 4);
+  ctx.fill();
+  ctx.fillStyle = '#122f32';
+  roundRect(-96, 20, 170, 13, 7);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,221,120,0.64)';
+  ctx.font = '9px DM Sans';
+  ctx.fillText('ALHENA', -54, 60);
+
+  ctx.fillStyle = a.dress;
+  ctx.beginPath();
+  ctx.moveTo(-20, 22);
+  ctx.quadraticCurveTo(-10, -18, 4, 20);
+  ctx.lineTo(14, 68);
+  ctx.lineTo(-32, 68);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = a.skin;
+  ctx.beginPath();
+  ctx.arc(-9, -12, 15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = a.hair;
+  ctx.beginPath();
+  ctx.arc(-10, -19, 16, Math.PI, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,244,206,0.9)';
+  ctx.beginPath();
+  ctx.arc(-15, -11, 2, 0, Math.PI * 2);
+  ctx.arc(-4, -11, 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#e3b1a2';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.arc(-9, -5, 5, 0.1, Math.PI - 0.1);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawRod(t) {
+  const w = state.w, h = state.h;
+  const baseX = w - 62;
+  const baseY = h - 44;
+  const castLift = state.mode === 'waiting' ? Math.min(1, (performance.now() - state.lastCastAt) / 420) : 0;
+  const biteShake = state.mode === 'bite' ? Math.sin(t * 0.045) * 5 : 0;
+  const tipX = w * 0.69 - castLift * 80;
+  const tipY = h * 0.71 - castLift * 70 + biteShake;
+
+  ctx.save();
+  ctx.strokeLinecap = 'round';
+  ctx.strokeStyle = '#4b271b';
+  ctx.lineWidth = 22;
+  ctx.beginPath();
+  ctx.moveTo(baseX, baseY);
+  ctx.lineTo(baseX + 26, baseY + 52);
+  ctx.stroke();
+
+  const rodGrad = ctx.createLinearGradient(baseX, baseY, tipX, tipY);
+  rodGrad.addColorStop(0, '#ffe19a');
+  rodGrad.addColorStop(1, '#59401e');
+  ctx.strokeStyle = rodGrad;
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.moveTo(baseX - 12, baseY - 4);
+  ctx.quadraticCurveTo(w * 0.86, h * 0.77, tipX, tipY);
+  ctx.stroke();
+
+  ctx.fillStyle = '#b7e7f3';
+  ctx.beginPath();
+  ctx.arc(baseX - 22, baseY - 4, 17, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.46)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  if (state.bobber) {
+    ctx.strokeStyle = 'rgba(255,246,212,0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.quadraticCurveTo((tipX + state.bobber.x) * 0.5, tipY + 90, state.bobber.x, state.bobber.y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawBobber(t) {
+  if (!state.bobber) return;
+  const now = performance.now();
+  const b = state.bobber;
+  if (state.mode === 'waiting') b.dip = Math.sin(t * 0.007) * 3;
+  if (state.mode === 'bite') b.dip = 12 + Math.abs(Math.sin(t * 0.035)) * 13;
+  ctx.save();
+  ctx.translate(b.x, b.y + b.dip);
+  ctx.fillStyle = '#f4f7fa';
+  ctx.beginPath();
+  ctx.arc(0, 0, 10, Math.PI, 0);
+  ctx.fill();
+  ctx.fillStyle = '#d84c3d';
+  ctx.beginPath();
+  ctx.arc(0, 0, 10, 0, Math.PI);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(5,14,25,0.42)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  if (state.mode === 'waiting' && now > state.biteAt) bite(now);
+  if (state.mode === 'bite') {
+    const p = 1 - Math.max(0, state.biteEndsAt - now) / Math.max(1, state.biteEndsAt - state.biteAt);
+    setTension(42 + p * 58);
+    if (now > state.biteEndsAt) miss();
+  }
+}
+
+function drawRain(t, weather) {
+  if (weather.rain <= 0) return;
+  const w = state.w, h = state.h;
+  ctx.save();
+  ctx.globalAlpha = weather.rain;
+  ctx.strokeStyle = 'rgba(220,240,255,0.35)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 160; i++) {
+    const x = (i * 71 + t * 0.42) % (w + 80) - 40;
+    const y = (i * 139 + t * 0.9) % h;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - 10, y + 28);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function frame(t) {
+  const time = TIMES[state.time];
+  const weather = WEATHER[state.weather];
+  drawSky(t, time, weather);
+  drawWater(t, time, weather);
+  drawShore(t, time);
+  drawRain(t, weather);
+  requestAnimationFrame(frame);
+}
+
+startBtn.addEventListener('click', () => {
+  state.started = true;
+  intro.classList.add('hidden');
+});
+
+canvas.addEventListener('pointerdown', () => {
+  if (!state.started) {
+    state.started = true;
+    intro.classList.add('hidden');
     return;
   }
-
-  // ── WATER RAY-MARCH ─────────────────────────────────────
-  // Project screen UV → world XZ via perspective approximation
-  // Water depth below horizon determines world-space distance
-  float waterT = clamp(-aboveHorizon / (1.0 - horizonY + 0.001), 0.0, 1.0);
-  // Perspective: near = top of water, far = bottom of screen
-  float dist = mix(0.5, 90.0, pow(waterT, 1.6));
-
-  // Camera position and viewing geometry
-  vec3 camPos = vec3(0.0, 2.2, 0.0);
-  vec3 rayDir = normalize(vec3(ndc.x * 0.7, -0.3 - waterT * 0.7, -1.0));
-
-  // World position on water plane (y=0)
-  float planeT = -camPos.y / rayDir.y;
-  vec2 worldPos = camPos.xz + rayDir.xz * planeT;
-  worldPos *= 0.08; // world scale
-  worldPos += vec2(u_time * 0.01, u_time * 0.008); // drift
-
-  float h = oceanHeight(worldPos, u_time, u_wind, u_chop);
-  vec3  nrm = oceanNormal(worldPos, u_time, u_wind, u_chop);
-  float lap = laplacian(worldPos, u_time, u_wind, u_chop);
-
-  // ── View and reflected directions ──────────────────
-  vec3 V = normalize(-rayDir);
-  vec3 R = reflect(-V, nrm);
-
-  // ── Fresnel ─────────────────────────────────────────
-  float NdotV = max(dot(nrm, V), 0.0);
-  float fresnel = fresnelSchlick(NdotV);
-
-  // ── Sky reflection ───────────────────────────────────
-  vec3 reflectedSky = skyColor(R, u_skyTint, u_goldHorizon);
-
-  // ── Water depth color ────────────────────────────────
-  // Normalize height to [0,1]
-  float hNorm = h * 0.4 + 0.5; // centered on 0
-  hNorm = clamp(hNorm, 0.0, 1.0);
-  // Deep navy in troughs, bright cyan on crests
-  vec3 waterDeep  = vec3(0.01, 0.04, 0.12);
-  vec3 waterShallow = vec3(0.08, 0.38, 0.55);
-  vec3 waterCrest = vec3(0.30, 0.72, 0.90);
-  vec3 waterBody = mix(waterDeep, waterShallow, hNorm);
-  waterBody = mix(waterBody, waterCrest, pow(hNorm, 3.0) * 0.7);
-
-  // ── Subsurface scatter ───────────────────────────────
-  // Where curvature > 0 (concave up) = focusing → bright SSS
-  float sss = clamp(lap * 0.15, 0.0, 1.0);
-  vec3 sssColor = vec3(0.0, 0.55, 0.60); // teal/cyan
-  waterBody += sssColor * sss * 0.4;
-
-  // ── Blinn-Phong specular (sun) ───────────────────────
-  vec3 sunDir = normalize(vec3(0.5, 0.35, 0.6));
-  vec3 halfV  = normalize(V + sunDir);
-  float spec  = pow(max(dot(nrm, halfV), 0.0), 120.0) * 2.5;
-  vec3 specColor = vec3(1.0, 0.95, 0.80) * spec * u_goldHorizon * 2.0;
-  specColor += vec3(0.8, 0.92, 1.0) * pow(max(dot(nrm, halfV), 0.0), 48.0) * 0.4;
-
-  // ── Blend water body + reflection via Fresnel ────────
-  vec3 water = mix(waterBody, reflectedSky, fresnel * 0.85);
-  water += specColor;
-
-  // ── Foam ─────────────────────────────────────────────
-  // White speckle where |h| > foamThresh
-  float foamH = abs(h);
-  float foam = smoothstep(u_foamT * 0.8, u_foamT * 1.2, foamH);
-  // Turbulent foam noise
-  vec2 foamUV = worldPos * 12.0 + vec2(u_time * 0.03, -u_time * 0.025);
-  float foamNoise = hash1v(floor(foamUV * 8.0) + floor(u_time * 1.5));
-  float foamDensity = foam * smoothstep(0.35, 0.75, foamNoise);
-  vec3 foamColor = vec3(0.88, 0.94, 0.98);
-
-  // Chromatic dispersion on foam edges
-  float foamEdge = abs(foam - foamDensity);
-  vec3 dispR = vec3(0.0);
-  vec3 dispB = vec3(0.0);
-  if (foamEdge > 0.05) {
-    float dr = oceanHeight(worldPos + vec2(0.002, 0.0), u_time, u_wind, u_chop);
-    float db = oceanHeight(worldPos - vec2(0.002, 0.0), u_time, u_wind, u_chop);
-    dispR = vec3(0.04, 0.0, 0.0) * abs(h - dr) * foamEdge * 12.0;
-    dispB = vec3(0.0, 0.0, 0.06) * abs(h - db) * foamEdge * 12.0;
-  }
-
-  water = mix(water, foamColor, foamDensity * 0.9);
-  water += dispR + dispB;
-
-  // ── Distance fog / depth ──────────────────────────────
-  float fogT = clamp((dist - 5.0) / 75.0, 0.0, 1.0);
-  vec3 fogColor = u_skyTint + vec3(0.06, 0.10, 0.20);
-  water = mix(water, fogColor, pow(fogT, 1.4));
-
-  // ── Horizon blend (sky→water seam) ────────────────────
-  float horizonBlend = 1.0 - clamp(-aboveHorizon * 18.0, 0.0, 1.0);
-  vec3 horizonCol = mix(fogColor * 1.1, vec3(0.55, 0.42, 0.16) * u_goldHorizon * 2.5, u_goldHorizon * 0.5);
-  water = mix(water, horizonCol, horizonBlend * 0.5);
-
-  // ── Vignette ──────────────────────────────────────────
-  float vignette = 1.0 - dot(v_uv - 0.5, (v_uv - 0.5) * 2.2);
-  water *= clamp(vignette, 0.0, 1.0);
-
-  // ── Tone map ──────────────────────────────────────────
-  // Reinhard
-  water = water / (water + vec3(1.0));
-  water = pow(water, vec3(1.0 / 2.2));
-
-  fragColor = vec4(water, 1.0);
-}`;
-
-// ── Compile shaders ─────────────────────────────────────────
-function compileShader(gl, type, src) {
-  const s = gl.createShader(type);
-  gl.shaderSource(s, src);
-  gl.compileShader(s);
-  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-    console.error('Shader compile error:', gl.getShaderInfoLog(s));
-    return null;
-  }
-  return s;
-}
-
-function buildProgram(gl, vs, fs) {
-  const prog = gl.createProgram();
-  gl.attachShader(prog, vs);
-  gl.attachShader(prog, fs);
-  gl.linkProgram(prog);
-  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-    console.error('Program link error:', gl.getProgramInfoLog(prog));
-    return null;
-  }
-  return prog;
-}
-
-let program = null;
-let uniforms = {};
-let vao = null;
-
-function initGL() {
-  if (!gl) return;
-
-  const vs = compileShader(gl, gl.VERTEX_SHADER, VERT_SRC);
-  const fs = compileShader(gl, gl.FRAGMENT_SHADER, FRAG_SRC);
-  if (!vs || !fs) return;
-
-  program = buildProgram(gl, vs, fs);
-  if (!program) return;
-
-  // Full-screen quad
-  const verts = new Float32Array([-1,-1, 1,-1, -1,1, 1,1]);
-  const buf = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-  gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
-
-  vao = gl.createVertexArray();
-  gl.bindVertexArray(vao);
-  const loc = gl.getAttribLocation(program, 'a_pos');
-  gl.enableVertexAttribArray(loc);
-  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-  gl.bindVertexArray(null);
-
-  // Cache uniform locations
-  ['u_time','u_resolution','u_wind','u_chop','u_foamT','u_skyTint','u_goldHorizon'].forEach(name => {
-    uniforms[name] = gl.getUniformLocation(program, name);
-  });
-}
-
-function resizeCanvas() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  canvas.width  = Math.floor(w * dpr);
-  canvas.height = Math.floor(h * dpr);
-  canvas.style.width  = w + 'px';
-  canvas.style.height = h + 'px';
-  if (gl) gl.viewport(0, 0, canvas.width, canvas.height);
-}
-
-// ── Render loop ─────────────────────────────────────────────
-let startTime = performance.now();
-let animRunning = true;
-
-function render() {
-  if (!gl || !program) { if(animRunning) requestAnimationFrame(render); return; }
-
-  const t = (performance.now() - startTime) * 0.001;
-  const p = currentPreset;
-
-  gl.clearColor(0, 0, 0, 1);
-  gl.clear(gl.COLOR_BUFFER_BIT);
-
-  gl.useProgram(program);
-  gl.bindVertexArray(vao);
-
-  gl.uniform1f(uniforms.u_time, t);
-  gl.uniform2f(uniforms.u_resolution, canvas.width, canvas.height);
-  gl.uniform1f(uniforms.u_wind, p.wind);
-  gl.uniform1f(uniforms.u_chop, p.choppiness);
-  gl.uniform1f(uniforms.u_foamT, p.foamThresh);
-  gl.uniform3fv(uniforms.u_skyTint, p.skyTint);
-  gl.uniform1f(uniforms.u_goldHorizon, p.horizonGold);
-
-  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-  gl.bindVertexArray(null);
-
-  if (animRunning) requestAnimationFrame(render);
-}
-
-// ── Init ─────────────────────────────────────────────────────
-resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
-initGL();
-if (gl) requestAnimationFrame(render);
-
-/* ══ OCEAN SOUND (synthesized locally via Web Audio API — no samples) ══ */
-let audioCtx = null, oceanMaster = null;
-
-function initOcean() {
-  if (audioCtx) return;
-  try {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const sr = audioCtx.sampleRate;
-    const buf = audioCtx.createBuffer(1, sr*8, sr);
-    const data = buf.getChannelData(0);
-    let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
-    for (let i=0; i<data.length; i++) {
-      const w = Math.random()*2-1;
-      b0=0.99886*b0+w*0.0555179; b1=0.99332*b1+w*0.0750759;
-      b2=0.96900*b2+w*0.1538520; b3=0.86650*b3+w*0.3104856;
-      b4=0.55000*b4+w*0.5329522; b5=-0.7616*b5-w*0.0168980;
-      data[i]=(b0+b1+b2+b3+b4+b5+b6+w*0.5362)*0.11;
-      b6=w*0.115926;
-    }
-    const src = audioCtx.createBufferSource();
-    src.buffer = buf; src.loop = true;
-    const lp = audioCtx.createBiquadFilter();
-    lp.type='lowpass'; lp.frequency.value=320; lp.Q.value=0.4;
-    const lfo = audioCtx.createOscillator();
-    lfo.frequency.value=0.11;
-    const lfoG = audioCtx.createGain(); lfoG.gain.value=140;
-    lfo.connect(lfoG); lfoG.connect(lp.frequency); lfo.start();
-    const lfo2 = audioCtx.createOscillator();
-    lfo2.frequency.value=0.04;
-    const lfoG2 = audioCtx.createGain(); lfoG2.gain.value=70;
-    lfo2.connect(lfoG2); lfoG2.connect(lp.frequency); lfo2.start();
-    oceanMaster = audioCtx.createGain();
-    oceanMaster.gain.setValueAtTime(0, audioCtx.currentTime);
-    oceanMaster.gain.linearRampToValueAtTime(0.38, audioCtx.currentTime+5);
-    src.connect(lp); lp.connect(oceanMaster); oceanMaster.connect(audioCtx.destination);
-    src.start();
-  } catch(e) { /* silent */ }
-}
-
-/* ══ INTRO → GREETING PHASE ═════════════════════════════════ */
-let entered = false;
-
-setTimeout(() => document.getElementById('hello-text').classList.add('visible'), 1200);
-setTimeout(() => document.getElementById('touch-prompt').classList.add('visible'), 3800);
-
-function enterOasis() {
-  if (entered) return;
-  entered = true;
-  initOcean();
-  const intro = document.getElementById('intro');
-  intro.classList.add('out');
-  setTimeout(() => {
-    intro.style.display = 'none';
-    document.getElementById('greeting').classList.add('visible');
-    document.getElementById('scene-picker').classList.add('visible');
-  }, 700);
-}
-
-function closeGreeting() {
-  document.getElementById('greeting').classList.remove('visible');
-  document.getElementById('reopen-tab').classList.add('visible');
-}
-function openGreeting() {
-  document.getElementById('greeting').classList.add('visible');
-  document.getElementById('reopen-tab').classList.remove('visible');
-}
-
-/* ══ SCENE SWITCHER (wind presets) ════════════════════════ */
-const SCENES = ['beach','forest','aurora','mountain','desert','meadow'];
-
-// Smooth wind transition
-let targetPreset = { ...currentPreset };
-let interpT = 1.0;
-let fromPreset = { ...currentPreset };
-
-function setScene(name, save=true) {
-  if (!SCENES.includes(name)) name = 'beach';
-  document.documentElement.setAttribute('data-scene', name);
-  document.querySelectorAll('.sp-dot').forEach(d => {
-    d.classList.toggle('active', d.dataset.scene === name);
-  });
-  if (save) localStorage.setItem('paradise_scene', name);
-
-  // Interpolate to new preset
-  fromPreset = { ...currentPreset };
-  targetPreset = { ...WIND_PRESETS[name] };
-  interpT = 0.0;
-
-  // Animate the transition
-  const startMs = performance.now();
-  const dur = 2200;
-  function lerp3(a, b, t) { return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t]; }
-  function lerp1(a, b, t) { return a + (b - a) * t; }
-  function easeInOut(x) { return x < 0.5 ? 2*x*x : 1-Math.pow(-2*x+2,2)/2; }
-
-  (function tick() {
-    const elapsed = performance.now() - startMs;
-    const frac = Math.min(elapsed / dur, 1.0);
-    const e = easeInOut(frac);
-    currentPreset = {
-      wind:        lerp1(fromPreset.wind, targetPreset.wind, e),
-      choppiness:  lerp1(fromPreset.choppiness, targetPreset.choppiness, e),
-      foamThresh:  lerp1(fromPreset.foamThresh, targetPreset.foamThresh, e),
-      skyTint:     lerp3(fromPreset.skyTint, targetPreset.skyTint, e),
-      horizonGold: lerp1(fromPreset.horizonGold, targetPreset.horizonGold, e),
-    };
-    if (frac < 1.0) requestAnimationFrame(tick);
-    else currentPreset = { ...targetPreset };
-  })();
-}
-
-const savedScene = localStorage.getItem('paradise_scene') || 'beach';
-setScene(savedScene, false);
-
-document.querySelectorAll('.sp-dot').forEach(dot => {
-  dot.addEventListener('click', e => {
-    e.stopPropagation();
-    setScene(dot.dataset.scene);
-  });
+  if (state.mode === 'idle') cast();
+  else if (state.mode === 'bite') reel();
 });
+
+castBtn.addEventListener('click', () => {
+  if (state.mode === 'idle') cast();
+  else if (state.mode === 'bite') reel();
+});
+
+clearBtn.addEventListener('click', clearLog);
+motionBtn.addEventListener('click', enableMotion);
+faceBtn.addEventListener('click', () => {
+  state.alhena = (state.alhena + 1) % ALHENA.length;
+  localStorage.setItem('paradise_alhena', String(state.alhena));
+  status('Alhena avatar variant changed. Real mesh variants come next.');
+});
+
+document.querySelectorAll('[data-time]').forEach(btn => btn.addEventListener('click', () => setTime(btn.dataset.time)));
+document.querySelectorAll('[data-weather]').forEach(btn => btn.addEventListener('click', () => setWeather(btn.dataset.weather)));
+
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (state.mode === 'idle') cast();
+    else if (state.mode === 'bite') reel();
+  }
+});
+
+window.addEventListener('resize', resize);
+resize();
+renderCatalog();
+updateControlState();
+requestAnimationFrame(frame);
 </script>
 </body>
 </html>
