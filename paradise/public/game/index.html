@@ -115,12 +115,35 @@ button.active { background: rgba(255, 213, 118, .24); border-color: rgba(255, 22
   position: fixed;
   inset: auto auto max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
   display: none;
-  grid-template-columns: repeat(3, 48px);
-  grid-template-rows: repeat(3, 48px);
-  gap: 7px;
+  width: 136px;
+  height: 136px;
   z-index: 4;
 }
-.mobile-pad button,
+.stick-zone {
+  position: relative;
+  width: 136px;
+  height: 136px;
+  border: 1px solid rgba(255, 226, 160, .25);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 244, 215, .12), transparent 31%),
+    radial-gradient(circle at 50% 50%, rgba(6, 20, 29, .62), rgba(6, 20, 29, .24));
+  box-shadow: inset 0 0 34px rgba(0,0,0,.35), 0 18px 45px rgba(0,0,0,.22);
+  touch-action: none;
+  backdrop-filter: blur(12px);
+}
+.stick-thumb {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 54px;
+  height: 54px;
+  border: 1px solid rgba(255, 235, 180, .55);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.42), rgba(255, 213, 118, .22) 42%, rgba(8, 27, 38, .66));
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
 .action-pad button {
   width: 48px;
   height: 48px;
@@ -130,10 +153,6 @@ button.active { background: rgba(255, 213, 118, .24); border-color: rgba(255, 22
   backdrop-filter: blur(12px);
   touch-action: none;
 }
-.mobile-pad [data-held="forward"] { grid-column: 2; grid-row: 1; }
-.mobile-pad [data-held="left"] { grid-column: 1; grid-row: 2; }
-.mobile-pad [data-held="back"] { grid-column: 2; grid-row: 3; }
-.mobile-pad [data-held="right"] { grid-column: 3; grid-row: 2; }
 .action-pad {
   position: fixed;
   right: max(18px, env(safe-area-inset-right));
@@ -167,6 +186,38 @@ body.clean .caption { opacity: 0; pointer-events: none; }
   .status { margin-top: 8px; padding: 7px 8px; font-size: 10px; }
   .caption { width: min(600px, 58vw); bottom: 12px; }
 }
+@media (pointer: coarse) and (orientation: landscape) {
+  .hud {
+    width: min(330px, 38vw);
+    padding: 10px;
+    border-radius: 14px;
+  }
+  .kicker { font-size: 7px; margin-bottom: 4px; }
+  h1 { font-size: 18px; margin-bottom: 0; }
+  .hud p,
+  .view-row,
+  .status,
+  .caption { display: none; }
+  .bar { margin-top: 8px; gap: 5px; }
+  button { height: 28px; padding: 0 9px; font-size: 8px; letter-spacing: .13em; }
+  .mobile-pad {
+    width: 112px;
+    height: 112px;
+  }
+  .stick-zone {
+    width: 112px;
+    height: 112px;
+  }
+  .stick-thumb {
+    width: 44px;
+    height: 44px;
+  }
+  .action-pad button {
+    width: 54px;
+    height: 54px;
+    border-radius: 18px;
+  }
+}
 </style>
 </head>
 <body>
@@ -195,10 +246,9 @@ body.clean .caption { opacity: 0; pointer-events: none; }
 </section>
 <div class="caption">Space or tap casts and reels · WASD moves · C hides interface · cinematic views above</div>
 <div class="mobile-pad" aria-label="movement controls">
-  <button data-held="forward">W</button>
-  <button data-held="left">A</button>
-  <button data-held="right">D</button>
-  <button data-held="back">S</button>
+  <div class="stick-zone" id="move-stick" role="application" aria-label="analog movement joystick">
+    <div class="stick-thumb" id="move-thumb"></div>
+  </div>
 </div>
 <div class="action-pad" aria-label="fishing controls">
   <button id="mobile-cast">Cast</button>
@@ -1091,6 +1141,7 @@ let targetAngle = 0;
 camera.lookAt(look);
 const statusEl = document.getElementById('status');
 const keys = new Set();
+const moveAxis = new THREE.Vector2();
 const play = {
   cast: false,
   bite: false,
@@ -1156,6 +1207,10 @@ function updatePlayerInput(dt) {
   if (keys.has('s') || keys.has('arrowdown')) play.velocity.sub(forward);
   if (keys.has('a') || keys.has('arrowleft')) play.velocity.sub(right);
   if (keys.has('d') || keys.has('arrowright')) play.velocity.add(right);
+  if (moveAxis.lengthSq() > 0.001) {
+    play.velocity.addScaledVector(forward, -moveAxis.y);
+    play.velocity.addScaledVector(right, moveAxis.x);
+  }
   if (play.velocity.lengthSq() > 0) {
     play.velocity.normalize().multiplyScalar(speed * dt);
     desiredCamera.add(play.velocity);
@@ -1206,16 +1261,53 @@ window.addEventListener('keydown', ev => {
 });
 window.addEventListener('keyup', ev => keys.delete(ev.key.toLowerCase()));
 
-document.querySelectorAll('[data-held]').forEach(btn => {
-  const key = { forward: 'w', left: 'a', back: 's', right: 'd' }[btn.dataset.held];
-  btn.addEventListener('pointerdown', ev => { ev.preventDefault(); keys.add(key); btn.classList.add('active'); });
-  btn.addEventListener('pointerup', ev => { ev.preventDefault(); keys.delete(key); btn.classList.remove('active'); });
-  btn.addEventListener('pointercancel', () => { keys.delete(key); btn.classList.remove('active'); });
-  btn.addEventListener('pointerleave', () => { keys.delete(key); btn.classList.remove('active'); });
+const moveStick = document.getElementById('move-stick');
+const moveThumb = document.getElementById('move-thumb');
+let stickPointer = null;
+function updateStick(ev) {
+  const rect = moveStick.getBoundingClientRect();
+  const centerX = rect.left + rect.width * .5;
+  const centerY = rect.top + rect.height * .5;
+  const max = rect.width * .34;
+  const dx = THREE.MathUtils.clamp(ev.clientX - centerX, -max, max);
+  const dy = THREE.MathUtils.clamp(ev.clientY - centerY, -max, max);
+  const len = Math.hypot(dx, dy);
+  const scale = len > max ? max / len : 1;
+  const x = dx * scale;
+  const y = dy * scale;
+  moveAxis.set(x / max, y / max);
+  moveThumb.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+}
+function resetStick() {
+  stickPointer = null;
+  moveAxis.set(0, 0);
+  moveThumb.style.transform = 'translate(-50%, -50%)';
+}
+moveStick.addEventListener('pointerdown', ev => {
+  ev.preventDefault();
+  stickPointer = ev.pointerId;
+  if (ev.isTrusted && moveStick.setPointerCapture) {
+    try {
+      moveStick.setPointerCapture(stickPointer);
+    } catch {
+      // Some mobile browser paths do not expose an active pointer capture target.
+    }
+  }
+  updateStick(ev);
+});
+moveStick.addEventListener('pointermove', ev => {
+  if (ev.pointerId === stickPointer) updateStick(ev);
+});
+moveStick.addEventListener('pointerup', ev => {
+  if (ev.pointerId === stickPointer) resetStick();
+});
+moveStick.addEventListener('pointercancel', ev => {
+  if (ev.pointerId === stickPointer) resetStick();
 });
 
 window.addEventListener('pointermove', ev => {
   if (tour) return;
+  if (ev.target.closest?.('.hud, .mobile-pad, .action-pad')) return;
   const nx = ev.clientX / innerWidth - .5;
   const ny = ev.clientY / innerHeight - .5;
   desiredLook.x = 0.4 + nx * 7.5;
