@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "updated": "2026-09-15",
+  "target": "web-deployable high-fidelity ocean/shore fishing scene",
+  "budgets": {
+    "initialLoadMiB": 18,
+    "totalOptionalMiB": 85,
+    "maxSingleModelMiB": 28,
+    "textureMaxDimension": 2048,
+    "requiredFormat": "glb"
+  },
+  "slots": [
+    {
+      "id": "alhena_bartender_rig",
+      "path": "public/assets/models/alhena-bartender.glb",
+      "required": false,
+      "maxMiB": 24,
+      "minimum": {
+        "mesh": "rigged humanoid bartender",
+        "animations": ["idle", "serve", "wave", "talk", "look_at"],
+        "materials": ["skin", "hair", "cloth", "apron", "glass"]
+      }
+    },
+    {
+      "id": "black_lab_rig",
+      "path": "public/assets/models/black-lab.glb",
+      "required": false,
+      "maxMiB": 18,
+      "minimum": {
+        "mesh": "rigged black Labrador retriever",
+        "animations": ["idle", "walk", "sniff", "sit", "tail_wag", "look_at"],
+        "materials": ["black_fur", "nose", "eyes", "collar", "tag"]
+      }
+    },
+    {
+      "id": "shoreline_environment",
+      "path": "public/assets/models/paradise-shoreline.glb",
+      "required": false,
+      "maxMiB": 28,
+      "minimum": {
+        "mesh": "authored beach, dock, bar, beach house, and near-shore terrain",
+        "animations": ["ambient_props_optional"],
+        "materials": ["sand", "wet_sand", "wood", "rope", "glass", "foliage", "shell"]
+      }
+    }
+  ],
+  "promotionGate": [
+    "shader-first default remains stable",
+    "each replacement model loads without console/runtime errors",
+    "production screenshot visibly improves over verification/paradise-material-cinematic.png",
+    "desktop and mobile landscape controls remain usable",
+    "no individual asset exceeds its maxMiB budget"
+  ]
+}
