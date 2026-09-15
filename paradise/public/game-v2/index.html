@@ -480,6 +480,8 @@ const wetSandMat = new THREE.MeshPhysicalMaterial({
 const woodMat = new THREE.MeshStandardMaterial({ map: woodTex, bumpMap: woodTex, bumpScale: .055, roughness: .76, color: 0x8e6036 });
 const darkWoodMat = new THREE.MeshStandardMaterial({ map: woodTex, bumpMap: woodTex, bumpScale: .04, roughness: .82, color: 0x5a351d });
 const barFaceMat = new THREE.MeshStandardMaterial({ map: woodTex, bumpMap: woodTex, bumpScale: .05, roughness: .78, color: 0x6f3f24 });
+const ropeMat = new THREE.MeshStandardMaterial({ color: 0xb58b55, roughness: .92, metalness: 0, bumpMap: woodTex, bumpScale: .018 });
+const trimMat = new THREE.MeshStandardMaterial({ color: 0xf0c979, roughness: .68, metalness: .02 });
 const glassMat = new THREE.MeshPhysicalMaterial({ color: 0xbaedf1, roughness: .04, transmission: .45, thickness: .4, transparent: true, opacity: .66, emissive: 0x183840, emissiveIntensity: .10 });
 const clothMat = new THREE.MeshStandardMaterial({ map: clothTex, bumpMap: clothTex, bumpScale: .025, color: 0x43abc1, roughness: .72 });
 const apronMat = new THREE.MeshStandardMaterial({ map: apronTex, bumpMap: apronTex, bumpScale: .018, color: 0xd9b66e, roughness: .78 });
@@ -897,6 +899,29 @@ for (let i = 0; i < 9; i++) {
   post.castShadow = post.receiveShadow = true;
   dock.add(post);
 }
+for (let i = 0; i < 8; i++) {
+  const x = -8.55 + i * 1.72;
+  const z = -.75 - i * .55;
+  const rail = new THREE.Mesh(new THREE.CylinderGeometry(.030, .030, 1.68, 10), ropeMat);
+  rail.name = 'v2-dock-sagging-rope-rail';
+  rail.position.set(x + .82, .40 - Math.sin(i * .7) * .035, z - .27);
+  rail.rotation.set(Math.PI / 2, 0, 1.24);
+  rail.castShadow = rail.receiveShadow = true;
+  dock.add(rail);
+  const cleat = new THREE.Mesh(new THREE.BoxGeometry(.32, .05, .08), trimMat);
+  cleat.name = 'v2-dock-brass-cleat';
+  cleat.position.set(x, .24, z + .20);
+  cleat.rotation.y = -.2;
+  cleat.castShadow = cleat.receiveShadow = true;
+  dock.add(cleat);
+}
+const coil = new THREE.Mesh(new THREE.TorusGeometry(.36, .032, 8, 42), ropeMat);
+coil.name = 'v2-coiled-rope-on-dock';
+coil.position.set(-4.1, .27, -2.15);
+coil.rotation.x = Math.PI / 2;
+coil.scale.set(1.25, .72, 1);
+coil.castShadow = coil.receiveShadow = true;
+dock.add(coil);
 
 box('v2-beach-house-body', [5.8, 2.5, 3.9], [-11.2, 1.05, 4.3], woodMat);
 contactShadow('v2-beach-house-soft-contact-shadow', -11.2, 4.9, 3.9, 2.2, .24);
@@ -908,6 +933,11 @@ roof.scale.z = .72;
 roof.castShadow = true;
 scene.add(roof);
 box('v2-warm-window', [1.1, 1.2, .08], [-11.2, 1.17, 6.28], glassMat);
+box('v2-beach-house-door', [.86, 1.55, .09], [-13.25, .66, 6.30], darkWoodMat);
+box('v2-beach-house-window-trim-top', [1.35, .08, .10], [-11.2, 1.81, 6.34], trimMat);
+box('v2-beach-house-window-trim-bottom', [1.35, .08, .10], [-11.2, .52, 6.34], trimMat);
+box('v2-beach-house-window-trim-left', [.08, 1.30, .10], [-11.9, 1.17, 6.34], trimMat);
+box('v2-beach-house-window-trim-right', [.08, 1.30, .10], [-10.5, 1.17, 6.34], trimMat);
 
 box('v2-bar-base', [6.6, .92, 1.18], [7.7, .39, 4.0], barFaceMat);
 box('v2-bar-counter', [7.1, .16, 1.62], [7.7, .96, 4.0], woodMat);
@@ -921,6 +951,10 @@ for (let i = 0; i < 6; i++) {
 box('v2-bar-front-upper-highlight', [6.2, .055, .04], [7.7, .86, 4.72], woodMat);
 for (const [x, z, h] of [[5.45, 3.08, .46], [5.78, 3.05, .58], [9.75, 3.06, .50], [10.08, 3.08, .38]]) {
   cyl('v2-glass-bottle-on-bar', .075, h, [x, 1.55 + h * .5, z], [0,0,0], glassMat, 18);
+}
+for (const x of [5.15, 6.35, 9.05, 10.45]) {
+  cyl('v2-low-beach-bar-stool-post', .06, .72, [x, .36, 5.18], [0,0,0], darkWoodMat, 12);
+  cyl('v2-low-beach-bar-stool-seat', .28, .08, [x, .74, 5.18], [0,0,0], woodMat, 24);
 }
 const shellMat = new THREE.MeshStandardMaterial({ color: 0xf3dfb6, roughness: .6 });
 const pebbleMat = new THREE.MeshStandardMaterial({ color: 0x5e5144, roughness: .92 });

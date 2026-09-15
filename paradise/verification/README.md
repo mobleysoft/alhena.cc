@@ -166,6 +166,11 @@ taken with Playwright Chromium at `1440x900`.
   procedural wash texture into the wet-sand material as color and bump detail,
   raising clearcoat, and tuning opacity/roughness so the surf edge has more
   reflective material response instead of reading as a flat translucent strip.
+- `paradise-game-v2-prop-detail-clean.png`: live shore capture after adding
+  lightweight authored-environment details: sagging dock rope rails, brass
+  cleats, a coiled rope, beach-house door/window trim, a warmer bar face, bar
+  plank highlights, and stools. A first shingle attempt was rejected before
+  commit because it created jagged roof artifacts.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.
