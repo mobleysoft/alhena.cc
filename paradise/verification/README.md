@@ -124,6 +124,13 @@ taken with Playwright Chromium at `1440x900`.
   a cinematic post-processing path with selective bloom and output pass. The
   first post-processing attempt over-bloomed the water; this capture verifies the
   tuned threshold/strength no longer blows out the scene.
+- `paradise-game-v2-pandora-water-3.png`: live V2 clean/cinematic water capture
+  after the PandoraChat-style WebGL ocean pass was strengthened with a wider
+  JONSWAP-inspired spectrum, matching CPU wave sampler, darker optical-depth
+  absorption, analytical normals, Fresnel/sky/sun reflection, subsurface scatter,
+  foam/shore streaks, fog, and tone mapping. It proves the intended water
+  framework is active, while still showing that photorealism requires a proper
+  authored 3D/PBR pipeline rather than more placeholder scene hacking.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.

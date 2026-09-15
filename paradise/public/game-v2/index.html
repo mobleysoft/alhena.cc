@@ -436,6 +436,7 @@ const eyeMat = new THREE.MeshBasicMaterial({ color: 0x080504 });
 const oceanUniforms = {
   uTime: { value: 0 },
   uWind: { value: 10.8 },
+  uChop: { value: 1.0 },
   uSun: { value: sun.position.clone().normalize() },
   uSky: { value: new THREE.Color(0x9fd6e6) },
   uHorizon: { value: new THREE.Color(0xffd08a) },
@@ -452,30 +453,35 @@ const oceanMat = new THREE.ShaderMaterial({
   vertexShader: `
     uniform float uTime;
     uniform float uWind;
+    uniform float uChop;
     varying vec3 vWorld;
     varying vec2 vUv;
     varying float vCrest;
     varying float vHeight;
     varying float vShore;
     varying vec3 vNormal;
+    varying float vSlope;
     const float PI = 3.14159265359;
     const float G = 9.81;
     float hash(float n) { return fract(sin(n) * 43758.5453123); }
-    void component(float i, out vec2 dir, out float k, out float omega, out float amp, out float phase) {
-      float t = i / 27.0;
-      float wind = uWind;
-      float wp = 0.13 * G / wind * 6.28318530718;
-      float wMin = wp * .45;
-      float wMax = wp * 4.9;
-      omega = wMin * pow(wMax / wMin, t);
-      k = omega * omega / G;
+    float jonswap(float omega, float wp) {
       float sigma = omega <= wp ? .07 : .09;
       float peak = exp(-pow(omega - wp, 2.0) / (2.0 * sigma * sigma * wp * wp));
-      float spectrum = 0.0081 * G * G / pow(omega, 5.0) * exp(-1.25 * pow(wp / omega, 4.0)) * pow(3.3, peak);
-      float spread = mix(1.05, .26, smoothstep(0.0, 1.0, t));
-      float theta = -PI * .5 + (t - .5) * PI * spread + .25 + (hash(i * 8.31) - .5) * .38;
+      return 0.0081 * G * G / pow(omega, 5.0) * exp(-1.25 * pow(wp / omega, 4.0)) * pow(3.3, peak);
+    }
+    void component(float i, out vec2 dir, out float k, out float omega, out float amp, out float phase) {
+      float t = i / 47.0;
+      float wind = uWind;
+      float wp = 0.13 * G / wind * 6.28318530718;
+      float wMin = wp * .38;
+      float wMax = wp * 7.8;
+      omega = wMin * pow(wMax / wMin, t);
+      k = omega * omega / G;
+      float spectrum = jonswap(omega, wp);
+      float spread = mix(1.18, .18, smoothstep(0.0, 1.0, t));
+      float theta = -PI * .5 + (t - .5) * PI * spread + .25 + (hash(i * 8.31) - .5) * .46;
       dir = normalize(vec2(cos(theta), sin(theta)));
-      amp = clamp(sqrt(2.0 * spectrum * ((wMax - wMin) / 36.0)) * .72 * wind / 12.0, 0.0, 2.1);
+      amp = clamp(sqrt(2.0 * spectrum * ((wMax - wMin) / 48.0)) * .88 * wind / 12.0, 0.0, 2.35);
       phase = hash(i * 19.19 + 3.7) * 6.28318530718;
     }
     void main() {
@@ -486,23 +492,26 @@ const oceanMat = new THREE.ShaderMaterial({
       vec2 lateral = vec2(0.0);
       vec2 grad = vec2(0.0);
       float crest = 0.0;
-      for (int j = 0; j < 36; j++) {
+      for (int j = 0; j < 48; j++) {
         float i = float(j);
         vec2 dir; float k; float omega; float amp; float phase;
         component(i, dir, k, omega, amp, phase);
         float a = dot(dir, wp) * k - omega * uTime + phase;
         h += amp * sin(a);
         float ca = cos(a);
-        lateral += dir * ca * amp * .28;
+        lateral += dir * ca * amp * (.22 + .16 * uChop);
         grad += dir * (amp * k * ca);
         crest += abs(amp * k * ca);
       }
       float shoreFade = smoothstep(-1.0, -9.0, p.z);
+      float backSwell = sin(p.x * .035 - uTime * .20) * .28 + sin(p.z * .05 + p.x * .018 + uTime * .12) * .18;
+      h += backSwell * shoreFade;
       p.xz += lateral * shoreFade;
       p.y += h * (.50 + shoreFade * .98);
       vHeight = h;
       vShore = shoreFade;
-      vCrest = clamp(crest * .30 + max(h, 0.0) * .10, 0.0, 1.0);
+      vSlope = clamp(length(grad) * .55, 0.0, 1.0);
+      vCrest = clamp(crest * .28 + max(h, 0.0) * .12 + vSlope * .22, 0.0, 1.0);
       vec4 world = modelMatrix * vec4(p, 1.0);
       vWorld = world.xyz;
       vNormal = normalize(normalMatrix * vec3(-grad.x * shoreFade, 1.0, -grad.y * shoreFade));
@@ -527,6 +536,7 @@ const oceanMat = new THREE.ShaderMaterial({
     varying float vHeight;
     varying float vShore;
     varying vec3 vNormal;
+    varying float vSlope;
     float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123); }
     float noise(vec2 p) {
       vec2 i = floor(p), f = fract(p), u = f*f*(3.0-2.0*f);
@@ -544,47 +554,65 @@ const oceanMat = new THREE.ShaderMaterial({
     void main() {
       vec3 n = normalize(vNormal);
       vec2 windUv = vWorld.xz;
-      vec2 micro = vec2(
-        fbm(windUv * 2.2 + vec2(uTime * .13, -uTime * .04)),
-        fbm(windUv.yx * 3.6 + vec2(-uTime * .06, uTime * .11))
-      ) - .5;
+      vec2 swellUv = vec2(windUv.x * .055 - uTime * .018, windUv.y * .24 + uTime * .045);
+      vec2 chopUv = vec2(windUv.x * .42 + windUv.y * .08 - uTime * .12, windUv.y * .95 + uTime * .18);
+      vec2 rippleUv = windUv * vec2(3.2, 1.35) + vec2(uTime * .35, -uTime * .12);
+      vec2 micro = vec2(fbm(chopUv), fbm(chopUv.yx + 8.0)) - .5;
+      vec2 ripple = vec2(fbm(rippleUv), fbm(rippleUv.yx + 3.7)) - .5;
       vec2 capillary = vec2(
-        sin(windUv.x * 18.0 - uTime * 2.4) + sin(dot(windUv, vec2(.7, 1.4)) * 15.0 - uTime * 1.8),
-        cos(windUv.y * 16.0 - uTime * 2.1) + sin(dot(windUv, vec2(1.3, -.5)) * 19.0 + uTime * 2.0)
-      ) * .018;
-      n = normalize(n + vec3(micro.x, 0.0, micro.y) * .24 + vec3(capillary.x, 0.0, capillary.y));
+        sin(windUv.x * 21.0 - uTime * 2.7) + sin(dot(windUv, vec2(.7, 1.4)) * 17.0 - uTime * 2.1),
+        cos(windUv.y * 19.0 - uTime * 2.2) + sin(dot(windUv, vec2(1.3, -.5)) * 23.0 + uTime * 2.4)
+      ) * .015;
+      n = normalize(n + vec3(micro.x, 0.0, micro.y) * .34 + vec3(ripple.x, 0.0, ripple.y) * .09 + vec3(capillary.x, 0.0, capillary.y));
       vec3 v = normalize(cameraPosition - vWorld);
       vec3 r = reflect(-v, n);
       float facing = clamp(dot(n, v), 0.0, 1.0);
       float fresnel = .0204 + .9796 * pow(1.0 - facing, 5.0);
-      float depth = smoothstep(2.5, -92.0, vWorld.z);
+      float depth = smoothstep(2.5, -104.0, vWorld.z);
       vec3 deep = uDeep;
       vec3 mid = uMid;
       vec3 shallow = uShallow;
-      vec3 body = mix(shallow, deep, depth);
-      body = mix(body, mid, smoothstep(.08, .55, 1.0 - abs(depth - .45)));
-      float scatter = pow(max(dot(n, -uSun), 0.0), 1.55) * (1.0 - depth) * (0.7 + vShore * .55);
-      body += vec3(.055, .46, .36) * scatter * .52;
-      body += vec3(.018, .065, .055) * smoothstep(-.18, .52, vHeight) * (1.0 - depth);
-      float horizonBand = smoothstep(-.10, .62, r.y);
-      vec3 reflectedSky = mix(vec3(.64,.86,.92), uSky, horizonBand);
-      reflectedSky = mix(reflectedSky, uHorizon, pow(max(dot(r, normalize(uSun)), 0.0), 9.0) * .24);
-      reflectedSky += vec3(1.0, .82, .46) * pow(max(dot(r, normalize(uSun)), 0.0), 68.0) * 1.15;
-      vec3 col = mix(body, reflectedSky, clamp(fresnel * .56 + (1.0 - facing) * .10, 0.0, .68));
-      float specTight = pow(max(dot(reflect(-uSun, n), v), 0.0), 260.0) * 3.8 * uGold;
-      float specWide = pow(max(dot(reflect(-uSun, n), v), 0.0), 42.0) * .48 * uGold;
-      float glitter = smoothstep(.74, .98, fbm(windUv * vec2(4.8, 1.9) + vec2(uTime * .22, -uTime * .10)));
-      glitter *= pow(max(dot(reflect(-uSun, n), v), 0.0), 18.0) * 1.1;
-      float whitecapNoise = fbm(windUv * .62 + vec2(uTime * .09, -uTime * .035));
-      float foam = smoothstep(.38, .76, vCrest) * smoothstep(.42, .72, whitecapNoise);
-      float streaks = smoothstep(.60, .82, fbm(vec2(windUv.x * .22 - uTime * .035, windUv.y * 1.6 + uTime * .12)));
-      float shoreFoam = smoothstep(-8.4, -2.0, vWorld.z) * smoothstep(.48, .80, fbm(vec2(vWorld.x * 1.9, uTime * .56)));
+      float opticalDepth = 1.0 - exp(-depth * 3.2);
+      vec3 body = mix(shallow * .52, deep * 1.42, opticalDepth);
+      body = mix(body, mid * .70, smoothstep(.10, .70, 1.0 - abs(depth - .45)));
+      float backScatter = pow(max(dot(n, -normalize(uSun)), 0.0), 1.45) * (1.0 - opticalDepth) * (0.85 + vShore * .55);
+      float forwardScatter = pow(max(dot(normalize(uSun), v), 0.0), 4.2) * (1.0 - depth);
+      body += vec3(.040, .43, .35) * backScatter * .72;
+      body += vec3(.12, .52, .46) * forwardScatter * .28;
+      body += vec3(.020, .090, .075) * smoothstep(-.22, .62, vHeight) * (1.0 - depth);
+
+      float horizonBand = smoothstep(-.16, .72, r.y);
+      vec3 zenithReflection = mix(vec3(.08,.23,.31), uSky * .44, horizonBand);
+      float sunMirror = pow(max(dot(r, normalize(uSun)), 0.0), 76.0);
+      float sunBloom = pow(max(dot(r, normalize(uSun)), 0.0), 9.0);
+      vec3 reflectedSky = mix(zenithReflection, uHorizon * .62, sunBloom * .24);
+      reflectedSky += vec3(1.0, .83, .46) * sunMirror * 1.55 * uGold;
+
+      float reflectionWeight = clamp(fresnel * .52 + (1.0 - facing) * .13 + vSlope * .075, 0.0, .58);
+      vec3 col = mix(body, reflectedSky, reflectionWeight);
+      float specTight = pow(max(dot(reflect(-normalize(uSun), n), v), 0.0), 320.0) * 4.2 * uGold;
+      float specWide = pow(max(dot(reflect(-normalize(uSun), n), v), 0.0), 48.0) * .56 * uGold;
+      float longRipple = smoothstep(.48, .78, fbm(swellUv + vec2(0.0, uTime * .02)));
+      float glitterMask = smoothstep(.66, .96, fbm(windUv * vec2(5.8, 1.65) + vec2(uTime * .34, -uTime * .13)));
+      float glitter = glitterMask * pow(max(dot(reflect(-normalize(uSun), n), v), 0.0), 16.0) * 1.25;
+
+      float whitecapNoise = fbm(windUv * .72 + vec2(uTime * .10, -uTime * .04));
+      float foam = smoothstep(.42, .82, vCrest + vSlope * .28) * smoothstep(.40, .72, whitecapNoise);
+      float streaks = smoothstep(.62, .84, fbm(vec2(windUv.x * .16 - uTime * .040, windUv.y * 1.9 + uTime * .16)));
+      float shoreNoise = fbm(vec2(vWorld.x * 1.75, uTime * .68 + sin(vWorld.x * .07) * .2));
+      float shoreFoam = smoothstep(-9.8, -2.0, vWorld.z) * smoothstep(.44, .76, shoreNoise);
+      float banding = smoothstep(.38, .78, fbm(vec2(windUv.x * .022 - uTime * .012, windUv.y * .42 + uTime * .045)));
+      col *= mix(.72, 1.16, banding);
+      col += vec3(.030, .18, .21) * longRipple * (1.0 - depth) * .50;
       col += vec3(1.0, .91, .62) * (specTight + specWide + glitter);
-      col = mix(col, vec3(.90,.985,1.0), clamp((foam * .50 + shoreFoam * .28 + streaks * foam * .20) * uFoamPower, 0.0, .68));
-      float fog = smoothstep(-42.0, -142.0, vWorld.z);
-      col = mix(col, uFogTint, fog * .14);
-      col = mix(col, vec3(.82,.93,.95), smoothstep(.8, 0.0, cameraPosition.y) * .06);
-      col = col / (col + vec3(1.0));
+      col = mix(col, vec3(.92,.985,1.0), clamp((foam * .62 + shoreFoam * .34 + streaks * foam * .22) * uFoamPower, 0.0, .78));
+
+      float haze = smoothstep(-34.0, -150.0, vWorld.z);
+      col = mix(col, uFogTint * .58, haze * .045);
+      col = mix(col, vec3(.84,.95,.97), smoothstep(.8, 0.0, cameraPosition.y) * .065);
+      col = max(col, vec3(0.0));
+      col = pow(col, vec3(.86));
+      col = vec3(1.0) - exp(-col * .88);
       col = pow(col, vec3(1.0 / 2.2));
       gl_FragColor = vec4(col, 1.0);
     }
@@ -1228,28 +1256,29 @@ function sampleOceanHeight(x, z, t) {
   const wind = weatherPresets[activeWeather]?.wind || 10.8;
   const g = 9.81;
   const wp = 0.13 * g / wind * Math.PI * 2;
-  const wMin = wp * .45;
-  const wMax = wp * 4.9;
+  const wMin = wp * .38;
+  const wMax = wp * 7.8;
   let h = 0;
-  for (let j = 0; j < 18; j++) {
+  for (let j = 0; j < 48; j++) {
     const n = j;
-    const u = n / 27;
+    const u = n / 47;
     const omega = wMin * Math.pow(wMax / wMin, u);
     const k = omega * omega / g;
     const sigma = omega <= wp ? .07 : .09;
     const peak = Math.exp(-Math.pow(omega - wp, 2) / (2 * sigma * sigma * wp * wp));
     const spectrum = 0.0081 * g * g / Math.pow(omega, 5) * Math.exp(-1.25 * Math.pow(wp / omega, 4)) * Math.pow(3.3, peak);
-    const spread = 1.05 + (.26 - 1.05) * u;
+    const spread = 1.18 + (.18 - 1.18) * u;
     const seed = Math.sin(n * 8.31) * 43758.5453123;
     const hash = seed - Math.floor(seed);
-    const theta = -Math.PI * .5 + (u - .5) * Math.PI * spread + .25 + (hash - .5) * .38;
+    const theta = -Math.PI * .5 + (u - .5) * Math.PI * spread + .25 + (hash - .5) * .46;
     const dx = Math.cos(theta);
     const dz = Math.sin(theta);
-    const amp = Math.min(2.1, Math.max(0, Math.sqrt(2 * spectrum * ((wMax - wMin) / 36)) * .72 * wind / 12));
+    const amp = Math.min(2.35, Math.max(0, Math.sqrt(2 * spectrum * ((wMax - wMin) / 48)) * .88 * wind / 12));
     const phaseSeed = Math.sin(n * 19.19 + 3.7) * 43758.5453123;
     const phase = (phaseSeed - Math.floor(phaseSeed)) * Math.PI * 2;
     h += amp * Math.sin((dx * x + dz * z) * .15 * k - omega * t + phase);
   }
+  h += (Math.sin(x * .035 - t * .20) * .28 + Math.sin(z * .05 + x * .018 + t * .12) * .18) * THREE.MathUtils.smoothstep(z, -1.0, -9.0);
   const shoreFade = 1 - THREE.MathUtils.smoothstep(z, -9.0, -1.0);
   return -.12 + h * (.50 + shoreFade * .98);
 }
@@ -1277,6 +1306,7 @@ function applyEnvironment(timeName = activeTime, weatherName = activeWeather) {
   oceanUniforms.uHorizon.value.setHex(time.waterHorizon);
   oceanUniforms.uFogTint.value.setHex(time.fog);
   oceanUniforms.uWind.value = weather.wind;
+  oceanUniforms.uChop.value = THREE.MathUtils.clamp(weather.wind / 10.8, .62, 1.58);
   oceanUniforms.uFoamPower.value = weather.foam;
   oceanUniforms.uGold.value = time.gold;
   waterOpticsUniforms.uOpticsPower.value = weather.optics;
