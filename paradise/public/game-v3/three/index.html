@@ -12,6 +12,7 @@
   --line: rgba(247, 237, 206, 0.18);
   --gold: #f0cf7a;
   --cyan: #78d8ed;
+  --grade-opacity: 1;
 }
 * { box-sizing: border-box; }
 html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #07131b; color: var(--paper); font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
@@ -76,6 +77,8 @@ body > canvas {
     radial-gradient(ellipse at 50% 50%, transparent 0 54%, rgba(3,10,18,0.18) 82%, rgba(3,10,18,0.34) 100%),
     linear-gradient(180deg, rgba(255,255,255,0.025), transparent 28%, rgba(0,32,42,0.10) 100%);
   mix-blend-mode: soft-light;
+  opacity: var(--grade-opacity);
+  transition: opacity 380ms ease;
 }
 .cinematic-grade::before {
   content: "";
@@ -270,10 +273,15 @@ const castButton = document.getElementById('cast-reel');
 const viewButton = document.getElementById('view-cycle');
 const resetButton = document.getElementById('reset-cast');
 const palette = {
-  dawn: { sky: 0x8fcde0, horizon: 0xffd89a, sun: 0xffefb4, deep: [0.00, 0.04, 0.10], mid: [0.00, 0.19, 0.28], shallow: [0.05, 0.42, 0.44], fog: 0xaad0d4, light: 1.15, gold: 1.0, wind: 8.4, chop: 0.92, foam: 0.72 },
-  noon: { sky: 0x55aeea, horizon: 0xd7eff7, sun: 0xfff5cf, deep: [0.00, 0.05, 0.16], mid: [0.00, 0.23, 0.38], shallow: [0.06, 0.54, 0.56], fog: 0xbfe4ea, light: 1.35, gold: 0.62, wind: 7.6, chop: 0.86, foam: 0.58 },
-  sunset: { sky: 0x3f315c, horizon: 0xffb469, sun: 0xffa45a, deep: [0.00, 0.018, 0.064], mid: [0.03, 0.09, 0.16], shallow: [0.18, 0.22, 0.27], fog: 0xa87572, light: 0.95, gold: 1.18, wind: 10.8, chop: 1.08, foam: 0.92 },
-  night: { sky: 0x030815, horizon: 0x243c5a, sun: 0xbfdfff, deep: [0.00, 0.006, 0.028], mid: [0.00, 0.04, 0.09], shallow: [0.02, 0.15, 0.20], fog: 0x102035, light: 0.52, gold: 0.18, wind: 6.2, chop: 0.72, foam: 0.45 },
+  dawn: { sky: 0x8fcde0, horizon: 0xffd89a, sun: 0xffefb4, deep: [0.00, 0.04, 0.10], mid: [0.00, 0.19, 0.28], shallow: [0.05, 0.42, 0.44], fog: 0xaad0d4, light: 1.15, gold: 1.0, wind: 8.4, chop: 0.92, foam: 0.72, exposure: 1.03, hemi: 1.22, sunPower: 2.55, fogDensity: 0.018, grade: 0.92 },
+  noon: { sky: 0x55aeea, horizon: 0xd7eff7, sun: 0xfff5cf, deep: [0.00, 0.05, 0.16], mid: [0.00, 0.23, 0.38], shallow: [0.06, 0.54, 0.56], fog: 0xbfe4ea, light: 1.35, gold: 0.62, wind: 7.6, chop: 0.86, foam: 0.58, exposure: 1.10, hemi: 1.42, sunPower: 2.95, fogDensity: 0.013, grade: 0.74 },
+  sunset: { sky: 0x3f315c, horizon: 0xffb469, sun: 0xffa45a, deep: [0.00, 0.018, 0.064], mid: [0.03, 0.09, 0.16], shallow: [0.18, 0.22, 0.27], fog: 0xa87572, light: 0.95, gold: 1.18, wind: 10.8, chop: 1.08, foam: 0.92, exposure: 0.96, hemi: 0.86, sunPower: 2.25, fogDensity: 0.022, grade: 1.10 },
+  night: { sky: 0x030815, horizon: 0x243c5a, sun: 0xbfdfff, deep: [0.00, 0.006, 0.028], mid: [0.00, 0.04, 0.09], shallow: [0.02, 0.15, 0.20], fog: 0x102035, light: 0.52, gold: 0.18, wind: 6.2, chop: 0.72, foam: 0.45, exposure: 0.72, hemi: 0.44, sunPower: 0.92, fogDensity: 0.028, grade: 1.24 },
+};
+const weatherProfiles = {
+  calm: { light: 1.05, fog: 0.88, reflection: 0.85, grade: 0.90 },
+  breeze: { light: 1.00, fog: 1.00, reflection: 1.00, grade: 1.00 },
+  storm: { light: 0.72, fog: 1.45, reflection: 0.64, grade: 1.24 },
 };
 let timeKey = new URLSearchParams(location.search).get('time') || 'dawn';
 if (!palette[timeKey]) timeKey = 'dawn';
@@ -1344,6 +1352,9 @@ function vibrate(pattern) {
   if (!navigator.vibrate || navigator.userActivation?.isActive === false) return;
   navigator.vibrate(pattern);
 }
+function setGradeOpacity(value) {
+  document.documentElement.style.setProperty('--grade-opacity', Math.min(1, Math.max(0.35, value)).toFixed(2));
+}
 function refreshPlayHud() {
   castButton.textContent = playState.bite ? 'Reel Bite' : playState.cast ? 'Reel' : 'Cast Line';
   castButton.classList.toggle('alert', playState.bite);
@@ -1411,6 +1422,15 @@ window.__paradiseDebug = {
   getBobber: () => bobber.position.toArray(),
   getCamera: () => camera.position.toArray(),
   getOceanSrc: () => oceanFrame?.src,
+  getEnvironment: () => ({
+    time: timeKey,
+    weather: weatherKey,
+    exposure: renderer.toneMappingExposure,
+    hemi: hemi.intensity,
+    sun: sun.intensity,
+    fog: scene.fog.density,
+    grade: getComputedStyle(document.documentElement).getPropertyValue('--grade-opacity').trim(),
+  }),
 };
 
 new GLTFLoader().load('/assets/models/paradise-shoreline.glb', gltf => {
@@ -1433,11 +1453,17 @@ new GLTFLoader().load('/assets/models/paradise-shoreline.glb', gltf => {
 function setTime(key) {
   timeKey = key;
   const p = palette[key];
+  const w = weatherProfiles[weatherKey];
   updateOceanFrame();
   scene.fog.color.setHex(p.fog);
+  scene.fog.density = p.fogDensity * w.fog;
   skyMat.uniforms.topColor.value.setHex(p.sky);
   skyMat.uniforms.horizonColor.value.setHex(p.horizon);
   skyMat.uniforms.sunColor.value.setHex(p.sun);
+  renderer.toneMappingExposure = p.exposure * w.light;
+  hemi.intensity = p.hemi * w.light;
+  sun.intensity = p.sunPower * w.light;
+  sun.color.setHex(p.sun);
   waterUniforms.uWind.value = p.wind;
   waterUniforms.uChop.value = p.chop;
   waterUniforms.uFoamPower.value = p.foam;
@@ -1452,11 +1478,21 @@ function setTime(key) {
   sunSprite.material.opacity = key === 'night' ? 0.28 : 0.92;
   const rayOpacity = key === 'night' ? 0.015 : key === 'sunset' ? 0.16 : 0.10;
   for (const ray of atmosphereRays) ray.material.opacity = rayOpacity;
+  setGradeOpacity(p.grade * w.grade);
+  document.body.dataset.time = key;
   for (const button of document.querySelectorAll('[data-time]')) button.classList.toggle('active', button.dataset.time === key);
 }
 function setWeather(key) {
   weatherKey = key;
+  const p = palette[timeKey];
+  const w = weatherProfiles[key];
   nearWaterMat.uniforms.uEnergy.value = key === 'storm' ? 1.0 : key === 'breeze' ? 0.72 : 0.42;
+  scene.fog.density = p.fogDensity * w.fog;
+  renderer.toneMappingExposure = p.exposure * w.light;
+  hemi.intensity = p.hemi * w.light;
+  sun.intensity = p.sunPower * w.light;
+  setGradeOpacity(p.grade * w.grade);
+  document.body.dataset.weather = key;
   updateOceanFrame();
   for (const button of document.querySelectorAll('[data-weather]')) button.classList.toggle('active', button.dataset.weather === key);
 }
@@ -1552,8 +1588,9 @@ function animate() {
   houseShadow.material.opacity = 0.18 + Math.sin(elapsed * 0.18) * 0.015;
   barShadow.material.opacity = 0.20 + Math.sin(elapsed * 0.21) * 0.014;
   for (const reflection of waterReflections) {
+    const weatherReflection = weatherProfiles[weatherKey].reflection;
     const shimmer = 0.72 + Math.sin(elapsed * 0.72 + reflection.userData.phase) * 0.18;
-    reflection.material.opacity = reflection.userData.baseOpacity * shimmer * (timeKey === 'night' ? 0.55 : 1);
+    reflection.material.opacity = reflection.userData.baseOpacity * shimmer * weatherReflection * (timeKey === 'night' ? 0.55 : 1);
     reflection.position.y = reflection.userData.baseY + Math.sin(elapsed * 0.9 + reflection.userData.phase) * 0.012;
     reflection.scale.x = reflection.userData.baseScaleX + Math.sin(elapsed * 0.45 + reflection.userData.phase) * 0.018;
   }
