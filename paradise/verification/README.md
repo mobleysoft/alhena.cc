@@ -89,6 +89,13 @@ taken with Playwright Chromium at `1440x900`.
   opaque, lowering cinematic fog, deepening the water body, raising the water
   camera, and adding a shader-only optical highlight layer. This is the current
   best verified V2 water view.
+- `paradise-game-v2-textured-bar.png`: live V2 focused bar capture after adding
+  procedural cloth/apron/fur bump textures and moving the bar camera toward the
+  front of the bartender. Still rejected as AAA-quality because the bartender is
+  procedural primitive geometry, not a rigged model.
+- `paradise-game-v2-textured-dog.png`: live V2 focused dog capture after adding
+  procedural fur texture/bump detail. Still rejected as AAA-quality because the
+  animal needs a skeletal dog asset and authored gait clips.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.
