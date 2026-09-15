@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#07131b">
+<title>Paradise V3 - Mesh Ocean Candidate</title>
+<style>
+:root {
+  --paper: #f7edce;
+  --glass: rgba(5, 15, 26, 0.58);
+  --line: rgba(247, 237, 206, 0.18);
+  --gold: #f0cf7a;
+  --cyan: #78d8ed;
+}
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #07131b; color: var(--paper); font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+canvas { display: block; }
+.hud {
+  position: fixed;
+  left: max(16px, env(safe-area-inset-left));
+  top: max(16px, env(safe-area-inset-top));
+  z-index: 3;
+  width: min(420px, calc(100vw - 32px));
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--glass);
+  box-shadow: 0 24px 80px rgba(0,0,0,0.32), inset 0 1px rgba(255,255,255,0.08);
+  backdrop-filter: blur(18px) saturate(1.2);
+}
+.kicker {
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+h1 {
+  margin: 10px 0 8px;
+  font: 500 clamp(28px, 6vw, 56px)/.9 Georgia, "Times New Roman", serif;
+  letter-spacing: -.04em;
+}
+p { margin: 0; color: rgba(247,237,206,.72); line-height: 1.5; font-size: 13px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+button, a.button {
+  min-height: 38px;
+  padding: 10px 12px;
+  border: 1px solid rgba(247,237,206,.24);
+  border-radius: 999px;
+  background: rgba(255,255,255,.07);
+  color: var(--paper);
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: .13em;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5a844); border-color: transparent; }
+.readout {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 3;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(5,15,26,.48);
+  color: rgba(247,237,206,.68);
+  backdrop-filter: blur(14px);
+  text-transform: uppercase;
+  letter-spacing: .14em;
+  font-size: 10px;
+}
+@media (max-width: 760px) {
+  .hud { padding: 14px; }
+  .hud p { display: none; }
+  .row { margin-top: 10px; }
+}
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body data-paradise-v3="three-mesh-ocean-candidate" data-water-system="pandorachat-jonswap-mesh-ocean-v1">
+<aside class="hud">
+  <div class="kicker">Paradise V3 / Mesh Candidate</div>
+  <h1>Mesh ocean, not flat art.</h1>
+  <p>This route is the replacement architecture candidate: a real perspective camera, fog, lights, displaced ocean geometry, shader Fresnel, and GLB shoreline loading.</p>
+  <div class="row">
+    <button class="active" data-time="dawn">Dawn</button>
+    <button data-time="noon">Noon</button>
+    <button data-time="sunset">Sunset</button>
+    <button data-time="night">Night</button>
+    <a class="button" href="/">Root Game</a>
+    <a class="button" href="/game-v3/">V3 Gate</a>
+  </div>
+</aside>
+<div class="readout" id="readout">loading mesh ocean</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const readout = document.getElementById('readout');
+const palette = {
+  dawn: { sky: 0x86c7dc, horizon: 0xffd089, sun: 0xffefb4, waterA: [0.04, 0.42, 0.52], waterB: [0.52, 0.82, 0.86], fog: 0xaad0d4, light: 1.15 },
+  noon: { sky: 0x4ba3e8, horizon: 0xd7eff7, sun: 0xfff5cf, waterA: [0.02, 0.44, 0.62], waterB: [0.40, 0.82, 0.92], fog: 0xbfe4ea, light: 1.35 },
+  sunset: { sky: 0x34244f, horizon: 0xffb469, sun: 0xffa45a, waterA: [0.04, 0.16, 0.28], waterB: [0.64, 0.32, 0.34], fog: 0xc18a79, light: 0.95 },
+  night: { sky: 0x030815, horizon: 0x243c5a, sun: 0xbfdfff, waterA: [0.01, 0.04, 0.10], waterB: [0.06, 0.20, 0.30], fog: 0x102035, light: 0.52 },
+};
+let timeKey = new URLSearchParams(location.search).get('time') || 'dawn';
+if (!palette[timeKey]) timeKey = 'dawn';
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(palette[timeKey].fog, 0.018);
+
+const camera = new THREE.PerspectiveCamera(54, innerWidth / innerHeight, 0.1, 900);
+camera.position.set(0, 5.1, 24);
+camera.lookAt(0, 0.9, -24);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.02;
+document.body.appendChild(renderer.domElement);
+
+const hemi = new THREE.HemisphereLight(0xf7f1d6, 0x102033, 1.3);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffe0a4, 2.4);
+sun.position.set(-9, 14, 6);
+scene.add(sun);
+
+const skyGeo = new THREE.SphereGeometry(360, 48, 24);
+const skyMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide,
+  depthWrite: false,
+  uniforms: {
+    topColor: { value: new THREE.Color(palette[timeKey].sky) },
+    horizonColor: { value: new THREE.Color(palette[timeKey].horizon) },
+    sunColor: { value: new THREE.Color(palette[timeKey].sun) },
+    sunDir: { value: new THREE.Vector3(-0.42, 0.62, 0.2).normalize() },
+  },
+  vertexShader: `
+    varying vec3 vWorld;
+    void main() {
+      vec4 wp = modelMatrix * vec4(position, 1.0);
+      vWorld = normalize(wp.xyz);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    varying vec3 vWorld;
+    uniform vec3 topColor;
+    uniform vec3 horizonColor;
+    uniform vec3 sunColor;
+    uniform vec3 sunDir;
+    void main() {
+      float h = clamp(vWorld.y * 0.5 + 0.5, 0.0, 1.0);
+      vec3 c = mix(horizonColor, topColor, smoothstep(0.05, 0.82, h));
+      float s = pow(max(dot(vWorld, sunDir), 0.0), 360.0);
+      float glow = pow(max(dot(vWorld, sunDir), 0.0), 16.0);
+      c += sunColor * (s * 2.8 + glow * 0.26);
+      gl_FragColor = vec4(c, 1.0);
+    }
+  `
+});
+scene.add(new THREE.Mesh(skyGeo, skyMat));
+
+const waterUniforms = {
+  uTime: { value: 0 },
+  uLight: { value: palette[timeKey].light },
+  uWaterA: { value: new THREE.Vector3(...palette[timeKey].waterA) },
+  uWaterB: { value: new THREE.Vector3(...palette[timeKey].waterB) },
+  uSky: { value: new THREE.Color(palette[timeKey].sky) },
+  uHorizon: { value: new THREE.Color(palette[timeKey].horizon) },
+  uSun: { value: new THREE.Vector3(-0.42, 0.62, 0.2).normalize() },
+};
+const waterMat = new THREE.ShaderMaterial({
+  uniforms: waterUniforms,
+  transparent: false,
+  vertexShader: `
+    uniform float uTime;
+    varying vec3 vPos;
+    varying vec3 vNormalApprox;
+    float wave(vec2 p, vec2 d, float k, float a, float s) {
+      return sin(dot(p, normalize(d)) * k + uTime * s) * a;
+    }
+    float heightAt(vec2 p) {
+      float h = 0.0;
+      h += wave(p, vec2(0.8, 1.0), 0.42, 0.42, 0.74);
+      h += wave(p, vec2(-0.35, 1.0), 0.91, 0.16, 1.10);
+      h += wave(p, vec2(1.0, 0.18), 1.86, 0.052, 1.86);
+      h += wave(p, vec2(-1.0, 0.62), 3.42, 0.018, 2.72);
+      return h;
+    }
+    void main() {
+      vec3 p = position;
+      float h = heightAt(p.xz);
+      p.y += h;
+      float e = 0.18;
+      float hx = heightAt(p.xz + vec2(e, 0.0)) - heightAt(p.xz - vec2(e, 0.0));
+      float hz = heightAt(p.xz + vec2(0.0, e)) - heightAt(p.xz - vec2(0.0, e));
+      vNormalApprox = normalize(vec3(-hx, 2.0 * e, -hz));
+      vPos = p;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+    }
+  `,
+  fragmentShader: `
+    precision highp float;
+    uniform float uTime;
+    uniform float uLight;
+    uniform vec3 uWaterA;
+    uniform vec3 uWaterB;
+    uniform vec3 uSky;
+    uniform vec3 uHorizon;
+    uniform vec3 uSun;
+    varying vec3 vPos;
+    varying vec3 vNormalApprox;
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+    float noise(vec2 p) {
+      vec2 i = floor(p), f = fract(p);
+      vec2 u = f * f * (3.0 - 2.0 * f);
+      return mix(mix(hash(i), hash(i + vec2(1.0,0.0)), u.x), mix(hash(i + vec2(0.0,1.0)), hash(i + vec2(1.0,1.0)), u.x), u.y);
+    }
+    float fbm(vec2 p) {
+      float v = 0.0, a = 0.5;
+      for (int i = 0; i < 5; i++) { v += noise(p) * a; p = mat2(1.7,-1.1,1.1,1.7) * p; a *= 0.5; }
+      return v;
+    }
+    void main() {
+      vec3 n = normalize(vNormalApprox);
+      vec3 v = normalize(cameraPosition - vPos);
+      float fresnel = 0.0204 + 0.9796 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
+      float depth = smoothstep(18.0, -28.0, vPos.z);
+      vec3 body = mix(uWaterB, uWaterA, depth);
+      vec3 reflected = mix(uHorizon, uSky, clamp(n.y * 0.62 + 0.22, 0.0, 1.0));
+      float glint = pow(max(dot(reflect(-uSun, n), v), 0.0), 64.0) * uLight;
+      float foam = smoothstep(0.64, 0.96, fbm(vPos.xz * vec2(0.18, 0.72) + vec2(uTime * 0.04, -uTime * 0.12)));
+      foam *= smoothstep(0.42, 0.92, abs(n.x) + abs(n.z));
+      vec3 color = mix(body, reflected, clamp(fresnel * 0.86, 0.0, 0.72));
+      color += vec3(1.0, 0.82, 0.46) * glint * 1.45;
+      color = mix(color, vec3(0.90, 0.98, 1.0), foam * 0.22);
+      color += vec3(0.0, 0.22, 0.20) * smoothstep(0.35, 1.0, depth) * 0.28;
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `
+});
+const water = new THREE.Mesh(new THREE.PlaneGeometry(280, 280, 240, 240), waterMat);
+water.rotation.x = -Math.PI / 2;
+water.position.set(0, -0.34, -58);
+scene.add(water);
+
+const sandMat = new THREE.MeshStandardMaterial({ color: 0xc6a468, roughness: 0.92, metalness: 0.0 });
+const sand = new THREE.Mesh(new THREE.PlaneGeometry(90, 28, 32, 8), sandMat);
+sand.rotation.x = -Math.PI / 2;
+sand.position.set(0, -0.45, 14);
+scene.add(sand);
+
+const bar = new THREE.Mesh(new THREE.BoxGeometry(5.2, 1.1, 1.55), new THREE.MeshStandardMaterial({ color: 0x6c4326, roughness: 0.72 }));
+bar.position.set(6.2, 0.25, 4.8);
+scene.add(bar);
+const roof = new THREE.Mesh(new THREE.ConeGeometry(3.1, 1.15, 4), new THREE.MeshStandardMaterial({ color: 0x9a5129, roughness: 0.84 }));
+roof.position.set(6.2, 1.35, 4.8);
+roof.rotation.y = Math.PI / 4;
+scene.add(roof);
+
+const dog = new THREE.Group();
+const dogMat = new THREE.MeshStandardMaterial({ color: 0x0b0b0a, roughness: 0.58, metalness: 0.02 });
+const dogBody = new THREE.Mesh(new THREE.CapsuleGeometry(0.55, 1.55, 6, 12), dogMat);
+dogBody.rotation.z = Math.PI / 2;
+dog.add(dogBody);
+const dogHead = new THREE.Mesh(new THREE.SphereGeometry(0.45, 18, 12), dogMat);
+dogHead.position.set(1.03, 0.13, 0.18);
+dog.add(dogHead);
+for (let i = 0; i < 4; i++) {
+  const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.58, 4, 8), dogMat);
+  leg.position.set(i < 2 ? -0.48 : 0.42, -0.52, i % 2 ? -0.28 : 0.28);
+  dog.add(leg);
+}
+dog.position.set(-3.8, 0.18, 8.4);
+dog.scale.setScalar(0.74);
+scene.add(dog);
+
+const person = new THREE.Group();
+const dress = new THREE.Mesh(new THREE.ConeGeometry(0.58, 1.75, 28), new THREE.MeshStandardMaterial({ color: 0x2a9fc0, roughness: 0.56 }));
+dress.position.y = 1.08;
+person.add(dress);
+const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 22, 16), new THREE.MeshStandardMaterial({ color: 0x8b5b42, roughness: 0.5 }));
+head.position.y = 2.18;
+person.add(head);
+const hair = new THREE.Mesh(new THREE.SphereGeometry(0.38, 22, 16), new THREE.MeshStandardMaterial({ color: 0x1b130f, roughness: 0.72 }));
+hair.scale.set(1.08, 0.9, 1.05);
+hair.position.set(0, 2.22, -0.03);
+person.add(hair);
+person.position.set(6.2, 0.18, 3.75);
+person.scale.setScalar(0.72);
+scene.add(person);
+
+new GLTFLoader().load('/assets/models/paradise-shoreline.glb', gltf => {
+  gltf.scene.position.set(-5.8, -0.42, 7.6);
+  gltf.scene.scale.setScalar(0.62);
+  gltf.scene.traverse(obj => {
+    if (obj.isMesh) {
+      obj.castShadow = true;
+      obj.receiveShadow = true;
+      if (obj.material) obj.material.roughness = Math.max(obj.material.roughness || 0.7, 0.62);
+    }
+  });
+  scene.add(gltf.scene);
+  readout.textContent = 'mesh ocean + shoreline glb';
+}, undefined, err => {
+  readout.textContent = `mesh ocean / glb missing: ${err.message || 'load failed'}`;
+});
+
+function setTime(key) {
+  timeKey = key;
+  const p = palette[key];
+  scene.fog.color.setHex(p.fog);
+  skyMat.uniforms.topColor.value.setHex(p.sky);
+  skyMat.uniforms.horizonColor.value.setHex(p.horizon);
+  skyMat.uniforms.sunColor.value.setHex(p.sun);
+  waterUniforms.uLight.value = p.light;
+  waterUniforms.uWaterA.value.set(...p.waterA);
+  waterUniforms.uWaterB.value.set(...p.waterB);
+  waterUniforms.uSky.value.setHex(p.sky);
+  waterUniforms.uHorizon.value.setHex(p.horizon);
+  for (const button of document.querySelectorAll('[data-time]')) button.classList.toggle('active', button.dataset.time === key);
+}
+document.querySelectorAll('[data-time]').forEach(button => button.addEventListener('click', () => setTime(button.dataset.time)));
+setTime(timeKey);
+
+let pointerX = 0;
+let pointerY = 0;
+addEventListener('pointermove', event => {
+  pointerX = event.clientX / innerWidth - 0.5;
+  pointerY = event.clientY / innerHeight - 0.5;
+});
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+const clock = new THREE.Clock();
+function animate() {
+  const elapsed = clock.getElapsedTime();
+  waterUniforms.uTime.value = elapsed;
+  dog.position.x = -4.2 + Math.sin(elapsed * 0.55) * 0.42;
+  dog.rotation.y = Math.sin(elapsed * 0.55) * 0.12;
+  person.rotation.y = Math.sin(elapsed * 0.38) * 0.08;
+  camera.position.x += (pointerX * 2.2 - camera.position.x) * 0.018;
+  camera.position.y += (5.1 - pointerY * 0.8 - camera.position.y) * 0.018;
+  camera.lookAt(0, 0.85, -24);
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+animate();
+</script>
+</body>
+</html>
