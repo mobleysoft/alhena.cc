@@ -362,7 +362,7 @@ import { GLTFLoader } from 'https://unpkg.com/three@0.168.0/examples/jsm/loaders
 const canvas = document.getElementById('stage');
 const oceanCanvas = document.getElementById('ocean-pass');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, premultipliedAlpha: false, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.35));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.1));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setClearColor(0x000000, 0);
 renderer.shadowMap.enabled = true;
@@ -579,7 +579,7 @@ function makeOceanPass(canvas) {
   };
   return {
     render(time, preset) {
-      const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.0);
       const w = Math.max(1, Math.floor(canvas.clientWidth * dpr));
       const h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
       if (canvas.width !== w || canvas.height !== h) {
@@ -2105,7 +2105,16 @@ resize();
 setPreset('dawn');
 
 let lastNow = performance.now();
+let pageVisible = !document.hidden;
+document.addEventListener('visibilitychange', () => {
+  pageVisible = !document.hidden;
+  lastNow = performance.now();
+});
 function animate(now) {
+  if (!pageVisible) {
+    requestAnimationFrame(animate);
+    return;
+  }
   const t = now * .001;
   const dt = Math.min(0.05, (now - lastNow) * 0.001);
   lastNow = now;
