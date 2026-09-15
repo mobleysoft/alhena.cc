@@ -119,7 +119,7 @@ button.active { background: rgba(255, 213, 118, .24); border-color: rgba(255, 22
 }
 body.clean .hud,
 body.clean .caption { opacity: 0; pointer-events: none; }
-@media (max-width: 720px) {
+@media (max-width: 720px), (max-height: 520px), (pointer: coarse) {
   .hud { width: calc(100vw - 24px); left: 12px; top: 12px; padding: 14px; }
   h1 { font-size: 24px; }
   .caption { font-size: 8px; border-radius: 18px; }
@@ -530,6 +530,38 @@ for (let i = 0; i < 11; i++) {
 }
 for (let i = 0; i < 8; i++) cyl('dock-post-' + i, .1, 1.4, [-7.4 + i * 1.72, -.42, -.46 - i * .5], [0,0,0], darkWoodMat, 14);
 
+const foamMat = new THREE.LineBasicMaterial({ color: 0xdff7f7, transparent: true, opacity: .34 });
+const goldFoamMat = new THREE.LineBasicMaterial({ color: 0xffd47c, transparent: true, opacity: .22 });
+const shoreFoamLines = [];
+for (let row = 0; row < 7; row++) {
+  const pts = [];
+  const z = -0.4 + row * .42;
+  for (let i = 0; i < 86; i++) {
+    const x = -28 + i * .66;
+    pts.push(new THREE.Vector3(x, .035 + row * .006, z + Math.sin(i * .23 + row) * .12));
+  }
+  const geom = new THREE.BufferGeometry().setFromPoints(pts);
+  const lineMesh = new THREE.Line(geom, row % 2 ? goldFoamMat : foamMat);
+  lineMesh.name = 'animated-shore-foam-line';
+  scene.add(lineMesh);
+  shoreFoamLines.push({ line: lineMesh, row, baseZ: z });
+}
+
+const bobberRingMat = new THREE.LineBasicMaterial({ color: 0xf6ffff, transparent: true, opacity: .42 });
+const bobberRings = [];
+for (let r = 0; r < 3; r++) {
+  const pts = [];
+  for (let i = 0; i <= 72; i++) {
+    const a = i / 72 * Math.PI * 2;
+    pts.push(new THREE.Vector3(Math.cos(a), 0, Math.sin(a)));
+  }
+  const ring = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), bobberRingMat);
+  ring.name = 'bobber-ripple-ring';
+  ring.visible = false;
+  scene.add(ring);
+  bobberRings.push(ring);
+}
+
 function sphere(name, radius, pos, material, scale = [1, 1, 1], segments = 24) {
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, segments, Math.max(8, Math.floor(segments / 2))), material);
   mesh.name = name;
@@ -860,6 +892,18 @@ function animate(now) {
   bobber.position.z = play.bobberBase.z + Math.sin(t * .72) * .75 * drift;
   bobber.position.x = play.bobberBase.x + Math.cos(t * .61) * .5 * drift;
   bobber.scale.setScalar(play.bite ? 1.18 : 1);
+  shoreFoamLines.forEach(({ line, row, baseZ }) => {
+    line.position.z = Math.sin(t * .8 + row * .7) * .12;
+    line.position.y = .028 + Math.sin(t * 1.4 + row) * .01;
+    line.material.opacity = row % 2 ? .16 + Math.sin(t + row) * .04 : .28 + Math.sin(t * .7 + row) * .06;
+  });
+  bobberRings.forEach((ring, i) => {
+    ring.visible = play.cast;
+    const s = .42 + i * .45 + (t * .34 % .45);
+    ring.position.set(bobber.position.x, .055, bobber.position.z);
+    ring.scale.setScalar(s);
+    ring.material.opacity = (play.bite ? .52 : .28) * (1 - i / 3);
+  });
   const points = [];
   const start = new THREE.Vector3(11.8, 2.3, 4.3);
   for (let i = 0; i < 28; i++) {
