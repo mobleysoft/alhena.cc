@@ -121,7 +121,10 @@ button { font: inherit; color: inherit; }
   letter-spacing: 0.16em;
   text-transform: uppercase;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 420ms ease;
 }
+body.started .hint { opacity: 1; }
 
 .hud {
   position: fixed;
@@ -132,7 +135,11 @@ button { font: inherit; color: inherit; }
   gap: 14px;
   align-items: end;
   pointer-events: none;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 520ms ease, transform 520ms ease;
 }
+body.started .hud { opacity: 1; transform: none; }
 .panel, .tray, .log {
   pointer-events: auto;
   background: var(--glass);
@@ -406,8 +413,8 @@ let waterProgram = null;
 
 const TIMES = {
   dawn: {
-    skyTop: '#203a5b', skyMid: '#6ca4ca', horizon: '#f4c77a', sun: '#ffe6a7',
-    seaNear: '#1e6f88', seaFar: '#80b7c5', sand: '#c5a66e', light: 0.82, sunX: 0.22, sunY: 0.34, stars: 0
+    skyTop: '#2f5f8a', skyMid: '#8fc8df', horizon: '#ffd28a', sun: '#fff0ba',
+    seaNear: '#227f9d', seaFar: '#8bcbd4', sand: '#d4b779', light: 0.9, sunX: 0.22, sunY: 0.34, stars: 0
   },
   noon: {
     skyTop: '#3386db', skyMid: '#77c7ee', horizon: '#d7eff7', sun: '#fff5c9',
@@ -472,11 +479,16 @@ function resize() {
   state.dpr = Math.min(window.devicePixelRatio || 1, 2);
   state.w = window.innerWidth;
   state.h = window.innerHeight;
+  waterCanvas.width = Math.floor(state.w * state.dpr);
+  waterCanvas.height = Math.floor(state.h * state.dpr);
+  waterCanvas.style.width = state.w + 'px';
+  waterCanvas.style.height = state.h + 'px';
   canvas.width = Math.floor(state.w * state.dpr);
   canvas.height = Math.floor(state.h * state.dpr);
   canvas.style.width = state.w + 'px';
   canvas.style.height = state.h + 'px';
   ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+  if (waterProgram) waterProgram.gl.viewport(0, 0, waterCanvas.width, waterCanvas.height);
 }
 
 function hexToRgb(hex) {
@@ -491,6 +503,238 @@ function rgbToHex(rgb) {
 function mix(a, b, t) {
   const ar = hexToRgb(a), br = hexToRgb(b);
   return rgbToHex(ar.map((v, i) => v + (br[i] - v) * t));
+}
+
+function hexToUnit(hex) {
+  return hexToRgb(hex).map(v => v / 255);
+}
+
+function clamp01(v) {
+  return Math.max(0, Math.min(1, v));
+}
+
+function initWaterShader() {
+  const gl = waterCanvas.getContext('webgl', { alpha: true, antialias: false, depth: false, stencil: false, premultipliedAlpha: false });
+  if (!gl) return null;
+  const vertexSource = `
+    attribute vec2 a_position;
+    void main() {
+      gl_Position = vec4(a_position, 0.0, 1.0);
+    }
+  `;
+  const fragmentSource = `
+    precision highp float;
+    uniform vec2 u_resolution;
+    uniform float u_time;
+    uniform float u_wind;
+    uniform float u_chop;
+    uniform float u_foam;
+    uniform float u_haze;
+    uniform vec3 u_sea_near;
+    uniform vec3 u_sea_far;
+    uniform vec3 u_sky_top;
+    uniform vec3 u_horizon;
+    uniform vec2 u_sun;
+    uniform float u_light;
+
+    mat2 rot(float a) {
+      float s = sin(a), c = cos(a);
+      return mat2(c, -s, s, c);
+    }
+
+    float hash(vec2 p) {
+      p = fract(p * vec2(123.34, 456.21));
+      p += dot(p, p + 45.32);
+      return fract(p.x * p.y);
+    }
+
+    float noise(vec2 p) {
+      vec2 i = floor(p);
+      vec2 f = fract(p);
+      vec2 u = f * f * (3.0 - 2.0 * f);
+      return mix(
+        mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+        mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
+        u.y
+      );
+    }
+
+    float fbm(vec2 p) {
+      float v = 0.0;
+      float a = 0.5;
+      for (int i = 0; i < 5; i++) {
+        v += noise(p) * a;
+        p = rot(1.17) * p * 2.03 + 7.31;
+        a *= 0.52;
+      }
+      return v;
+    }
+
+    float jonswapEnergy(float f, float fp, float gamma) {
+      float sigma = mix(0.09, 0.07, step(f, fp));
+      float r = exp(-pow((f / fp - 1.0) / sigma, 2.0) * 0.5);
+      float peak = pow(gamma, r);
+      float tail = pow(f, -5.0) * exp(-1.25 * pow(fp / f, 4.0));
+      return tail * peak;
+    }
+
+    float waveComponent(vec2 p, float i, float wind, float chop) {
+      float idx = i / 31.0;
+      float fp = mix(0.052, 0.034, wind);
+      float f = mix(0.018, 0.18, idx);
+      float gamma = mix(2.2, 5.6, chop);
+      float e = jonswapEnergy(f, fp, gamma);
+      float ePeak = jonswapEnergy(fp, fp, gamma);
+      float amp = sqrt(max(e / ePeak, 0.0)) * (0.018 + 0.11 * wind);
+
+      float spread = mix(1.15, 0.38, smoothstep(0.0, 1.0, wind));
+      float angle = 0.62 + (hash(vec2(i, 2.7)) - 0.5) * spread + wind * 0.28;
+      vec2 dir = normalize(rot(angle) * vec2(1.0, 0.24 + sin(i * 2.1) * 0.16));
+
+      float dispersion = sqrt(9.81 * f) * 0.42;
+      float phase = u_time * dispersion + hash(vec2(i, 9.1)) * 6.2831853;
+      float k = f * (42.0 + wind * 24.0);
+      float crest = sin(dot(p, dir) * k + phase);
+      crest += sin(dot(p, dir.yx) * k * 1.84 - phase * 1.17) * 0.18 * chop;
+      return crest * amp * (0.75 + chop * 0.6);
+    }
+
+    float oceanHeight(vec2 p) {
+      float h = 0.0;
+      for (int i = 0; i < 32; i++) {
+        h += waveComponent(p, float(i), u_wind, u_chop);
+      }
+      return h;
+    }
+
+    void main() {
+      vec2 uv = gl_FragCoord.xy / u_resolution;
+      float y = 1.0 - uv.y;
+      float waterTop = 0.54;
+      float shore = 0.88;
+      if (y < waterTop || y > shore) {
+        gl_FragColor = vec4(0.0);
+        return;
+      }
+
+      float depth = clamp((y - waterTop) / (shore - waterTop), 0.0, 1.0);
+      float perspective = 0.18 + depth * depth * 2.8;
+      vec2 world = vec2((uv.x - 0.5) * (32.0 + depth * 105.0), perspective * 48.0);
+      world.y += u_time * (0.88 + u_wind * 1.15);
+
+      float h = oceanHeight(world);
+      float e = mix(0.19, 0.055, depth);
+      float hx = oceanHeight(world + vec2(e, 0.0)) - oceanHeight(world - vec2(e, 0.0));
+      float hy = oceanHeight(world + vec2(0.0, e)) - oceanHeight(world - vec2(0.0, e));
+      vec3 normal = normalize(vec3(-hx * 2.6, 0.72 + depth * 1.8, -hy * 2.6));
+
+      vec3 viewDir = normalize(vec3(0.0, 0.5 + depth * 1.25, 1.0));
+      float fresnel = pow(1.0 - clamp(dot(normal, viewDir), 0.0, 1.0), 3.0);
+      vec3 reflectedSky = mix(u_horizon, u_sky_top, clamp(0.3 + normal.z * 0.42 - depth * 0.15, 0.0, 1.0));
+      vec3 body = mix(u_sea_far, u_sea_near, depth);
+      body = mix(body, vec3(0.02, 0.52, 0.58), (1.0 - depth) * (0.18 + u_wind * 0.16));
+
+      vec2 sunUv = vec2(u_sun.x, 1.0 - u_sun.y);
+      vec2 toSun = normalize((sunUv - uv) * vec2(u_resolution.x / u_resolution.y, 1.0));
+      vec2 slope = normalize(normal.xz + vec2(0.0001));
+      float glitter = pow(max(dot(slope, toSun), 0.0), 36.0) * (0.16 + u_chop * 0.7);
+      float sunPath = pow(max(0.0, 1.0 - abs(uv.x - u_sun.x) * 5.0), 3.0) * pow(1.0 - depth, 1.7);
+      float specular = glitter * sunPath * u_light;
+
+      float curvature = abs(hx) + abs(hy);
+      float scatter = smoothstep(0.1, 0.68, curvature) * (1.0 - depth) * (0.28 + u_light * 0.32);
+      float crest = smoothstep(0.13 + (1.0 - u_foam) * 0.16, 0.28, h + curvature * 0.34);
+      float shoreFoam = smoothstep(0.76, 0.92, depth) * (0.45 + 0.35 * sin(world.x * 0.31 + u_time * 2.0));
+      float foamNoise = fbm(world * vec2(0.82, 1.75) + vec2(u_time * 0.7, -u_time * 0.18));
+      float foamCells = smoothstep(0.47, 0.92, foamNoise) * smoothstep(0.18, 0.7, curvature + u_foam * 0.45);
+      float foam = clamp((crest * foamCells * u_foam + shoreFoam * (0.42 + foamCells * 0.5)) * (0.55 + u_chop * 0.55), 0.0, 1.0);
+
+      vec3 color = mix(body, reflectedSky, fresnel * 0.58);
+      color += vec3(0.0, 0.27, 0.29) * scatter;
+      vec3 shimmer = vec3(
+        specular * (1.02 + 0.18 * sin((uv.x + normal.x) * 620.0 + u_time * 4.7)),
+        specular * 0.86,
+        specular * (0.74 + 0.24 * sin((uv.y + normal.z) * 530.0 - u_time * 5.2))
+      );
+      color += vec3(1.0, 0.83, 0.48) * specular + shimmer * vec3(0.24, 0.08, 0.3);
+      color = mix(color, vec3(0.92, 0.98, 1.0), foam * 0.72);
+      float horizonFog = pow(1.0 - depth, 2.3) * (0.34 + u_haze * 0.85);
+      color = mix(color, u_horizon, horizonFog);
+      color = mix(color, vec3(0.38, 0.43, 0.46), u_haze * 0.32);
+      color *= 0.72 + u_light * 0.48;
+      float vignette = smoothstep(0.92, 0.22, length((uv - 0.5) * vec2(1.05, 0.88)));
+      color *= 0.74 + vignette * 0.34;
+      color = color / (color + vec3(0.88));
+      color = pow(color, vec3(0.4545));
+
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `;
+
+  function compile(type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader));
+    return shader;
+  }
+
+  try {
+    const program = gl.createProgram();
+    gl.attachShader(program, compile(gl.VERTEX_SHADER, vertexSource));
+    gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fragmentSource));
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
+    gl.useProgram(program);
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const position = gl.getAttribLocation(program, 'a_position');
+    gl.enableVertexAttribArray(position);
+    gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+    return {
+      gl,
+      program,
+      uniforms: {
+        resolution: gl.getUniformLocation(program, 'u_resolution'),
+        time: gl.getUniformLocation(program, 'u_time'),
+        wind: gl.getUniformLocation(program, 'u_wind'),
+        chop: gl.getUniformLocation(program, 'u_chop'),
+        foam: gl.getUniformLocation(program, 'u_foam'),
+        haze: gl.getUniformLocation(program, 'u_haze'),
+        seaNear: gl.getUniformLocation(program, 'u_sea_near'),
+        seaFar: gl.getUniformLocation(program, 'u_sea_far'),
+        skyTop: gl.getUniformLocation(program, 'u_sky_top'),
+        horizon: gl.getUniformLocation(program, 'u_horizon'),
+        sun: gl.getUniformLocation(program, 'u_sun'),
+        light: gl.getUniformLocation(program, 'u_light'),
+      }
+    };
+  } catch (err) {
+    console.warn('Water shader unavailable:', err);
+    return null;
+  }
+}
+
+function drawWaterShader(t, time, weather) {
+  if (!waterProgram) return;
+  const gl = waterProgram.gl;
+  const u = waterProgram.uniforms;
+  gl.useProgram(waterProgram.program);
+  gl.viewport(0, 0, waterCanvas.width, waterCanvas.height);
+  gl.uniform2f(u.resolution, waterCanvas.width, waterCanvas.height);
+  gl.uniform1f(u.time, t * 0.001);
+  gl.uniform1f(u.wind, clamp01((weather.wave - 0.45) / 1.25));
+  gl.uniform1f(u.chop, weather.chop);
+  gl.uniform1f(u.foam, weather.foam);
+  gl.uniform1f(u.haze, weather.haze + weather.cloud * 0.18);
+  gl.uniform3fv(u.seaNear, hexToUnit(mix(time.seaNear, '#243441', weather.haze + weather.cloud * 0.12)));
+  gl.uniform3fv(u.seaFar, hexToUnit(mix(time.seaFar, '#66737b', weather.haze)));
+  gl.uniform3fv(u.skyTop, hexToUnit(mix(time.skyTop, '#7c8592', weather.haze)));
+  gl.uniform3fv(u.horizon, hexToUnit(mix(time.horizon, '#b8aea0', weather.haze * 0.7)));
+  gl.uniform2f(u.sun, time.sunX, time.sunY);
+  gl.uniform1f(u.light, time.light);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
 function pulse(pattern) {
@@ -719,14 +963,16 @@ function drawWater(t, time, weather) {
   const w = state.w, h = state.h;
   const top = h * 0.54;
   const bottom = h * 0.88;
-  const g = ctx.createLinearGradient(0, top, 0, bottom);
-  const far = mix(time.seaFar, '#66737b', weather.haze);
-  const near = mix(time.seaNear, '#243441', weather.haze + weather.cloud * 0.12);
-  g.addColorStop(0, far);
-  g.addColorStop(0.42, mix(far, near, 0.46));
-  g.addColorStop(1, near);
-  ctx.fillStyle = g;
-  ctx.fillRect(0, top, w, bottom - top + 2);
+  if (!waterProgram) {
+    const g = ctx.createLinearGradient(0, top, 0, bottom);
+    const far = mix(time.seaFar, '#66737b', weather.haze);
+    const near = mix(time.seaNear, '#243441', weather.haze + weather.cloud * 0.12);
+    g.addColorStop(0, far);
+    g.addColorStop(0.42, mix(far, near, 0.46));
+    g.addColorStop(1, near);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, top, w, bottom - top + 2);
+  }
 
   ctx.save();
   ctx.beginPath();
@@ -1014,6 +1260,8 @@ function roundRect(x, y, w, h, r) {
 function frame(t) {
   const time = TIMES[state.time];
   const weather = WEATHER[state.weather];
+  drawWaterShader(t, time, weather);
+  ctx.clearRect(0, 0, state.w, state.h);
   drawSky(t, time, weather);
   drawWater(t, time, weather);
   drawShore(t, time);
@@ -1023,12 +1271,14 @@ function frame(t) {
 
 startBtn.addEventListener('click', () => {
   state.started = true;
+  document.body.classList.add('started');
   intro.classList.add('hidden');
 });
 
 canvas.addEventListener('pointerdown', () => {
   if (!state.started) {
     state.started = true;
+    document.body.classList.add('started');
     intro.classList.add('hidden');
     return;
   }
@@ -1061,6 +1311,7 @@ window.addEventListener('keydown', e => {
 });
 
 window.addEventListener('resize', resize);
+waterProgram = initWaterShader();
 resize();
 renderCatalog();
 updateControlState();
