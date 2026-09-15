@@ -171,6 +171,14 @@ taken with Playwright Chromium at `1440x900`.
   cleats, a coiled rope, beach-house door/window trim, a warmer bar face, bar
   plank highlights, and stools. A first shingle attempt was rejected before
   commit because it created jagged roof artifacts.
+- `paradise-game-v2-pandorachat-water-refit.png`: live clean water capture
+  after explicitly retuning the V2 ocean toward the old PandoraChat approach:
+  stronger JONSWAP-inspired long-wave energy, matching CPU/GPU wave amplitude,
+  higher analytical-normal contribution, Fresnel/sky reflection, subsurface
+  volume bands, fog, controlled foam, and weather-coupled optics. This is the
+  correct browser-shader direction, but still not the final AAA path; the scene
+  needs authored 3D assets, PBR materials, and likely a Godot/Web export or
+  equivalent asset pipeline for the next major leap.
 - `scripts/verify-game.sh`: production verifier now covers the legacy canvas
   game, the root launcher, and the primary `/game-v2/` route. It syntax-checks
   both module scripts, validates asset budgets, checks root CTA markers, and

@@ -90,6 +90,7 @@ fi
 
 v2_markers=(
   "v2-jonswap-displaced-ocean-mesh"
+  "v2-pandorachat-jonswap-fresnel-water-optics-overlay"
   "v2-layered-shorebreak-wash-sheet"
   "v2-layered-atmospheric-cloud-bank"
   "v2-black-lab-procedural-rig-standin"
