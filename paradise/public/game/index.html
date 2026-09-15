@@ -444,7 +444,7 @@ function makeOceanPass(canvas) {
     }
     void waveComponent(float i, out vec2 dir, out float k, out float omega, out float amp, out float phase) {
       float t = i / 31.0;
-      float spread = mix(0.92, 0.16, smoothstep(0.0, 1.0, t));
+      float spread = mix(1.05, 0.12, smoothstep(0.0, 1.0, t));
       float theta = -PI * 0.5 + (t - 0.5) * PI * spread + 0.22 + (hash(i * 8.31) - 0.5) * 0.34;
       dir = normalize(vec2(cos(theta), sin(theta)));
       float wind = max(uWind, 1.5);
@@ -456,7 +456,7 @@ function makeOceanPass(canvas) {
       float sigma = omega <= wp ? 0.07 : 0.09;
       float peak = exp(-pow(omega - wp, 2.0) / (2.0 * sigma * sigma * wp * wp));
       float spectrum = 0.0081 * G * G / pow(omega, 5.0) * exp(-1.25 * pow(wp / omega, 4.0)) * pow(3.3, peak);
-      amp = clamp(sqrt(2.0 * spectrum * ((wMax - wMin) / 32.0)) * 0.35 * wind / 12.0 * uChop, 0.0, 1.80);
+      amp = clamp(sqrt(2.0 * spectrum * ((wMax - wMin) / 32.0)) * 0.52 * wind / 12.0 * uChop, 0.0, 2.20);
       phase = hash(i * 19.19 + 3.7) * TAU;
     }
     float waveHeight(vec2 p) {
@@ -471,12 +471,14 @@ function makeOceanPass(canvas) {
     }
     vec3 waterNormal(vec2 p, float px) {
       float e = max(px, 0.018);
-      float c = waveHeight(p);
-      float x = waveHeight(p + vec2(e, 0.0));
-      float y = waveHeight(p + vec2(0.0, e));
-      vec3 macro = normalize(vec3(-(x - c) / e, 1.0, -(y - c) / e));
-      vec2 ripple = vec2(fbm(p * 9.0 + uTime * .05), fbm(p * 15.0 - uTime * .07)) - 0.5;
-      return normalize(macro + vec3(ripple.x, 0.0, ripple.y) * (0.11 + uWind * 0.008));
+      float x1 = waveHeight(p + vec2(e, 0.0));
+      float x2 = waveHeight(p - vec2(e, 0.0));
+      float y1 = waveHeight(p + vec2(0.0, e));
+      float y2 = waveHeight(p - vec2(0.0, e));
+      vec3 macro = normalize(vec3(-(x1 - x2) / (2.0 * e), 1.0, -(y1 - y2) / (2.0 * e)));
+      vec2 capillary = vec2(fbm(p * 12.0 + uTime * .07), fbm(p * 23.0 - uTime * .09)) - 0.5;
+      vec2 chop = vec2(sin(p.y * 2.7 + uTime * 1.3), cos(p.x * 2.1 - uTime * .9)) * 0.035;
+      return normalize(macro + vec3(capillary.x + chop.x, 0.0, capillary.y + chop.y) * (0.16 + uWind * 0.010));
     }
     float laplacian(vec2 p) {
       float e = 0.08;
@@ -500,6 +502,69 @@ function makeOceanPass(canvas) {
       sky += vec3(1.0, 0.70, 0.32) * (sun * .48 + glow * .055) * uGold;
       return sky;
     }
+    vec3 acesTone(vec3 x) {
+      const float a = 2.51;
+      const float b = 0.03;
+      const float c = 2.43;
+      const float d = 0.59;
+      const float e = 0.14;
+      return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+    }
+    vec3 oceanColor(vec2 uv, vec2 q, float horizon) {
+      float d = clamp((horizon - uv.y) / horizon, 0.0, 1.0);
+      float grazing = smoothstep(0.0, 0.18, d);
+      float range = 1.0 / max(0.026, pow(d + 0.018, 1.92));
+      vec2 p = vec2(q.x * range * 2.55, range * 3.85 - uTime * (0.36 + uWind * 0.018));
+      p += vec2(waveHeight(p * 0.21 + 8.0), waveHeight(p * 0.17 - 4.0)) * 0.022 * uChop;
+
+      float px = range * 0.010;
+      vec3 n = waterNormal(p, px);
+      float h = waveHeight(p);
+      float curv = laplacian(p);
+      float curvature = clamp(curv * 0.12 + 0.22, 0.0, 1.0);
+      float slope = clamp((1.0 - n.y) * 4.7, 0.0, 1.0);
+
+      vec3 viewDir = normalize(vec3(q.x * .48, d * .42 + .13, 1.0));
+      float ndv = clamp(dot(n, viewDir), 0.0, 1.0);
+      float fresnel = 0.0204 + 0.9796 * pow(1.0 - ndv, 5.0);
+      vec3 refl = skyColor(vec2(uv.x + n.x * .075, horizon + d * .56 + n.z * .06), reflect(-viewDir, n));
+
+      vec3 deep = vec3(0.003, 0.020, 0.070);
+      vec3 mid = vec3(0.012, 0.118, 0.185);
+      vec3 shallow = vec3(0.040, 0.240, 0.315);
+      float nearShore = smoothstep(0.55, 1.0, d);
+      float farDepth = smoothstep(0.07, 0.42, d) * (1.0 - nearShore * 0.44);
+      vec3 body = mix(mid, shallow, nearShore);
+      body = mix(body, deep, farDepth * 0.70);
+
+      float transmission = smoothstep(-0.22, 0.38, h) * smoothstep(0.14, 0.94, d);
+      float sss = pow(max(dot(n, normalize(vec3(-0.34, 0.84, 0.40))), 0.0), 2.0);
+      body += vec3(0.00, 0.42, 0.36) * transmission * 0.22;
+      body += vec3(0.08, 0.30, 0.26) * sss * nearShore * (0.18 + uGold * 0.08);
+      body += vec3(0.0, 0.20, 0.23) * curvature * 0.16;
+
+      float crestEnergy = smoothstep(0.12, 0.52, abs(h)) * max(slope, curvature);
+      float foamNoise = fbm(p * 5.6 + vec2(uTime * .08, -uTime * .05));
+      float microFoam = smoothstep(uFoamT * .52, uFoamT * 1.28, abs(h)) * smoothstep(.50, .86, foamNoise);
+      float shoreLine = 0.218 + 0.012 * sin(q.x * 3.4 + uTime * .18);
+      float shoreFoam = smoothstep(0.030, 0.0, abs(uv.y - shoreLine)) * smoothstep(.34, .82, fbm(vec2(q.x * 24.0, uTime * .42)));
+      float foam = clamp(crestEnergy * microFoam + shoreFoam * .50, 0.0, .86);
+
+      vec3 water = mix(body, refl, fresnel * mix(.55, .92, grazing));
+      vec3 sunDir = normalize(vec3(-0.34, .86, .38));
+      vec3 halfV = normalize(viewDir + sunDir);
+      float spec = pow(max(dot(n, halfV), 0.0), mix(58.0, 220.0, smoothstep(0.10, 0.92, d)));
+      float glints = smoothstep(.62, .96, fbm(p * 31.0 + vec2(uTime * .55, -uTime * .21)));
+      water += vec3(1.0, .84, .46) * spec * glints * (0.9 + uGold * 1.6);
+      water = mix(water, vec3(.88, .97, .99), foam * .46);
+      water += vec3(.12, .03, .18) * foam * curvature * 0.08;
+
+      float farHaze = smoothstep(0.30, 0.0, d);
+      vec3 fog = mix(vec3(.25, .38, .45), vec3(.70, .78, .78), uGold * .18);
+      water = mix(water, fog, farHaze * .82);
+      water = mix(water, vec3(.055, .145, .18), smoothstep(.82, 1.0, d) * .08);
+      return water;
+    }
     void main() {
       vec2 uv = gl_FragCoord.xy / uRes;
       vec2 q = (gl_FragCoord.xy * 2.0 - uRes) / min(uRes.x, uRes.y);
@@ -508,47 +573,12 @@ function makeOceanPass(canvas) {
       vec3 col = skyColor(uv, rd);
       if (uv.y < horizon) {
         float d = clamp((horizon - uv.y) / horizon, 0.0, 1.0);
-        float perspective = 1.0 / max(0.035, d * d * 1.95);
-        vec2 p = vec2(q.x * perspective * 2.5, perspective * 3.6 - uTime * 0.52);
-        float px = perspective * 0.018;
-        vec3 n = waterNormal(p, px);
-        vec3 viewDir = normalize(vec3(q.x * .45, d * .38 + .18, 1.0));
-        float fresnel = 0.02 + 0.98 * pow(1.0 - clamp(dot(n, viewDir), 0.0, 1.0), 5.0);
-        vec3 refl = skyColor(vec2(uv.x + n.x * .05, horizon + d * .52 + n.z * .04), reflect(-viewDir, n));
-        vec3 deep = vec3(0.006, 0.030, 0.105);
-        vec3 mid = vec3(0.020, 0.165, 0.250);
-        vec3 shallow = vec3(0.042, 0.230, 0.335);
-        float nearShore = smoothstep(0.34, 1.0, d);
-        float midDepth = smoothstep(0.05, 0.48, d) * (1.0 - nearShore * 0.35);
-        vec3 body = mix(mid, shallow, nearShore);
-        body = mix(body, deep, midDepth * 0.48);
-        float h = waveHeight(p);
-        float curvature = clamp(laplacian(p) * 0.15, 0.0, 1.0);
-        float slope = clamp((1.0 - n.y) * 3.4, 0.0, 1.0);
-        float crest = smoothstep(0.10, 0.30, abs(h)) * max(slope, curvature);
-        float shoreFoam = smoothstep(0.11, 0.0, abs(uv.y - 0.235)) * smoothstep(0.38, 0.78, fbm(vec2(q.x * 20.0, uTime * .55)));
-        float foamGate = smoothstep(uFoamT * .72, uFoamT * 1.38, abs(h));
-        float foam = clamp(crest * foamGate * smoothstep(0.42, 0.84, fbm(p * 5.4)) + shoreFoam * .30, 0.0, 0.72);
-        float scatter = smoothstep(0.0, 0.75, d) * (0.38 + 0.24 * sin(p.x * .24 + uTime));
-        body += vec3(0.0, 0.46, 0.50) * curvature * 0.38;
-        vec3 water = mix(body + vec3(0.0, 0.12, 0.11) * scatter, refl, fresnel * (0.32 + d * .38));
-        vec3 sunDir = normalize(vec3(-0.28, .84, .46));
-        vec3 halfV = normalize(viewDir + sunDir);
-        float glitter = pow(max(dot(n, halfV), 0.0), mix(48.0, 180.0, smoothstep(0.15, 1.0, d)));
-        glitter *= smoothstep(0.54, 0.95, fbm(p * 22.0 + vec2(uTime * .34, -uTime * .18)));
-        glitter *= smoothstep(0.045, 0.20, d);
-        water += vec3(1.0, .82, .48) * glitter * (0.9 + uGold * 1.35);
-        water = mix(water, vec3(.86, .94, .98), foam * .38);
-        float farWaterHaze = smoothstep(0.28, 0.0, d);
-        water = mix(water, vec3(0.25, 0.38, 0.45), farWaterHaze * 0.92);
-        float haze = smoothstep(.56, .02, d) * .18;
-        water = mix(water, vec3(.34, .50, .58), haze);
-        water = mix(water, min(water, vec3(0.36, 0.52, 0.58)), smoothstep(0.34, 0.03, d));
+        vec3 water = oceanColor(uv, q, horizon);
         float horizonBlend = smoothstep(0.0, 0.006, d);
         col = mix(col, water, horizonBlend);
       }
       col *= 1.0 - dot(q, q) * 0.035;
-      col = col / (col + vec3(1.0));
+      col = acesTone(col * 1.18);
       col = pow(col, vec3(1.0 / 2.2));
       gl_FragColor = vec4(col, 1.0);
     }`;
