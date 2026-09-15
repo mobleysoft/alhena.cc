@@ -138,9 +138,9 @@ body.clean .caption {
   bottom: max(14px, env(safe-area-inset-bottom));
   z-index: 12;
   display: none;
-  grid-template-columns: repeat(2, minmax(82px, 1fr));
+  grid-template-columns: repeat(2, minmax(76px, 1fr));
   gap: 9px;
-  width: min(250px, calc(100vw - 28px));
+  width: min(260px, calc(100vw - 28px));
 }
 .mobile-controls button {
   min-height: 52px;
@@ -156,14 +156,42 @@ body.clean .caption {
   .caption { max-width: calc(100vw - 20px); white-space: normal; text-align: center; }
 }
 @media (pointer: coarse), (max-height: 520px) {
-  .hud { width: min(340px, calc(100vw - 300px)); }
+  .hud {
+    width: min(260px, calc(100vw - 250px));
+    max-height: calc(100vh - 24px);
+    padding: 9px;
+    border-radius: 13px;
+    overflow: hidden;
+  }
+  .kicker { font-size: 7px; letter-spacing: .18em; }
+  h1 { margin-top: 4px; font-size: 18px; }
+  p { margin-top: 6px; font-size: 10px; line-height: 1.38; }
+  .meter { height: 5px; margin-top: 8px; }
+  .row { margin-top: 8px; gap: 5px; }
+  button { padding: 7px 9px; font-size: 8px; letter-spacing: .13em; }
   .mobile-controls { display: grid; }
+  .caption { display: none; }
+  body.presentation .hud {
+    width: min(210px, calc(100vw - 224px));
+    opacity: .42;
+  }
+  body.presentation .hud:hover,
+  body.presentation .hud:focus-within {
+    opacity: .88;
+  }
+  body.presentation .hud .row,
+  body.presentation .hud .meter {
+    display: none;
+  }
+  body.presentation h1 { font-size: 16px; }
+  body.presentation p { font-size: 9px; max-height: 42px; overflow: hidden; }
   body.clean .mobile-controls { opacity: 0; pointer-events: none; }
 }
 @media (max-width: 760px) {
-  .hud { width: min(310px, calc(100vw - 220px)); }
-  .mobile-controls { width: min(210px, 42vw); }
-  .mobile-controls button { min-height: 46px; font-size: 9px; padding: 8px; }
+  .hud { width: min(240px, calc(100vw - 224px)); }
+  .mobile-controls { width: min(200px, 40vw); gap: 7px; }
+  .mobile-controls button { min-height: 42px; font-size: 8px; padding: 7px; border-radius: 14px; }
+  #touch-motion { grid-column: 1 / -1; min-height: 42px; }
 }
 </style>
 </head>
@@ -193,6 +221,7 @@ body.clean .caption {
     <button data-weather="calm">Calm</button>
     <button data-weather="breeze">Breeze</button>
     <button data-weather="storm">Storm</button>
+    <button id="motion-cast">Motion</button>
   </div>
 </div>
 <div class="caption">Space/tap casts and reels · drag to orbit · wheel to dolly · H toggles HUD</div>
@@ -201,6 +230,7 @@ body.clean .caption {
   <button id="touch-reel">Reel</button>
   <button id="touch-clear">Clear</button>
   <button id="touch-view">View</button>
+  <button id="touch-motion">Motion</button>
 </div>
 
 <script type="importmap">
@@ -1885,9 +1915,21 @@ const play = {
   species: fishSpecies[0],
   target: castTargets[1].clone()
 };
+const motionCast = {
+  enabled: false,
+  armed: false,
+  lastMagnitude: 0,
+  lastActionAt: 0,
+  samples: []
+};
+document.body.dataset.controlArchitecture = 'v2-mobile-wrist-casting-haptic-feedback';
 
 function setStatus(text) {
   statusEl.textContent = text;
+}
+
+function haptic(pattern = 18) {
+  if ('vibrate' in navigator) navigator.vibrate(pattern);
 }
 
 function castLine() {
@@ -1901,6 +1943,7 @@ function castLine() {
   play.species = fishSpecies[Math.min(fishSpecies.length - 1, Math.floor(Math.pow(Math.random(), 1.9) * fishSpecies.length))];
   play.target.copy(castTargets[Math.floor(Math.random() * castTargets.length)]);
   setStatus('Line out. Watch for the bobber to dive.');
+  haptic([20, 30, 24]);
 }
 
 function clearLine() {
@@ -1908,6 +1951,7 @@ function clearLine() {
   play.bite = false;
   play.tension = 0;
   setStatus('Cast past the foam line. When the bobber dives, reel before the tension breaks.');
+  haptic(10);
 }
 
 function reelLine() {
@@ -1915,18 +1959,63 @@ function reelLine() {
   if (!play.bite) {
     play.tension = Math.min(1, play.tension + .16);
     setStatus('Too early. Let the bite develop before reeling.');
+    haptic(12);
     return;
   }
   play.tension += .28;
   if (play.tension > .62 && play.tension < 1.05) {
     play.catches += 1;
     setStatus(`Caught ${play.species.name} x${play.catches}. Cast again.`);
+    haptic([30, 35, 50]);
     clearLine();
   } else if (play.tension >= 1.05) {
     setStatus('Line snapped. Reset and cast again.');
+    haptic([70, 35, 70]);
     clearLine();
   } else {
     setStatus('Reel again. Keep tension in the strike window.');
+    haptic(22);
+  }
+}
+
+async function enableMotionCasting() {
+  try {
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+      const permission = await DeviceMotionEvent.requestPermission();
+      if (permission !== 'granted') {
+        setStatus('Motion casting needs device motion permission. Tap Motion again after enabling it.');
+        return;
+      }
+    }
+    motionCast.enabled = true;
+    motionCast.armed = true;
+    document.getElementById('motion-cast').classList.add('active');
+    document.getElementById('touch-motion').classList.add('active');
+    setStatus('Motion casting armed. Flick forward to cast; pull back to reel.');
+    haptic([16, 28, 16]);
+  } catch (error) {
+    setStatus('Motion casting could not start here. Tap or space still works.');
+  }
+}
+
+function handleMotionCast(event) {
+  if (!motionCast.enabled) return;
+  const a = event.accelerationIncludingGravity || event.acceleration || {};
+  const x = a.x || 0;
+  const y = a.y || 0;
+  const z = a.z || 0;
+  const magnitude = Math.sqrt(x * x + y * y + z * z);
+  const impulse = magnitude - motionCast.lastMagnitude;
+  motionCast.lastMagnitude = magnitude;
+  motionCast.samples.push(impulse);
+  if (motionCast.samples.length > 8) motionCast.samples.shift();
+  const recent = motionCast.samples.reduce((sum, value) => sum + Math.max(0, value), 0);
+  const now = performance.now();
+  if (now - motionCast.lastActionAt < 850) return;
+  if (recent > 6.8) {
+    motionCast.lastActionAt = now;
+    if (!play.cast) castLine();
+    else reelLine();
   }
 }
 
@@ -1935,11 +2024,14 @@ document.getElementById('reel').addEventListener('click', reelLine);
 document.getElementById('touch-cast').addEventListener('click', castLine);
 document.getElementById('touch-reel').addEventListener('click', reelLine);
 document.getElementById('touch-clear').addEventListener('click', clearLine);
+document.getElementById('motion-cast').addEventListener('click', enableMotionCasting);
+document.getElementById('touch-motion').addEventListener('click', enableMotionCasting);
 document.getElementById('touch-view').addEventListener('click', () => {
   const order = ['shore', 'water', 'bar', 'dog'];
   const active = document.querySelector('[data-view].active')?.dataset.view || 'shore';
   setView(order[(order.indexOf(active) + 1) % order.length]);
 });
+window.addEventListener('devicemotion', handleMotionCast);
 window.addEventListener('keydown', event => {
   if (event.code === 'Space') {
     event.preventDefault();

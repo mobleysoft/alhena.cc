@@ -122,6 +122,8 @@ v2_markers=(
   "v2-bleached-driftwood-log-a"
   "class=\"lens\""
   "mobile-controls"
+  "v2-mobile-wrist-casting-haptic-feedback"
+  "DeviceMotionEvent.requestPermission"
   "presentation"
   "hud-hidden"
   "installRuntimeAssetSlots"
