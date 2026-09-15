@@ -116,22 +116,32 @@ def write_glb(builder):
         {"bufferView": 1, "componentType": 5126, "count": len(builder.normals) // 3, "type": "VEC3"},
         {"bufferView": 2, "componentType": 5125, "count": len(builder.indices), "type": "SCALAR"},
     ]
+    primitive_index_accessors = []
+    for p in builder.primitives:
+        primitive_index_accessors.append(len(accessors))
+        indices = builder.indices[p["index_start"]:p["index_start"] + p["index_count"]]
+        accessors.append({
+            "bufferView": 2,
+            "byteOffset": p["index_start"] * 4,
+            "componentType": 5125,
+            "count": p["index_count"],
+            "type": "SCALAR",
+            "min": [min(indices)],
+            "max": [max(indices)]
+        })
     meshes = [{
         "name": "paradise-authored-shoreline-enhancement",
         "primitives": [
             {
                 "attributes": {"POSITION": 0, "NORMAL": 1},
-                "indices": 2,
+                "indices": primitive_index_accessors[i],
                 "material": p["material"],
                 "mode": 4,
                 "extras": {"name": p["name"], "indexStart": p["index_start"], "indexCount": p["index_count"]}
             }
-            for p in builder.primitives
+            for i, p in enumerate(builder.primitives)
         ]
     }]
-    # GLTF cannot offset primitives inside a shared accessor cleanly without extra accessors.
-    # For loader compatibility, emit one combined material-0 terrain mesh plus named extras.
-    meshes[0]["primitives"] = [{"attributes": {"POSITION": 0, "NORMAL": 1}, "indices": 2, "material": 0, "mode": 4}]
     gltf = {
         "asset": {"version": "2.0", "generator": "Paradise stdlib shoreline generator"},
         "scene": 0,
