@@ -524,7 +524,7 @@ function makeOceanPass(canvas) {
         float haze = smoothstep(.56, .02, d) * .18;
         water = mix(water, vec3(.34, .50, .58), haze);
         water = mix(water, min(water, vec3(0.36, 0.52, 0.58)), smoothstep(0.34, 0.03, d));
-        float horizonBlend = smoothstep(0.001, 0.018, d);
+        float horizonBlend = smoothstep(0.0, 0.006, d);
         col = mix(col, water, horizonBlend);
       }
       col *= 1.0 - dot(q, q) * 0.035;
@@ -1056,7 +1056,7 @@ const water = new THREE.Mesh(new THREE.PlaneGeometry(180, 126, 220, 150), waterM
 water.rotation.x = -Math.PI / 2;
 water.position.set(0, -0.06, -66);
 water.receiveShadow = true;
-water.visible = true;
+water.visible = new URLSearchParams(window.location.search).get('meshwater') === '1';
 scene.add(water);
 
 const shoreGeo = new THREE.PlaneGeometry(100, 42, 170, 70);
@@ -1082,7 +1082,7 @@ const wetSand = new THREE.Mesh(
     roughness: .34,
     metalness: .05,
     transparent: true,
-    opacity: .30
+    opacity: .18
   })
 );
 wetSand.name = 'reflective-wet-sand-transition';
