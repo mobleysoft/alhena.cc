@@ -217,6 +217,22 @@ body.clean .caption { opacity: 0; pointer-events: none; }
   white-space: pre;
 }
 body.debug .debug-panel { display: block; }
+.runtime-error {
+  position: fixed;
+  left: max(14px, env(safe-area-inset-left));
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(64px, env(safe-area-inset-bottom));
+  display: none;
+  z-index: 5;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 124, 99, .42);
+  border-radius: 14px;
+  background: rgba(35, 7, 4, .72);
+  color: rgba(255, 235, 220, .92);
+  font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+  backdrop-filter: blur(12px);
+}
+body.runtime-failed .runtime-error { display: block; }
 @media (max-width: 720px), (max-height: 520px), (pointer: coarse) {
   .hud { width: calc(100vw - 24px); left: 12px; top: 12px; padding: 14px; }
   h1 { font-size: 24px; }
@@ -306,6 +322,7 @@ body.debug .debug-panel { display: block; }
 </section>
 <div class="caption">Space or tap casts and reels · WASD moves · C hides interface · cinematic views above</div>
 <div class="debug-panel" id="debug-panel" aria-live="polite"></div>
+<div class="runtime-error" id="runtime-error" aria-live="assertive"></div>
 <div class="mobile-pad" aria-label="movement controls">
   <div class="stick-zone" id="move-stick" role="application" aria-label="analog movement joystick">
     <div class="stick-thumb" id="move-thumb"></div>
@@ -468,11 +485,13 @@ function makeOceanPass(canvas) {
         vec3 viewDir = normalize(vec3(q.x * .45, d * .38 + .18, 1.0));
         float fresnel = 0.02 + 0.98 * pow(1.0 - clamp(dot(n, viewDir), 0.0, 1.0), 5.0);
         vec3 refl = skyColor(vec2(uv.x + n.x * .05, horizon + d * .52 + n.z * .04), reflect(-viewDir, n));
-        vec3 deep = vec3(0.006, 0.070, 0.155);
-        vec3 mid = vec3(0.020, 0.285, 0.385);
-        vec3 shallow = vec3(0.115, 0.520, 0.610);
-        float shoreDepth = smoothstep(0.0, 0.45, d);
-        vec3 body = mix(shallow, mix(mid, deep, shoreDepth), shoreDepth);
+        vec3 deep = vec3(0.004, 0.045, 0.115);
+        vec3 mid = vec3(0.014, 0.175, 0.255);
+        vec3 shallow = vec3(0.050, 0.285, 0.350);
+        float nearShore = smoothstep(0.34, 1.0, d);
+        float midDepth = smoothstep(0.05, 0.48, d) * (1.0 - nearShore * 0.35);
+        vec3 body = mix(mid, shallow, nearShore);
+        body = mix(body, deep, midDepth * 0.48);
         float h = waveHeight(p);
         float slope = clamp((1.0 - n.y) * 2.9, 0.0, 1.0);
         float crest = smoothstep(0.08, 0.31, abs(h)) * slope;
@@ -480,16 +499,17 @@ function makeOceanPass(canvas) {
         float foamGate = smoothstep(uFoamT * .72, uFoamT * 1.38, abs(h));
         float foam = clamp(crest * foamGate * smoothstep(0.44, 0.84, fbm(p * 4.6)) + shoreFoam * .75, 0.0, 1.0);
         float scatter = smoothstep(0.0, 0.75, d) * (0.38 + 0.24 * sin(p.x * .24 + uTime));
-        vec3 water = mix(body + vec3(0.0, 0.20, 0.16) * scatter, refl, fresnel * (0.42 + d * .34));
+        vec3 water = mix(body + vec3(0.0, 0.12, 0.11) * scatter, refl, fresnel * (0.22 + d * .25));
         vec3 sunDir = normalize(vec3(-0.28, .84, .46));
         vec3 halfV = normalize(viewDir + sunDir);
         float glitter = pow(max(dot(n, halfV), 0.0), mix(48.0, 180.0, smoothstep(0.15, 1.0, d)));
         glitter *= smoothstep(0.54, 0.95, fbm(p * 22.0 + vec2(uTime * .34, -uTime * .18)));
-        water += vec3(1.0, .86, .48) * glitter * (1.3 + uGold * 2.0);
-        water = mix(water, vec3(.84, .96, 1.0), foam * .54);
+        water += vec3(1.0, .82, .48) * glitter * (0.9 + uGold * 1.35);
+        water = mix(water, vec3(.74, .90, .92), foam * .34);
         float haze = smoothstep(.56, .02, d) * .18;
-        water = mix(water, vec3(.42, .64, .73), haze);
-        col = water;
+        water = mix(water, vec3(.34, .50, .58), haze);
+        float horizonBlend = smoothstep(0.006, 0.055, d);
+        col = mix(col, water, horizonBlend);
       }
       col *= 1.0 - dot(q, q) * 0.035;
       col = col / (col + vec3(1.0));
@@ -1006,7 +1026,8 @@ const waterMat = new THREE.ShaderMaterial({
       water = mix(water, fogColor, pow(fogT, 1.5) * 0.34);
       water = water / (water + vec3(1.0));
       water = pow(water, vec3(1.0 / 2.2));
-      float alpha = mix(0.34, 0.50, smoothstep(0.08, 0.96, vUv.y));
+      float horizonFade = smoothstep(-92.0, -42.0, vWorld.z);
+      float alpha = mix(0.34, 0.50, smoothstep(0.08, 0.96, vUv.y)) * horizonFade;
       alpha = max(alpha, clamp(foamDensity * 0.70 + shore * 0.34, 0.0, 0.78));
       gl_FragColor = vec4(water, alpha);
     }
@@ -1655,12 +1676,19 @@ let targetAngle = 0;
 camera.lookAt(look);
 const statusEl = document.getElementById('status');
 const debugEl = document.getElementById('debug-panel');
+const runtimeErrorEl = document.getElementById('runtime-error');
 const tensionFillEl = document.getElementById('tension-fill');
 const catchCountEl = document.getElementById('catch-count');
 const biteStateEl = document.getElementById('bite-state');
 const keys = new Set();
 const moveAxis = new THREE.Vector2();
 const gltfLoader = new GLTFLoader();
+function reportRuntimeError(message) {
+  document.body.classList.add('runtime-failed');
+  runtimeErrorEl.textContent = `Runtime render fault: ${message}`;
+}
+window.addEventListener('error', ev => reportRuntimeError(ev.message || 'unknown error'));
+window.addEventListener('unhandledrejection', ev => reportRuntimeError(ev.reason?.message || String(ev.reason || 'unknown rejection')));
 const runtime = {
   fps: 0,
   frameCount: 0,
