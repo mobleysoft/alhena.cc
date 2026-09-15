@@ -78,6 +78,12 @@ taken with Playwright Chromium at `1440x900`.
 - `paradise-game-v2-character-bar-composed.png`: live V2 bar composition after
   raising the canopy, lowering the counter, lifting Alhena, and retargeting the
   camera so the bartender reads as a character instead of an occluded blob.
+- `paradise-game-v2-pandora-water-pass.png`: live V2 clean/cinematic capture
+  after tuning the Three.js ocean shader toward the old PandoraChat water
+  recipe: JONSWAP-inspired spectral waves, analytic normals, stronger Fresnel
+  reflection, sky/horizon reflection, subsurface scatter, foam streaks, fog,
+  and tone mapping. It verifies the approach is active in `/game-v2/`, but also
+  shows the visual ceiling of the current procedural scene.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.

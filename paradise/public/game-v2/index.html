@@ -54,6 +54,11 @@ button {
   cursor: pointer;
 }
 button.active { border-color: rgba(255, 220, 116, .75); background: rgba(255, 213, 111, .18); }
+body.clean .hud,
+body.clean .caption {
+  opacity: 0;
+  pointer-events: none;
+}
 .caption {
   position: fixed;
   left: 50%;
@@ -106,14 +111,18 @@ button.active { border-color: rgba(255, 220, 116, .75); background: rgba(255, 21
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
+const query = new URLSearchParams(location.search);
+const cinematic = query.get('quality') === 'cinematic';
+document.body.classList.toggle('clean', query.get('clean') === '1');
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+renderer.setPixelRatio(Math.min(devicePixelRatio, cinematic ? 2 : 1.75));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = cinematic ? 1.12 : 1.05;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -136,7 +145,7 @@ scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffcf83, 4.2);
 sun.position.set(-18, 24, 18);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.mapSize.set(cinematic ? 4096 : 2048, cinematic ? 4096 : 2048);
 sun.shadow.camera.left = -35;
 sun.shadow.camera.right = 35;
 sun.shadow.camera.top = 25;
@@ -287,6 +296,7 @@ const oceanUniforms = {
   uTime: { value: 0 },
   uSun: { value: sun.position.clone().normalize() },
   uSky: { value: new THREE.Color(0x9fd6e6) },
+  uHorizon: { value: new THREE.Color(0xffd08a) },
   uGold: { value: 1.0 }
 };
 
@@ -297,25 +307,27 @@ const oceanMat = new THREE.ShaderMaterial({
     varying vec3 vWorld;
     varying vec2 vUv;
     varying float vCrest;
+    varying float vHeight;
+    varying float vShore;
     varying vec3 vNormal;
     const float PI = 3.14159265359;
     const float G = 9.81;
     float hash(float n) { return fract(sin(n) * 43758.5453123); }
     void component(float i, out vec2 dir, out float k, out float omega, out float amp, out float phase) {
       float t = i / 27.0;
-      float wind = 8.4;
+      float wind = 10.8;
       float wp = 0.13 * G / wind * 6.28318530718;
       float wMin = wp * .45;
-      float wMax = wp * 3.8;
+      float wMax = wp * 4.9;
       omega = wMin * pow(wMax / wMin, t);
       k = omega * omega / G;
       float sigma = omega <= wp ? .07 : .09;
       float peak = exp(-pow(omega - wp, 2.0) / (2.0 * sigma * sigma * wp * wp));
       float spectrum = 0.0081 * G * G / pow(omega, 5.0) * exp(-1.25 * pow(wp / omega, 4.0)) * pow(3.3, peak);
-      float spread = mix(1.18, .20, smoothstep(0.0, 1.0, t));
+      float spread = mix(1.05, .26, smoothstep(0.0, 1.0, t));
       float theta = -PI * .5 + (t - .5) * PI * spread + .25 + (hash(i * 8.31) - .5) * .38;
       dir = normalize(vec2(cos(theta), sin(theta)));
-      amp = clamp(sqrt(2.0 * spectrum * ((wMax - wMin) / 28.0)) * .52 * wind / 12.0, 0.0, 1.7);
+      amp = clamp(sqrt(2.0 * spectrum * ((wMax - wMin) / 36.0)) * .72 * wind / 12.0, 0.0, 2.1);
       phase = hash(i * 19.19 + 3.7) * 6.28318530718;
     }
     void main() {
@@ -326,7 +338,7 @@ const oceanMat = new THREE.ShaderMaterial({
       vec2 lateral = vec2(0.0);
       vec2 grad = vec2(0.0);
       float crest = 0.0;
-      for (int j = 0; j < 28; j++) {
+      for (int j = 0; j < 36; j++) {
         float i = float(j);
         vec2 dir; float k; float omega; float amp; float phase;
         component(i, dir, k, omega, amp, phase);
@@ -339,8 +351,10 @@ const oceanMat = new THREE.ShaderMaterial({
       }
       float shoreFade = smoothstep(-1.0, -9.0, p.z);
       p.xz += lateral * shoreFade;
-      p.y += h * (.44 + shoreFade * .85);
-      vCrest = clamp(crest * .22, 0.0, 1.0);
+      p.y += h * (.50 + shoreFade * .98);
+      vHeight = h;
+      vShore = shoreFade;
+      vCrest = clamp(crest * .30 + max(h, 0.0) * .10, 0.0, 1.0);
       vec4 world = modelMatrix * vec4(p, 1.0);
       vWorld = world.xyz;
       vNormal = normalize(normalMatrix * vec3(-grad.x * shoreFade, 1.0, -grad.y * shoreFade));
@@ -352,10 +366,13 @@ const oceanMat = new THREE.ShaderMaterial({
     uniform float uTime;
     uniform vec3 uSun;
     uniform vec3 uSky;
+    uniform vec3 uHorizon;
     uniform float uGold;
     varying vec3 vWorld;
     varying vec2 vUv;
     varying float vCrest;
+    varying float vHeight;
+    varying float vShore;
     varying vec3 vNormal;
     float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123); }
     float noise(vec2 p) {
@@ -373,34 +390,55 @@ const oceanMat = new THREE.ShaderMaterial({
     }
     void main() {
       vec3 n = normalize(vNormal);
-      vec2 micro = vec2(fbm(vWorld.xz * 1.9 + vec2(uTime * .08, 0.0)), fbm(vWorld.zx * 2.7 + vec2(0.0, -uTime * .07))) - .5;
-      n = normalize(n + vec3(micro.x, 0.0, micro.y) * .16);
+      vec2 windUv = vWorld.xz;
+      vec2 micro = vec2(
+        fbm(windUv * 2.2 + vec2(uTime * .13, -uTime * .04)),
+        fbm(windUv.yx * 3.6 + vec2(-uTime * .06, uTime * .11))
+      ) - .5;
+      vec2 capillary = vec2(
+        sin(windUv.x * 18.0 - uTime * 2.4) + sin(dot(windUv, vec2(.7, 1.4)) * 15.0 - uTime * 1.8),
+        cos(windUv.y * 16.0 - uTime * 2.1) + sin(dot(windUv, vec2(1.3, -.5)) * 19.0 + uTime * 2.0)
+      ) * .018;
+      n = normalize(n + vec3(micro.x, 0.0, micro.y) * .24 + vec3(capillary.x, 0.0, capillary.y));
       vec3 v = normalize(cameraPosition - vWorld);
       vec3 r = reflect(-v, n);
-      float fresnel = .0204 + .9796 * pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 5.0);
-      float depth = smoothstep(7.5, -75.0, vWorld.z);
+      float facing = clamp(dot(n, v), 0.0, 1.0);
+      float fresnel = .0204 + .9796 * pow(1.0 - facing, 5.0);
+      float depth = smoothstep(2.5, -92.0, vWorld.z);
       vec3 deep = vec3(.001, .038, .145);
-      vec3 shallow = vec3(.015, .235, .285);
+      vec3 mid = vec3(.012, .145, .235);
+      vec3 shallow = vec3(.030, .330, .340);
       vec3 body = mix(shallow, deep, depth);
-      float scatter = pow(max(dot(n, -uSun), 0.0), 1.7) * (1.0 - depth);
-      body += vec3(.04, .38, .33) * scatter * .42;
-      vec3 reflectedSky = mix(vec3(.93,.73,.42), uSky, smoothstep(-.08, .7, r.y));
-      vec3 col = mix(body, reflectedSky, fresnel * .48);
-      float spec = pow(max(dot(reflect(-uSun, n), v), 0.0), 170.0) * 2.4 * uGold;
-      float foam = smoothstep(.42, .84, vCrest) * smoothstep(.42, .78, fbm(vWorld.xz * .55 + vec2(uTime * .08, -uTime * .03)));
-      float shoreFoam = smoothstep(-6.8, -2.0, vWorld.z) * smoothstep(.56, .84, fbm(vec2(vWorld.x * 1.7, uTime * .5)));
-      col += vec3(1.0, .90, .62) * spec;
-      col = mix(col, vec3(.88,.98,1.0), clamp(foam * .38 + shoreFoam * .16, 0.0, .46));
-      col = mix(col, vec3(.66,.82,.86), smoothstep(-52.0, -132.0, vWorld.z) * .14);
+      body = mix(body, mid, smoothstep(.08, .55, 1.0 - abs(depth - .45)));
+      float scatter = pow(max(dot(n, -uSun), 0.0), 1.55) * (1.0 - depth) * (0.7 + vShore * .55);
+      body += vec3(.055, .46, .36) * scatter * .52;
+      body += vec3(.018, .065, .055) * smoothstep(-.18, .52, vHeight) * (1.0 - depth);
+      float horizonBand = smoothstep(-.10, .62, r.y);
+      vec3 reflectedSky = mix(uHorizon, uSky, horizonBand);
+      reflectedSky += vec3(1.0, .82, .46) * pow(max(dot(r, normalize(uSun)), 0.0), 68.0) * 1.15;
+      vec3 col = mix(body, reflectedSky, clamp(fresnel * .72 + (1.0 - facing) * .18, 0.0, .86));
+      float specTight = pow(max(dot(reflect(-uSun, n), v), 0.0), 260.0) * 3.8 * uGold;
+      float specWide = pow(max(dot(reflect(-uSun, n), v), 0.0), 42.0) * .48 * uGold;
+      float glitter = smoothstep(.74, .98, fbm(windUv * vec2(4.8, 1.9) + vec2(uTime * .22, -uTime * .10)));
+      glitter *= pow(max(dot(reflect(-uSun, n), v), 0.0), 18.0) * 1.1;
+      float whitecapNoise = fbm(windUv * .62 + vec2(uTime * .09, -uTime * .035));
+      float foam = smoothstep(.38, .76, vCrest) * smoothstep(.42, .72, whitecapNoise);
+      float streaks = smoothstep(.60, .82, fbm(vec2(windUv.x * .22 - uTime * .035, windUv.y * 1.6 + uTime * .12)));
+      float shoreFoam = smoothstep(-8.4, -2.0, vWorld.z) * smoothstep(.48, .80, fbm(vec2(vWorld.x * 1.9, uTime * .56)));
+      col += vec3(1.0, .91, .62) * (specTight + specWide + glitter);
+      col = mix(col, vec3(.90,.985,1.0), clamp(foam * .50 + shoreFoam * .28 + streaks * foam * .20, 0.0, .58));
+      float fog = smoothstep(-42.0, -142.0, vWorld.z);
+      col = mix(col, vec3(.62,.80,.86), fog * .30);
+      col = mix(col, vec3(.82,.93,.95), smoothstep(.8, 0.0, cameraPosition.y) * .06);
       col = col / (col + vec3(1.0));
       col = pow(col, vec3(1.0 / 2.2));
-      gl_FragColor = vec4(col, .96);
+      gl_FragColor = vec4(col, mix(.91, .985, clamp(fresnel + depth * .25, 0.0, 1.0)));
     }
   `,
   transparent: true
 });
 
-const ocean = new THREE.Mesh(new THREE.PlaneGeometry(190, 140, 260, 190), oceanMat);
+const ocean = new THREE.Mesh(new THREE.PlaneGeometry(210, 156, cinematic ? 360 : 260, cinematic ? 252 : 190), oceanMat);
 ocean.name = 'v2-jonswap-displaced-ocean-mesh';
 ocean.rotation.x = -Math.PI / 2;
 ocean.position.set(0, -.12, -75);
@@ -677,6 +715,55 @@ function makeDog() {
 }
 const dog = makeDog();
 
+async function installRuntimeAssetSlots() {
+  try {
+    window.__paradiseV2AssetCount = 0;
+    const response = await fetch('/assets/paradise-asset-manifest.json', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`manifest ${response.status}`);
+    const manifest = await response.json();
+    const loader = new GLTFLoader();
+    const slots = manifest.assets || [];
+    for (const slot of slots) {
+      const path = slot.targetPath || '';
+      const assetExistsByContract = slot.status === 'active' || slot.status === 'candidate' || slot.loadByDefault;
+      const requested = (query.get('assets') === '1' && assetExistsByContract) || query.get(`asset_${slot.id}`) === '1';
+      const shouldLoad = path.endsWith('.glb') && (slot.loadByDefault || requested);
+      if (!shouldLoad) continue;
+      const preflight = await fetch(path, { method: 'HEAD', cache: 'no-store' });
+      if (!preflight.ok) {
+        console.warn(`Skipping ${slot.id}: ${path} returned ${preflight.status}`);
+        continue;
+      }
+      loader.load(path, gltf => {
+        const root = gltf.scene;
+        root.name = `v2-runtime-asset-${slot.id}`;
+        root.traverse(node => {
+          if (node.isMesh) {
+            node.castShadow = true;
+            node.receiveShadow = true;
+            if (node.material) node.material.needsUpdate = true;
+          }
+        });
+        scene.add(root);
+        if (slot.id === 'alhena_bartender_rig' && slot.status === 'active') alhena.visible = false;
+        if (slot.id === 'black_lab_rig' && slot.status === 'active') dog.visible = false;
+        if (slot.id === 'shoreline_environment' && query.get('replace') === '1') {
+          beach.visible = false;
+          wet.visible = false;
+          dock.visible = false;
+        }
+        window.__paradiseV2AssetCount += 1;
+        setStatus(`Loaded ${slot.id} runtime asset.`);
+      }, undefined, error => {
+        console.warn(`Could not load ${slot.id}`, error);
+      });
+    }
+  } catch (error) {
+    console.warn('Runtime asset manifest unavailable', error);
+  }
+}
+installRuntimeAssetSlots();
+
 const bobber = new THREE.Mesh(new THREE.SphereGeometry(.16, 24, 12), new THREE.MeshStandardMaterial({ color: 0xf4f1e0, roughness: .35 }));
 bobber.name = 'v2-floating-bobber';
 bobber.position.set(-1.4, .08, -13);
@@ -800,7 +887,7 @@ document.querySelectorAll('[data-view]').forEach(button => {
     setView(button.dataset.view);
   });
 });
-setView(new URLSearchParams(location.search).get('view') || 'shore');
+setView(query.get('view') || 'shore');
 
 function resize() {
   camera.aspect = innerWidth / innerHeight;
