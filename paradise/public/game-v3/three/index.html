@@ -811,6 +811,46 @@ function makeArticulatedLab(url) {
   return rig;
 }
 
+function makeArticulatedAlhena(url) {
+  const rig = {
+    group: new THREE.Group(),
+    ready: false,
+    parts: {},
+  };
+  rig.group.visible = false;
+  rig.group.position.set(6.25, 0.12, 4.06);
+  rig.group.scale.setScalar(0.86);
+  scene.add(rig.group);
+
+  const image = new Image();
+  image.crossOrigin = 'anonymous';
+  image.onload = () => {
+    const crops = {
+      trayArm: cropTextureFromImage(image, 110, 250, 330, 370),
+      head: cropTextureFromImage(image, 330, 12, 380, 360),
+      torso: cropTextureFromImage(image, 280, 330, 470, 470),
+      rightArm: cropTextureFromImage(image, 670, 350, 220, 355),
+      skirt: cropTextureFromImage(image, 255, 650, 560, 360),
+      apron: cropTextureFromImage(image, 360, 600, 360, 430),
+    };
+    rig.parts.skirt = makeBillboardPart(crops.skirt, 1.36, 0.92, 0.02, 0.66, 0.015, 11);
+    rig.parts.torso = makeBillboardPart(crops.torso, 1.12, 1.10, 0.02, 1.26, 0.03, 14);
+    rig.parts.apron = makeBillboardPart(crops.apron, 0.82, 0.98, 0.03, 0.78, 0.06, 15);
+    rig.parts.head = makeBillboardPart(crops.head, 0.78, 0.74, 0.02, 1.94, 0.09, 18);
+    rig.parts.trayArm = makeBillboardPart(crops.trayArm, 1.16, 0.88, -0.55, 1.40, 0.08, 16);
+    rig.parts.rightArm = makeBillboardPart(crops.rightArm, 0.52, 0.86, 0.54, 1.05, 0.07, 16);
+    rig.parts.trayArm.rotation.z = -0.015;
+    rig.parts.rightArm.rotation.z = 0.035;
+    for (const part of Object.values(rig.parts)) rig.group.add(part);
+    rig.group.visible = true;
+    rig.ready = true;
+    alhenaSprite.visible = false;
+    readout.textContent = 'shader ocean + articulated characters';
+  };
+  image.src = url;
+  return rig;
+}
+
 function makeContactShadow(x, z, sx, sz, opacity = 0.28) {
   const mesh = new THREE.Mesh(
     new THREE.CircleGeometry(1, 48),
@@ -1022,6 +1062,7 @@ const barSprite = makeSprite('/assets/beach-bar-billboard.png', 6.6, 1.05, 5.3, 
 const alhenaSprite = makeSprite('/assets/alhena-bartender-billboard.png', 6.25, 2.05, 4.35, 2.25, 3.35);
 const palmSprite = makeSprite('/assets/palm-cluster-billboard.png', -6.4, 1.7, 6.2, 3.1, 3.4);
 const articulatedLab = makeArticulatedLab('/assets/alhena-black-lab.png');
+const articulatedAlhena = makeArticulatedAlhena('/assets/alhena-bartender-billboard.png');
 const houseShadow = makeContactShadow(-8.7, 7.9, 3.4, 0.72, 0.20);
 const labShadow = makeContactShadow(-2.8, 7.8, 1.3, 0.28, 0.24);
 const barShadow = makeContactShadow(6.6, 5.95, 3.0, 0.62, 0.22);
@@ -1182,7 +1223,22 @@ function animate() {
     articulatedLab.parts.collar.rotation.z = articulatedLab.parts.head.rotation.z * 0.55;
   }
   labShadow.position.x = articulatedLab.ready ? articulatedLab.group.position.x : labSprite.position.x;
-  alhenaSprite.position.y = 1.55 + Math.sin(elapsed * 1.2) * 0.025;
+  if (articulatedAlhena.ready) {
+    const breath = Math.sin(elapsed * 1.12);
+    const serve = Math.sin(elapsed * 0.74 + 0.8);
+    articulatedAlhena.group.position.y = 0.12 + breath * 0.014;
+    articulatedAlhena.group.rotation.z = Math.sin(elapsed * 0.42) * 0.010;
+    articulatedAlhena.parts.torso.rotation.z = breath * 0.010;
+    articulatedAlhena.parts.apron.rotation.z = breath * 0.006;
+    articulatedAlhena.parts.skirt.rotation.z = -breath * 0.006;
+    articulatedAlhena.parts.head.position.y = 1.94 + Math.sin(elapsed * 0.88 + 1.1) * 0.018;
+    articulatedAlhena.parts.head.rotation.z = Math.sin(elapsed * 0.62) * 0.024;
+    articulatedAlhena.parts.trayArm.position.y = 1.40 + serve * 0.018;
+    articulatedAlhena.parts.trayArm.rotation.z = -0.015 + serve * 0.020;
+    articulatedAlhena.parts.rightArm.rotation.z = 0.035 - serve * 0.014;
+  } else {
+    alhenaSprite.position.y = 1.55 + Math.sin(elapsed * 1.2) * 0.025;
+  }
   houseSprite.material.rotation = Math.sin(elapsed * 0.22) * 0.004;
   houseShadow.material.opacity = 0.18 + Math.sin(elapsed * 0.18) * 0.015;
   barShadow.material.opacity = 0.20 + Math.sin(elapsed * 0.21) * 0.014;
