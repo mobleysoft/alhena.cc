@@ -473,6 +473,14 @@ const catchName = document.getElementById('catch-name');
 const hintEl = document.getElementById('hint');
 const labSprite = new Image();
 labSprite.src = './assets/alhena-black-lab.png';
+const alhenaSprite = new Image();
+alhenaSprite.src = './assets/alhena-bartender-billboard.png';
+const barSprite = new Image();
+barSprite.src = './assets/beach-bar-billboard.png';
+const houseSprite = new Image();
+houseSprite.src = './assets/beach-house-billboard.png';
+const palmSprite = new Image();
+palmSprite.src = './assets/palm-cluster-billboard.png';
 let waterProgram = null;
 
 const TIMES = {
@@ -798,7 +806,7 @@ function initWaterShader() {
       color += vec3(1.0, 0.84, 0.48) * specular;
       color = mix(color, vec3(0.91, 0.975, 1.0), foam * 0.58);
       color += vec3(0.05, 0.00, 0.08) * foam * curve * 0.018;
-      float horizonFog = pow(1.0 - depth, 2.65) * (0.30 + u_haze * 0.95);
+      float horizonFog = pow(1.0 - depth, 2.85) * (0.18 + u_haze * 0.62);
       color = mix(color, mix(u_horizon, vec3(0.55,0.66,0.69), u_haze), horizonFog);
       color = mix(color, vec3(0.34, 0.39, 0.42), u_haze * 0.28);
       color *= 0.78 + u_light * 0.48;
@@ -868,10 +876,10 @@ function drawWaterShader(t, time, weather) {
   gl.uniform1f(u.chop, weather.chop);
   gl.uniform1f(u.foam, weather.foam);
   gl.uniform1f(u.haze, weather.haze + weather.cloud * 0.18);
-  gl.uniform3fv(u.seaNear, hexToUnit(mix(time.seaNear, '#243441', weather.haze + weather.cloud * 0.12)));
-  gl.uniform3fv(u.seaFar, hexToUnit(mix(time.seaFar, '#66737b', weather.haze)));
+  gl.uniform3fv(u.seaNear, hexToUnit(mix(time.seaNear, '#092838', weather.haze * 0.82 + weather.cloud * 0.08)));
+  gl.uniform3fv(u.seaFar, hexToUnit(mix(time.seaFar, '#0b2438', 0.34 + weather.haze * 0.62)));
   gl.uniform3fv(u.skyTop, hexToUnit(mix(time.skyTop, '#7c8592', weather.haze)));
-  gl.uniform3fv(u.horizon, hexToUnit(mix(time.horizon, '#b8aea0', weather.haze * 0.7)));
+  gl.uniform3fv(u.horizon, hexToUnit(mix(mix(time.horizon, time.seaFar, 0.55), '#53646a', weather.haze * 0.7)));
   gl.uniform2f(u.sun, time.sunX, time.sunY);
   gl.uniform1f(u.light, time.light);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -1224,6 +1232,7 @@ function drawWater(t, time, weather) {
 
   if (waterProgram) {
     drawShaderWaterForeground(t, top, bottom, time, weather);
+    drawObjectWaterReflections(t, top, bottom, time);
     drawFishShadows(t, top, bottom);
     drawBobber(t);
     drawSplashes(t);
@@ -1324,6 +1333,51 @@ function drawShaderWaterForeground(t, top, bottom, time, weather) {
     const y = top + height * (0.14 + depth * 0.70) + Math.sin(t * 0.001 + i) * 8;
     const x = ((i * 233 + t * (0.018 + depth * 0.016)) % (w + 420)) - 210;
     drawGaussianBlob(x, y, 190 + depth * 330, 10 + depth * 28, `rgba(7,18,24,${0.016 + depth * 0.030})`, 0.08);
+  }
+  ctx.restore();
+}
+
+function drawObjectWaterReflections(t, top, bottom, time) {
+  const w = state.w, h = state.h;
+  const lab = labLocomotion(w, h, t);
+  const objects = [
+    { x: w * 0.16, y: h * 0.755, rx: 126, ry: 34, a: 0.18, tone: '88,57,31' },
+    { x: lab.x, y: lab.y - 6, rx: 80 * lab.s, ry: 22 * lab.s, a: 0.21, tone: '5,7,8' },
+    { x: w * 0.80, y: h * 0.750, rx: 145, ry: 38, a: 0.20, tone: '62,35,22' },
+    { x: w * 0.815, y: h * 0.720, rx: 58, ry: 42, a: 0.13, tone: '29,104,121' },
+  ];
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, top, w, bottom - top);
+  ctx.clip();
+  ctx.filter = 'blur(5px)';
+  ctx.globalCompositeOperation = 'multiply';
+  for (const o of objects) {
+    const waterline = h * 0.84;
+    const reflectedY = waterline - Math.max(0, o.y - waterline) * 0.34 - 14;
+    const g = ctx.createRadialGradient(o.x, reflectedY, 2, o.x, reflectedY, o.rx);
+    g.addColorStop(0, `rgba(${o.tone},${o.a * (0.76 + time.light * 0.18)})`);
+    g.addColorStop(0.52, `rgba(${o.tone},${o.a * 0.34})`);
+    g.addColorStop(1, `rgba(${o.tone},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(o.x + Math.sin(t * 0.001 + o.x) * 4, reflectedY, o.rx, o.ry, Math.sin(t * 0.0007 + o.x) * 0.035, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.filter = 'blur(1px)';
+  ctx.globalCompositeOperation = 'screen';
+  for (const o of objects) {
+    const reflectedY = h * 0.835 - Math.max(0, o.y - h * 0.84) * 0.22 - 18;
+    ctx.strokeStyle = `rgba(220,252,255,${0.035 + time.light * 0.035})`;
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    for (let x = o.x - o.rx * 0.78; x <= o.x + o.rx * 0.78; x += 10) {
+      const p = (x - o.x) / o.rx;
+      const y = reflectedY + Math.sin(p * 7.0 + t * 0.002) * 3.5 + Math.sin(p * 19.0 - t * 0.001) * 1.6;
+      if (x === o.x - o.rx * 0.78) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
   }
   ctx.restore();
 }
@@ -1985,6 +2039,10 @@ function drawForegroundPlants(x, y, s, time) {
 }
 
 function drawBeachHouse(x, y, s, time) {
+  if (houseSprite.complete && houseSprite.naturalWidth) {
+    drawBeachHouseAsset(x, y, s, time);
+    return;
+  }
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(s, s);
@@ -2056,7 +2114,37 @@ function drawBeachHouse(x, y, s, time) {
   ctx.restore();
 }
 
+function drawBeachHouseAsset(x, y, s, time) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  drawContactShadow(72, 70, 116, 19, 0.28);
+  ctx.shadowColor = 'rgba(0,0,0,0.24)';
+  ctx.shadowBlur = 16;
+  ctx.shadowOffsetY = 8;
+  ctx.drawImage(houseSprite, -22, -58, 205, 171);
+  ctx.shadowBlur = 0;
+  ctx.globalCompositeOperation = 'screen';
+  const windowGlow = ctx.createRadialGradient(64, 42, 2, 64, 42, 70);
+  windowGlow.addColorStop(0, `rgba(255,213,107,${state.time === 'night' ? 0.34 : 0.10 + time.light * 0.05})`);
+  windowGlow.addColorStop(1, 'rgba(255,213,107,0)');
+  ctx.fillStyle = windowGlow;
+  ctx.beginPath();
+  ctx.ellipse(64, 54, 76, 18, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawPalm(x, y, s) {
+  if (palmSprite.complete && palmSprite.naturalWidth) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(s, s);
+    drawContactShadow(2, 63, 50, 10, 0.18);
+    ctx.drawImage(palmSprite, -54, -48, 118, 128);
+    ctx.restore();
+    return;
+  }
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(s, s);
@@ -2292,6 +2380,10 @@ function drawLabPawContacts(gait, time) {
 }
 
 function drawBarAndAlhena(x, y, t, time) {
+  if (barSprite.complete && barSprite.naturalWidth && alhenaSprite.complete && alhenaSprite.naturalWidth) {
+    drawBarAndAlhenaAssets(x, y, t, time);
+    return;
+  }
   const a = ALHENA[state.alhena % ALHENA.length];
   ctx.save();
   ctx.translate(x, y);
@@ -2453,6 +2545,38 @@ function drawBarAndAlhena(x, y, t, time) {
   ctx.quadraticCurveTo(-12, 78 + Math.sin(t * 0.002) * 2, 14, 68);
   ctx.stroke();
   ctx.restore();
+  ctx.restore();
+}
+
+function drawBarAndAlhenaAssets(x, y, t, time) {
+  ctx.save();
+  ctx.translate(x, y);
+  drawContactShadow(-10, 104, 136, 22, 0.38);
+  drawBarBacklight(time);
+  ctx.shadowColor = 'rgba(0,0,0,0.24)';
+  ctx.shadowBlur = 14;
+  ctx.shadowOffsetY = 7;
+  const breath = Math.sin(t * 0.003) * 1.8;
+  ctx.save();
+  ctx.translate(-3, -1 + breath);
+  ctx.drawImage(alhenaSprite, -54, -86, 108, 162);
+  ctx.restore();
+  ctx.drawImage(barSprite, -124, 0, 236, 157);
+  ctx.shadowBlur = 0;
+  ctx.globalCompositeOperation = 'screen';
+  const rim = ctx.createLinearGradient(-70, -82, 78, 128);
+  rim.addColorStop(0, `rgba(255,221,158,${0.06 + time.light * 0.08})`);
+  rim.addColorStop(0.5, 'rgba(255,255,255,0)');
+  rim.addColorStop(1, `rgba(96,226,236,${0.07 + time.light * 0.06})`);
+  ctx.strokeStyle = rim;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-49, -76);
+  ctx.bezierCurveTo(-88, -16, -75, 66, -51, 114);
+  ctx.moveTo(47, -76);
+  ctx.bezierCurveTo(77, -6, 72, 68, 51, 114);
+  ctx.stroke();
+  drawBarWetVarnish(time);
   ctx.restore();
 }
 
