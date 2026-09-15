@@ -200,7 +200,7 @@ body.started .hud { opacity: 1; transform: none; }
 }
 .actions {
   display: grid;
-  grid-template-columns: 1fr 78px;
+  grid-template-columns: 1fr 78px 118px;
   gap: 8px;
 }
 .actions button, .pill-row button {
@@ -216,6 +216,9 @@ body.started .hud { opacity: 1; transform: none; }
 .actions button:hover, .pill-row button:hover, .actions button.active, .pill-row button.active {
   background: rgba(255,229,162,0.16);
   border-color: rgba(255,229,162,0.48);
+}
+#cast {
+  grid-row: span 2;
 }
 .tray {
   justify-self: center;
@@ -1305,10 +1308,10 @@ function drawShore(t, time) {
   drawShellsAndPebbles(t, y, time);
   drawFootprintsAndTideWrack(t, y, time);
   drawBeachHouse(w * 0.11, h * 0.735, 1.14, time);
-  drawBlackLab(w * 0.31, h * 0.82, 1.18);
+  drawBlackLab(w * 0.31, h * 0.82, 1.18, t, time);
   drawForegroundPlants(w * 0.965, h * 0.87, 1.0, time);
   drawRod(t);
-  drawBarAndAlhena(w * 0.80, h * 0.725);
+  drawBarAndAlhena(w * 0.80, h * 0.725, t, time);
 }
 
 function drawWetSandCaustics(t, shoreTop, time) {
@@ -1513,10 +1516,11 @@ function drawPalm(x, y, s) {
   ctx.restore();
 }
 
-function drawBlackLab(x, y, s) {
+function drawBlackLab(x, y, s, t, time) {
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(s, s);
+  const wag = Math.sin(t * 0.011) * 8;
   drawContactShadow(2, 12, 62, 14, 0.32);
   const fur = ctx.createLinearGradient(-38, -17, 46, 14);
   fur.addColorStop(0, '#010102');
@@ -1581,8 +1585,22 @@ function drawBlackLab(x, y, s) {
   ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.moveTo(-26, -4);
-  ctx.quadraticCurveTo(-45, -22, -58, -12);
+  ctx.quadraticCurveTo(-45, -23 + wag * 0.35, -58, -12 + wag);
   ctx.stroke();
+  ctx.globalCompositeOperation = 'screen';
+  ctx.strokeStyle = `rgba(180,210,220,${0.06 + time.light * 0.08})`;
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 7; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-24 + i * 9, -9 + Math.sin(i) * 2);
+    ctx.quadraticCurveTo(-13 + i * 8, -16, 8 + i * 4, -8 + Math.cos(i) * 2);
+    ctx.stroke();
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#f0c04a';
+  ctx.beginPath();
+  ctx.arc(31, 3, 2.5, 0, Math.PI * 2);
+  ctx.fill();
   ctx.fillStyle = 'rgba(225,235,238,0.13)';
   for (const paw of [-21, -6, 13, 25]) {
     ctx.beginPath();
@@ -1592,7 +1610,7 @@ function drawBlackLab(x, y, s) {
   ctx.restore();
 }
 
-function drawBarAndAlhena(x, y) {
+function drawBarAndAlhena(x, y, t, time) {
   const a = ALHENA[state.alhena % ALHENA.length];
   ctx.save();
   ctx.translate(x, y);
@@ -1616,25 +1634,38 @@ function drawBarAndAlhena(x, y) {
   ctx.fillText('ALHENA', -64, 66);
   drawBarDetails(-92, 24);
 
+  const breath = Math.sin(t * 0.003) * 1.6;
   ctx.strokeStyle = a.skin;
   ctx.lineWidth = 6;
   ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.moveTo(-21, 17);
-  ctx.quadraticCurveTo(-42, 32, -52, 47);
+  ctx.moveTo(-21, 17 + breath);
+  ctx.quadraticCurveTo(-42, 32 + breath, -52, 47);
   ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(2, 18);
-  ctx.quadraticCurveTo(24, 30, 38, 44);
+  ctx.moveTo(2, 18 + breath);
+  ctx.quadraticCurveTo(24, 30 + breath, 38, 44);
   ctx.stroke();
-  ctx.fillStyle = a.dress;
+  const dressBase = ctx.createLinearGradient(-30, 18, 14, 70);
+  dressBase.addColorStop(0, mix(a.dress, '#ffffff', 0.13 * time.light));
+  dressBase.addColorStop(0.45, a.dress);
+  dressBase.addColorStop(1, mix(a.dress, '#071017', 0.42));
+  ctx.fillStyle = dressBase;
   ctx.beginPath();
-  ctx.moveTo(-20, 22);
-  ctx.quadraticCurveTo(-10, -18, 4, 20);
+  ctx.moveTo(-20, 22 + breath);
+  ctx.quadraticCurveTo(-10, -18 + breath, 4, 20 + breath);
   ctx.lineTo(14, 68);
   ctx.lineTo(-32, 68);
   ctx.closePath();
   ctx.fill();
+  ctx.strokeStyle = `rgba(255,255,255,${0.08 + time.light * 0.08})`;
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 5; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-20 + i * 8, 30 + breath);
+    ctx.quadraticCurveTo(-16 + i * 6, 48, -18 + i * 9, 66);
+    ctx.stroke();
+  }
   const dressHi = ctx.createLinearGradient(-24, 15, 12, 68);
   dressHi.addColorStop(0, 'rgba(255,255,255,0.28)');
   dressHi.addColorStop(0.55, 'rgba(255,255,255,0.03)');
@@ -1649,7 +1680,15 @@ function drawBarAndAlhena(x, y) {
   ctx.fill();
   ctx.fillStyle = a.skin;
   ctx.beginPath();
-  ctx.arc(-9, -12, 15, 0, Math.PI * 2);
+  ctx.arc(-9, -12 + breath * 0.25, 15, 0, Math.PI * 2);
+  ctx.fill();
+  const faceLight = ctx.createRadialGradient(-15, -18, 1, -9, -12, 16);
+  faceLight.addColorStop(0, 'rgba(255,236,193,0.38)');
+  faceLight.addColorStop(0.55, 'rgba(255,236,193,0.08)');
+  faceLight.addColorStop(1, 'rgba(0,0,0,0.18)');
+  ctx.fillStyle = faceLight;
+  ctx.beginPath();
+  ctx.arc(-9, -12 + breath * 0.25, 15, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,0.16)';
   ctx.beginPath();
@@ -1662,11 +1701,30 @@ function drawBarAndAlhena(x, y) {
   ctx.beginPath();
   ctx.ellipse(-25, -11, 6, 14, -0.15, 0, Math.PI * 2);
   ctx.fill();
+  ctx.strokeStyle = `rgba(255,255,255,${0.05 + time.light * 0.05})`;
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 8; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-21 + i * 3, -25);
+    ctx.quadraticCurveTo(-25 + i * 4, -17, -22 + i * 3, -6);
+    ctx.stroke();
+  }
   ctx.fillStyle = 'rgba(255,244,206,0.9)';
   ctx.beginPath();
   ctx.arc(-15, -11, 2, 0, Math.PI * 2);
   ctx.arc(-4, -11, 2, 0, Math.PI * 2);
   ctx.fill();
+  ctx.fillStyle = 'rgba(41,25,20,0.78)';
+  ctx.beginPath();
+  ctx.arc(-14.5, -10.8, 0.7, 0, Math.PI * 2);
+  ctx.arc(-3.5, -10.8, 0.7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(100,54,42,0.32)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-9, -10);
+  ctx.lineTo(-10.6, -6);
+  ctx.stroke();
   ctx.strokeStyle = '#e3b1a2';
   ctx.lineWidth = 1.4;
   ctx.beginPath();
@@ -1824,7 +1882,28 @@ function frame(t) {
   drawWater(t, time, weather);
   drawShore(t, time);
   drawRain(t, weather);
+  drawFilmGrade(t, time, weather);
   requestAnimationFrame(frame);
+}
+
+function drawFilmGrade(t, time, weather) {
+  const w = state.w, h = state.h;
+  ctx.save();
+  ctx.pointerEvents = 'none';
+  const vignette = ctx.createRadialGradient(w * 0.52, h * 0.48, h * 0.2, w * 0.52, h * 0.48, h * 0.82);
+  vignette.addColorStop(0, 'rgba(255,255,255,0.018)');
+  vignette.addColorStop(0.66, 'rgba(0,0,0,0)');
+  vignette.addColorStop(1, `rgba(0,0,0,${0.16 + weather.haze * 0.16})`);
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, w, h);
+  ctx.globalAlpha = 0.018 + weather.haze * 0.014;
+  ctx.fillStyle = time.light > 0.6 ? '#fff7dd' : '#8fb7ff';
+  for (let i = 0; i < 280; i++) {
+    const x = (i * 73.17 + t * 0.013) % w;
+    const y = (i * 151.91 + t * 0.009) % h;
+    ctx.fillRect(x, y, 1, 1);
+  }
+  ctx.restore();
 }
 
 startBtn.addEventListener('click', () => {
