@@ -75,6 +75,20 @@
       ]
     },
     {
+      "id": "palm_cluster_billboard",
+      "type": "transparent-environment-card",
+      "targetPath": "/assets/palm-cluster-billboard.png",
+      "status": "active",
+      "loadByDefault": true,
+      "currentFallback": "procedural palm meshes behind ?palmmesh=1",
+      "requirements": [
+        "transparent high-resolution palm and tropical foliage cutout",
+        "organic curved fronds with material detail",
+        "grounded contact shadow",
+        "future replacement by authored wind-animated GLB foliage"
+      ]
+    },
+    {
       "id": "black_lab_rig",
       "type": "rigged-animal",
       "targetPath": "/assets/models/black-lab.glb",

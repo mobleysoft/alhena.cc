@@ -259,6 +259,7 @@ const useDogBillboard = query.get('dogmesh') !== '1';
 const useAlhenaBillboard = query.get('alhenamesh') !== '1';
 const useBarBillboard = query.get('barmesh') !== '1';
 const useHouseBillboard = query.get('housemesh') !== '1';
+const usePalmBillboard = query.get('palmmesh') !== '1';
 document.body.classList.toggle('presentation', presentation);
 document.body.classList.toggle('clean', query.get('clean') === '1');
 document.body.dataset.waterArchitecture = canonicalPandoraWaterOnly
@@ -1599,6 +1600,29 @@ addPalm('v2-small-palm-by-bar', 12.1, 6.6, .62);
 addSeaGrassPatch('v2-left-dune-sea-grass', -25.5, 15.2, 34, 3.4);
 addSeaGrassPatch('v2-right-dune-sea-grass', 25.4, 15.8, 28, 3.0);
 addSeaGrassPatch('v2-house-edge-sea-grass', -15.5, 7.4, 20, 2.0);
+const palmBillboardTexture = new THREE.TextureLoader().load('/assets/palm-cluster-billboard.png');
+palmBillboardTexture.colorSpace = THREE.SRGBColorSpace;
+palmBillboardTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+const palmBillboard = new THREE.Group();
+palmBillboard.name = 'v2-high-fidelity-transparent-palm-cluster-billboard';
+palmBillboard.position.set(12.75, 1.08, 6.08);
+const palmCard = new THREE.Mesh(
+  new THREE.PlaneGeometry(3.35, 3.65),
+  new THREE.MeshBasicMaterial({
+    map: palmBillboardTexture,
+    transparent: true,
+    alphaTest: .05,
+    depthWrite: false,
+    toneMapped: true
+  })
+);
+palmCard.name = 'v2-palm-cluster-photo-cutout-card';
+palmCard.position.y = .92;
+palmBillboard.add(palmCard);
+palmBillboard.visible = usePalmBillboard;
+scene.add(palmBillboard);
+const palmBillboardShadow = contactShadow('v2-palm-cluster-billboard-contact-shadow', 12.75, 6.30, 1.20, .58, .16);
+palmBillboardShadow.visible = usePalmBillboard;
 
 function makeAlhena() {
   const g = new THREE.Group();
@@ -2340,11 +2364,16 @@ function setView(name) {
     if (/^v2-bar/.test(obj.name) || /^v2-glass-bottle/.test(obj.name) || /^v2-low-beach-bar/.test(obj.name)) {
       obj.visible = !waterStudy && !useBarBillboard;
     }
+    if (/^v2-wind-shaped-palm/.test(obj.name) || /^v2-small-palm-by-bar/.test(obj.name)) {
+      obj.visible = !waterStudy && !usePalmBillboard;
+    }
   });
   houseBillboard.visible = !waterStudy && useHouseBillboard;
   houseBillboardShadow.visible = !waterStudy && useHouseBillboard;
   barBillboard.visible = !waterStudy && useBarBillboard;
   barBillboardShadow.visible = !waterStudy && useBarBillboard;
+  palmBillboard.visible = !waterStudy && usePalmBillboard;
+  palmBillboardShadow.visible = !waterStudy && usePalmBillboard;
   dog.visible = !waterStudy && !useDogBillboard;
   dogBillboard.visible = !waterStudy && useDogBillboard;
   dogBillboardShadow.visible = !waterStudy && useDogBillboard;
@@ -2453,6 +2482,9 @@ function animate() {
   barBillboard.lookAt(new THREE.Vector3(camera.position.x, barBillboard.position.y, camera.position.z));
   barBillboard.rotation.z = Math.sin(t * .18) * .004;
   barBillboardShadow.material.opacity = useBarBillboard ? .18 + Math.sin(t * .38) * .010 : 0;
+  palmBillboard.lookAt(new THREE.Vector3(camera.position.x, palmBillboard.position.y, camera.position.z));
+  palmBillboard.rotation.z = Math.sin(t * .42) * .010;
+  palmBillboardShadow.material.opacity = usePalmBillboard ? .13 + Math.sin(t * .37) * .010 : 0;
   const sniff = Math.sin(t * .36);
   const stepClock = t * (play.bite ? 6.2 : 3.15);
   dog.name = 'v2-black-lab-procedural-four-beat-gait-standin';
