@@ -95,6 +95,7 @@ v2_markers=(
   "v2-jonswap-inspired-analytical-normals-fresnel-scatter-foam-fog-tonemap"
   "v2-pandorachat-parallax-reflection-caustic-horizon-breakup"
   "v2-pandorachat-legacy-reflection-folding-haze-inheritance"
+  "v2-ocean-first-shore-composition-scaled-billboard-depth"
   "causticField"
   "jonswapSpectrum"
   "v2-pandorachat-background-owns-atmosphere"

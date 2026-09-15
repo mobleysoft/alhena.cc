@@ -266,6 +266,7 @@ document.body.dataset.waterArchitecture = canonicalPandoraWaterOnly
   ? 'v2-canonical-pandorachat-webgl2-ocean-shader'
   : 'v2-debug-pandorachat-plus-three-water-mesh';
 document.body.dataset.waterRefinement = 'v2-pandorachat-parallax-reflection-caustic-horizon-breakup';
+document.body.dataset.shoreStaging = 'v2-ocean-first-shore-composition-scaled-billboard-depth';
 const oceanCanvas = document.getElementById('ocean-pass');
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, premultipliedAlpha: false, powerPreference: 'high-performance' });
 renderer.domElement.className = 'three-pass';
@@ -656,7 +657,7 @@ const furTex = makeTexture(512, (ctx, s) => {
 });
 furTex.repeat.set(1.8, 1.0);
 
-const sandMat = new THREE.MeshStandardMaterial({ map: sandTex, bumpMap: sandTex, bumpScale: .09, roughness: .98, color: 0x9f805b, envMapIntensity: .10 });
+const sandMat = new THREE.MeshStandardMaterial({ map: sandTex, bumpMap: sandTex, bumpScale: .075, roughness: .98, color: 0xc7aa7a, envMapIntensity: .13 });
 const wetSandMat = new THREE.MeshPhysicalMaterial({
   map: washTex,
   bumpMap: washTex,
@@ -668,7 +669,7 @@ const wetSandMat = new THREE.MeshPhysicalMaterial({
   clearcoatRoughness: .18,
   envMapIntensity: .86,
   transparent: true,
-  opacity: .70
+  opacity: .58
 });
 const woodMat = new THREE.MeshStandardMaterial({ map: woodTex, bumpMap: woodTex, bumpScale: .055, roughness: .76, color: 0x8e6036, envMapIntensity: .22 });
 const darkWoodMat = new THREE.MeshStandardMaterial({ map: woodTex, bumpMap: woodTex, bumpScale: .04, roughness: .82, color: 0x5a351d, envMapIntensity: .16 });
@@ -1272,10 +1273,10 @@ for (let i = 0; i < shallowWaterPositions.count; i++) {
   shallowWaterBase.push([shallowWaterPositions.getX(i), shallowWaterPositions.getY(i)]);
 }
 
-const beach = new THREE.Mesh(new THREE.PlaneGeometry(120, 48, 160, 48), sandMat);
+const beach = new THREE.Mesh(new THREE.PlaneGeometry(120, 38, 160, 44), sandMat);
 beach.name = 'v2-sculpted-beach-foreground';
 beach.rotation.x = -Math.PI / 2;
-beach.position.set(0, -.18, 10);
+beach.position.set(0, -.18, 13.2);
 const bp = beach.geometry.attributes.position;
 for (let i = 0; i < bp.count; i++) {
   const x = bp.getX(i);
@@ -1439,9 +1440,9 @@ houseBillboardTexture.colorSpace = THREE.SRGBColorSpace;
 houseBillboardTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 const houseBillboard = new THREE.Group();
 houseBillboard.name = 'v2-high-fidelity-transparent-beach-house-billboard';
-houseBillboard.position.set(-8.85, 1.12, 4.82);
+houseBillboard.position.set(-10.45, 1.04, 5.28);
 const houseCard = new THREE.Mesh(
-  new THREE.PlaneGeometry(5.95, 4.96),
+  new THREE.PlaneGeometry(5.15, 4.30),
   new THREE.MeshBasicMaterial({
     map: houseBillboardTexture,
     transparent: true,
@@ -1452,10 +1453,11 @@ const houseCard = new THREE.Mesh(
 );
 houseCard.name = 'v2-beach-house-photo-cutout-card';
 houseCard.position.y = .92;
+houseCard.renderOrder = 18;
 houseBillboard.add(houseCard);
 houseBillboard.visible = useHouseBillboard;
 scene.add(houseBillboard);
-const houseBillboardShadow = contactShadow('v2-beach-house-billboard-contact-shadow', -8.85, 5.1, 2.55, 1.05, .18);
+const houseBillboardShadow = contactShadow('v2-beach-house-billboard-contact-shadow', -10.45, 5.42, 2.25, .92, .16);
 houseBillboardShadow.visible = useHouseBillboard;
 
 const barBase = box('v2-bar-base', [6.6, .92, 1.18], [7.7, .39, 4.0], barFaceMat);
@@ -1483,9 +1485,9 @@ barBillboardTexture.colorSpace = THREE.SRGBColorSpace;
 barBillboardTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 const barBillboard = new THREE.Group();
 barBillboard.name = 'v2-high-fidelity-transparent-beach-bar-billboard';
-barBillboard.position.set(7.7, 1.55, 4.24);
+barBillboard.position.set(8.8, 1.32, 4.70);
 const barCard = new THREE.Mesh(
-  new THREE.PlaneGeometry(8.4, 5.6),
+  new THREE.PlaneGeometry(6.25, 4.17),
   new THREE.MeshBasicMaterial({
     map: barBillboardTexture,
     transparent: true,
@@ -1496,10 +1498,11 @@ const barCard = new THREE.Mesh(
 );
 barCard.name = 'v2-beach-bar-photo-cutout-card';
 barCard.position.y = .72;
+barCard.renderOrder = 22;
 barBillboard.add(barCard);
 barBillboard.visible = useBarBillboard;
 scene.add(barBillboard);
-const barBillboardShadow = contactShadow('v2-beach-bar-billboard-contact-shadow', 7.7, 5.25, 4.05, .92, .22);
+const barBillboardShadow = contactShadow('v2-beach-bar-billboard-contact-shadow', 8.8, 5.64, 3.05, .74, .18);
 barBillboardShadow.visible = useBarBillboard;
 
 const shellMat = new THREE.MeshStandardMaterial({ color: 0xf3dfb6, roughness: .6 });
@@ -1614,9 +1617,9 @@ palmBillboardTexture.colorSpace = THREE.SRGBColorSpace;
 palmBillboardTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 const palmBillboard = new THREE.Group();
 palmBillboard.name = 'v2-high-fidelity-transparent-palm-cluster-billboard';
-palmBillboard.position.set(12.75, 1.08, 6.08);
+palmBillboard.position.set(12.15, .96, 6.36);
 const palmCard = new THREE.Mesh(
-  new THREE.PlaneGeometry(3.35, 3.65),
+  new THREE.PlaneGeometry(2.72, 2.96),
   new THREE.MeshBasicMaterial({
     map: palmBillboardTexture,
     transparent: true,
@@ -1627,10 +1630,11 @@ const palmCard = new THREE.Mesh(
 );
 palmCard.name = 'v2-palm-cluster-photo-cutout-card';
 palmCard.position.y = .92;
+palmCard.renderOrder = 20;
 palmBillboard.add(palmCard);
 palmBillboard.visible = usePalmBillboard;
 scene.add(palmBillboard);
-const palmBillboardShadow = contactShadow('v2-palm-cluster-billboard-contact-shadow', 12.75, 6.30, 1.20, .58, .16);
+const palmBillboardShadow = contactShadow('v2-palm-cluster-billboard-contact-shadow', 12.15, 6.50, 1.00, .50, .13);
 palmBillboardShadow.visible = usePalmBillboard;
 
 function makeAlhena() {
@@ -1738,9 +1742,9 @@ alhenaBillboardTexture.colorSpace = THREE.SRGBColorSpace;
 alhenaBillboardTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 const alhenaBillboard = new THREE.Group();
 alhenaBillboard.name = 'v2-alhena-high-fidelity-transparent-bartender-billboard';
-alhenaBillboard.position.set(7.72, 1.55, 3.08);
+alhenaBillboard.position.set(11.05, 1.18, 3.72);
 const alhenaCard = new THREE.Mesh(
-  new THREE.PlaneGeometry(1.35, 2.02),
+  new THREE.PlaneGeometry(1.18, 1.76),
   new THREE.MeshBasicMaterial({
     map: alhenaBillboardTexture,
     transparent: true,
@@ -1751,10 +1755,11 @@ const alhenaCard = new THREE.Mesh(
 );
 alhenaCard.name = 'v2-alhena-modest-bartender-photo-cutout-card';
 alhenaCard.position.y = .36;
+alhenaCard.renderOrder = 30;
 alhenaBillboard.add(alhenaCard);
 alhenaBillboard.visible = useAlhenaBillboard;
 scene.add(alhenaBillboard);
-const alhenaBillboardShadow = contactShadow('v2-alhena-billboard-contact-shadow', 7.72, 3.72, .55, .32, .18);
+const alhenaBillboardShadow = contactShadow('v2-alhena-billboard-contact-shadow', 11.05, 4.04, .48, .28, .16);
 alhenaBillboardShadow.visible = useAlhenaBillboard;
 
 function makeDog() {
@@ -2481,7 +2486,7 @@ function animate() {
   alhena.userData.drinkGlow.position.y = .18 + Math.sin(t * 1.0) * .012;
   alhena.userData.necklace.rotation.z = Math.sin(t * .9) * .035;
   alhena.userData.smile.scale.x = 1.0 + (play.bite ? .12 : Math.sin(t * .7) * .03);
-  alhenaBillboard.position.y = 1.55 + Math.sin(t * .86) * .018;
+  alhenaBillboard.position.y = 1.18 + Math.sin(t * .86) * .018;
   alhenaBillboard.lookAt(new THREE.Vector3(camera.position.x, alhenaBillboard.position.y, camera.position.z));
   alhenaBillboard.rotation.z = Math.sin(t * .58) * .010;
   alhenaBillboardShadow.material.opacity = useAlhenaBillboard ? .15 + Math.sin(t * .7) * .012 : 0;
