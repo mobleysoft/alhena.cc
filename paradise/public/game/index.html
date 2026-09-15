@@ -63,6 +63,12 @@ p { margin: 0; color: rgba(255,244,215,.75); font: 12px/1.55 ui-sans-serif, syst
   flex-wrap: wrap;
   margin-top: 14px;
 }
+.view-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
 button {
   height: 36px;
   padding: 0 13px;
@@ -173,6 +179,13 @@ body.clean .caption { opacity: 0; pointer-events: none; }
     <button id="tour">Tour</button>
     <button id="cast">Cast</button>
     <button id="clean">Clean HUD</button>
+  </div>
+  <div class="view-row">
+    <button class="active" data-view="wide">Wide</button>
+    <button data-view="water">Water</button>
+    <button data-view="dock">Dock</button>
+    <button data-view="dog">Dog</button>
+    <button data-view="bar">Bar</button>
   </div>
   <div class="status" id="status">Ready. Space/click casts; reel when the bobber dives.</div>
 </section>
@@ -426,6 +439,7 @@ const waterMat = new THREE.ShaderMaterial({
   fragmentShader: `
     precision highp float;
     uniform float uTime;
+    uniform float uWind;
     uniform float uChop;
     uniform float uFoamT;
     uniform vec3 uSkyTint;
@@ -433,10 +447,64 @@ const waterMat = new THREE.ShaderMaterial({
     varying vec2 vUv;
     varying vec3 vWorld;
     varying float vH;
+    const float PI = 3.14159265359;
+    const float TAU = 6.28318530718;
+    const float gravity = 9.81;
     float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123); }
+    float hash1(float n) { return fract(sin(n) * 43758.5453123); }
     float noise(vec2 p){
       vec2 i=floor(p), f=fract(p), u=f*f*(3.0-2.0*f);
       return mix(mix(hash(i),hash(i+vec2(1,0)),u.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y);
+    }
+    vec2 waveDir(float i) {
+      float t = i / 23.0;
+      float theta = (t - 0.5) * PI * 0.92 + 0.18;
+      return vec2(cos(theta), sin(theta));
+    }
+    void component(float i, out float freq, out float amp, out float phase) {
+      float omegaP = 0.13 * gravity / max(uWind, 1.0) * TAU;
+      float t = i / 23.0;
+      float omegaMin = omegaP * 0.5;
+      float omegaMax = omegaP * 3.5;
+      freq = omegaMin * pow(omegaMax / omegaMin, t);
+      float sigma = freq <= omegaP ? 0.07 : 0.09;
+      float r = exp(-pow(freq - omegaP, 2.0) / (2.0 * sigma * sigma * omegaP * omegaP));
+      float spectrum = 0.0081 * gravity * gravity / pow(freq, 5.0)
+        * exp(-1.25 * pow(omegaP / freq, 4.0))
+        * pow(3.3, r);
+      float dOmega = (omegaMax - omegaMin) / 24.0;
+      amp = sqrt(2.0 * spectrum * dOmega) * 0.35 * uWind / 12.0;
+      amp = clamp(amp, 0.0, 1.8);
+      phase = hash1(i * 17.31 + 0.73) * TAU;
+    }
+    float oceanHeight(vec2 pos) {
+      float h = 0.0;
+      for (int j = 0; j < 24; j++) {
+        float i = float(j);
+        float freq;
+        float amp;
+        float phase;
+        component(i, freq, amp, phase);
+        float k = freq * freq / gravity;
+        h += amp * sin(dot(waveDir(i), pos) * k - freq * uTime + phase);
+      }
+      return h * uChop;
+    }
+    vec3 oceanNormal(vec2 pos) {
+      float eps = 0.055;
+      float hc = oceanHeight(pos);
+      float hx = oceanHeight(pos + vec2(eps, 0.0));
+      float hy = oceanHeight(pos + vec2(0.0, eps));
+      return normalize(vec3(-(hx - hc) / eps, 1.0, -(hy - hc) / eps));
+    }
+    float laplacian(vec2 pos) {
+      float eps = 0.11;
+      float hc = oceanHeight(pos);
+      float hx1 = oceanHeight(pos + vec2(eps, 0.0));
+      float hx2 = oceanHeight(pos - vec2(eps, 0.0));
+      float hy1 = oceanHeight(pos + vec2(0.0, eps));
+      float hy2 = oceanHeight(pos - vec2(0.0, eps));
+      return (hx1 + hx2 + hy1 + hy2 - 4.0 * hc) / (eps * eps);
     }
     float fresnelSchlick(float cosTheta) {
       float f0 = 0.02;
@@ -454,36 +522,39 @@ const waterMat = new THREE.ShaderMaterial({
       return sky;
     }
     void main() {
-      vec3 dx = dFdx(vWorld);
-      vec3 dy = dFdy(vWorld);
-      vec3 normal = normalize(cross(dy, dx));
-      normal = normalize(mix(vec3(0.0, 1.0, 0.0), normal, 0.82));
+      vec2 spectralPos = vWorld.xz * 0.18 + vec2(uTime * 0.018, uTime * 0.011);
+      vec3 normal = oceanNormal(spectralPos);
+      float lap = laplacian(spectralPos);
       vec3 viewDir = normalize(cameraPosition - vWorld + vec3(0.0, vH * 0.4, 0.0));
       vec3 reflected = reflect(-viewDir, normal);
       float fresnel = fresnelSchlick(max(dot(normal, viewDir), 0.0));
-      float depth = pow(vUv.y, 1.35);
-      float hNorm = clamp(vH * 0.34 + 0.5, 0.0, 1.0);
+      float depth = pow(vUv.y, 1.48);
+      float h = oceanHeight(spectralPos);
+      float hNorm = clamp(h * 0.40 + 0.5, 0.0, 1.0);
       vec3 waterDeep = vec3(0.01, 0.04, 0.12);
       vec3 waterShallow = vec3(0.06, 0.32, 0.46);
       vec3 waterCrest = vec3(0.28, 0.70, 0.88);
       vec3 waterBody = mix(waterDeep, waterShallow, depth);
       waterBody = mix(waterBody, waterCrest, pow(hNorm, 3.0) * 0.68);
-      float sss = smoothstep(0.48, 0.86, hNorm);
+      float sss = clamp(lap * 0.15, 0.0, 1.0) + smoothstep(0.58, 0.92, hNorm) * 0.25;
       waterBody += vec3(0.0, 0.55, 0.60) * sss * 0.34;
       vec3 water = mix(waterBody, skyColor(reflected), fresnel * 0.82);
       vec3 sunDir = normalize(vec3(0.5, 0.35, 0.6));
       vec3 halfV = normalize(viewDir + sunDir);
       float spec = pow(max(dot(normal, halfV), 0.0), 118.0) * 2.4;
+      spec += pow(max(dot(normal, halfV), 0.0), 42.0) * 0.38;
       water += vec3(1.0, 0.95, 0.78) * spec * uGold * 1.7;
-      vec2 foamUv = vWorld.xz * 1.6 + vec2(uTime * 0.18, -uTime * 0.12);
-      float foamH = abs(vH);
+      vec2 foamUv = spectralPos * 12.0 + vec2(uTime * 0.03, -uTime * 0.025);
+      float foamH = abs(h);
       float foam = smoothstep(uFoamT * 0.72, uFoamT * 1.2, foamH);
-      float foamNoise = noise(foamUv);
+      float foamNoise = hash(floor(foamUv * 8.0) + floor(vec2(uTime * 1.5)));
       float foamDensity = foam * smoothstep(0.36, 0.72, foamNoise);
       float shore = smoothstep(0.82, 1.0, vUv.y) * (0.5 + 0.5 * sin(vWorld.x * 1.7 + uTime * 2.1));
+      vec3 dispR = vec3(0.04, 0.0, 0.0) * abs(h - oceanHeight(spectralPos + vec2(0.002, 0.0))) * foamDensity * 12.0;
+      vec3 dispB = vec3(0.0, 0.0, 0.06) * abs(h - oceanHeight(spectralPos - vec2(0.002, 0.0))) * foamDensity * 12.0;
       water = mix(water, vec3(0.88, 0.95, 0.98), clamp(foamDensity * 0.86 + shore * 0.62, 0.0, 1.0));
-      water += vec3(0.025, 0.0, 0.035) * foamDensity * noise(foamUv * 3.0);
-      float fogT = clamp((1.0 - vUv.y) * 1.2, 0.0, 1.0);
+      water += dispR + dispB + vec3(0.025, 0.0, 0.035) * foamDensity * noise(foamUv * 0.4);
+      float fogT = clamp((1.0 - vUv.y) * 1.35, 0.0, 1.0);
       vec3 fogColor = uSkyTint + vec3(0.06, 0.10, 0.20);
       water = mix(water, fogColor, pow(fogT, 1.5) * 0.34);
       water = water / (water + vec3(1.0));
@@ -830,6 +901,8 @@ const line = new THREE.Line(lineGeo, lineMat);
 scene.add(line);
 
 const look = new THREE.Vector3(0.4, 1.05, -11);
+const desiredCamera = new THREE.Vector3(0.8, 3.0, 18.5);
+const desiredLook = new THREE.Vector3(0.4, 1.05, -11);
 let tour = false;
 let targetAngle = 0;
 camera.lookAt(look);
@@ -845,9 +918,26 @@ const play = {
   velocity: new THREE.Vector3(),
 };
 
+const views = {
+  wide: { pos: [0.8, 3.0, 18.5], look: [0.4, 1.05, -11], note: 'Wide establishing view.' },
+  water: { pos: [-1.2, 1.05, 5.6], look: [0.9, .38, -18], note: 'Low waterline view.' },
+  dock: { pos: [-6.8, 1.65, 6.0], look: [-1.0, .75, -8.5], note: 'Dock and cast lane.' },
+  dog: { pos: [-4.7, 1.12, 8.3], look: [-2.4, .48, 5.1], note: 'Black lab movement slot.' },
+  bar: { pos: [5.4, 2.25, 8.9], look: [8.6, 1.38, 3.2], note: 'Alhena bartender slot.' },
+};
+
 function setStatus(message) {
   play.message = message;
   statusEl.textContent = message;
+}
+
+function setView(name) {
+  const view = views[name] || views.wide;
+  tour = false;
+  desiredCamera.set(...view.pos);
+  desiredLook.set(...view.look);
+  document.querySelectorAll('[data-view]').forEach(btn => btn.classList.toggle('active', btn.dataset.view === name));
+  setStatus(view.note);
 }
 
 function castOrReel() {
@@ -885,13 +975,12 @@ function updatePlayerInput(dt) {
   if (keys.has('d') || keys.has('arrowright')) play.velocity.add(right);
   if (play.velocity.lengthSq() > 0) {
     play.velocity.normalize().multiplyScalar(speed * dt);
-    camera.position.add(play.velocity);
-    look.add(play.velocity);
-    camera.position.x = THREE.MathUtils.clamp(camera.position.x, -15, 15);
-    camera.position.z = THREE.MathUtils.clamp(camera.position.z, 6, 24);
-    look.x = THREE.MathUtils.clamp(look.x, -12, 12);
-    look.z = THREE.MathUtils.clamp(look.z, -24, 0);
-    camera.lookAt(look);
+    desiredCamera.add(play.velocity);
+    desiredLook.add(play.velocity);
+    desiredCamera.x = THREE.MathUtils.clamp(desiredCamera.x, -15, 15);
+    desiredCamera.z = THREE.MathUtils.clamp(desiredCamera.z, 5, 24);
+    desiredLook.x = THREE.MathUtils.clamp(desiredLook.x, -12, 12);
+    desiredLook.z = THREE.MathUtils.clamp(desiredLook.z, -24, 0);
   }
 }
 
@@ -911,6 +1000,7 @@ function setPreset(name) {
 }
 
 document.querySelectorAll('[data-time]').forEach(btn => btn.addEventListener('click', () => setPreset(btn.dataset.time)));
+document.querySelectorAll('[data-view]').forEach(btn => btn.addEventListener('click', () => setView(btn.dataset.view)));
 document.getElementById('tour').addEventListener('click', () => { tour = !tour; });
 document.getElementById('cast').addEventListener('click', castOrReel);
 document.getElementById('mobile-cast').addEventListener('pointerdown', ev => { ev.preventDefault(); castOrReel(); });
@@ -941,9 +1031,8 @@ window.addEventListener('pointermove', ev => {
   if (tour) return;
   const nx = ev.clientX / innerWidth - .5;
   const ny = ev.clientY / innerHeight - .5;
-  look.x = 0.4 + nx * 7.5;
-  camera.position.y = 3.0 - ny * 2.2;
-  camera.lookAt(look);
+  desiredLook.x = 0.4 + nx * 7.5;
+  desiredCamera.y = THREE.MathUtils.clamp(3.0 - ny * 2.2, .85, 5.2);
 });
 
 function resize() {
@@ -965,13 +1054,16 @@ function animate(now) {
   waterUniforms.uTime.value = t;
   if (tour) {
     targetAngle += .0018;
-    camera.position.x = 3.4 + Math.sin(targetAngle) * 4.2;
-    camera.position.z = 11.4 + Math.cos(targetAngle * .7) * 2.2;
-    camera.position.y = 2.65 + Math.sin(targetAngle * 1.4) * .25;
-    camera.lookAt(look);
+    desiredCamera.x = 3.4 + Math.sin(targetAngle) * 4.2;
+    desiredCamera.z = 11.4 + Math.cos(targetAngle * .7) * 2.2;
+    desiredCamera.y = 2.65 + Math.sin(targetAngle * 1.4) * .25;
+    desiredLook.set(0.4, 1.05, -11);
   } else {
     updatePlayerInput(dt);
   }
+  camera.position.lerp(desiredCamera, 1 - Math.pow(0.001, dt));
+  look.lerp(desiredLook, 1 - Math.pow(0.001, dt));
+  camera.lookAt(look);
   alhena.group.rotation.y = Math.sin(t * .38) * .08;
   alhena.leftArm.rotation.z = -.58 + Math.sin(t * 1.2) * .07;
   alhena.rightArm.rotation.z = .58 + Math.cos(t * 1.1) * .07;
