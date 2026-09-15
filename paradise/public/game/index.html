@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Paradise Fishing</title>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.168.0/build/three.module.js"
+  }
+}
+</script>
 <style>
 :root {
   --ink: #fff4d7;
@@ -311,7 +318,8 @@ body.debug .debug-panel { display: block; }
 </div>
 
 <script type="module">
-import * as THREE from 'https://unpkg.com/three@0.168.0/build/three.module.js';
+import * as THREE from 'three';
+import { GLTFLoader } from 'https://unpkg.com/three@0.168.0/examples/jsm/loaders/GLTFLoader.js';
 
 const canvas = document.getElementById('stage');
 const oceanCanvas = document.getElementById('ocean-pass');
@@ -988,7 +996,7 @@ const waterMat = new THREE.ShaderMaterial({
       float foamNoise = fbm(foamUv * 0.68);
       float foamDensity = foam * smoothstep(0.47, 0.82, foamNoise);
       float shoreComb = 0.5 + 0.5 * sin(vWorld.x * 1.7 + uTime * 2.1 + fbm(vWorld.xz * .14) * 3.4);
-      float shore = smoothstep(0.80, 1.0, vUv.y) * shoreComb;
+      float shore = smoothstep(-7.8, -2.4, vWorld.z) * shoreComb;
       vec3 dispR = vec3(0.04, 0.0, 0.0) * curvature * foamDensity;
       vec3 dispB = vec3(0.0, 0.0, 0.06) * curvature * foamDensity;
       water = mix(water, vec3(0.88, 0.95, 0.98), clamp(foamDensity * 0.58 + shore * 0.72, 0.0, 1.0));
@@ -998,7 +1006,7 @@ const waterMat = new THREE.ShaderMaterial({
       water = mix(water, fogColor, pow(fogT, 1.5) * 0.34);
       water = water / (water + vec3(1.0));
       water = pow(water, vec3(1.0 / 2.2));
-      float alpha = mix(0.30, 0.58, smoothstep(0.08, 0.96, vUv.y));
+      float alpha = mix(0.34, 0.50, smoothstep(0.08, 0.96, vUv.y));
       alpha = max(alpha, clamp(foamDensity * 0.70 + shore * 0.34, 0.0, 0.78));
       gl_FragColor = vec4(water, alpha);
     }
@@ -1652,11 +1660,13 @@ const catchCountEl = document.getElementById('catch-count');
 const biteStateEl = document.getElementById('bite-state');
 const keys = new Set();
 const moveAxis = new THREE.Vector2();
+const gltfLoader = new GLTFLoader();
 const runtime = {
   fps: 0,
   frameCount: 0,
   lastFpsAt: performance.now(),
   assetStatus: 'manifest loading',
+  assetDetails: [],
 };
 const play = {
   cast: false,
@@ -1674,12 +1684,87 @@ const play = {
   velocity: new THREE.Vector3(),
 };
 
+const runtimeAssetSlots = {
+  alhena_bartender_rig: {
+    fallback: [alhena.group],
+    place(model) {
+      model.position.set(8.6, 1.68, 3.28);
+      model.rotation.y = 0;
+      model.scale.setScalar(1);
+    }
+  },
+  black_lab_rig: {
+    fallback: [lab.group, labMeshShadow, labCutout, labCutoutShadow],
+    place(model) {
+      model.position.set(1.65, .52, 5.85);
+      model.rotation.y = -.18;
+      model.scale.setScalar(.78);
+    }
+  },
+  shoreline_environment: {
+    fallback: [],
+    place(model) {
+      model.position.set(0, 0, 0);
+      model.scale.setScalar(1);
+    }
+  }
+};
+
+function markAssetDetail(id, status) {
+  const idx = runtime.assetDetails.findIndex(item => item.id === id);
+  if (idx >= 0) runtime.assetDetails[idx].status = status;
+  else runtime.assetDetails.push({ id, status });
+  const loaded = runtime.assetDetails.filter(item => item.status === 'loaded' || item.status === 'active').length;
+  const fallback = runtime.assetDetails.filter(item => item.status === 'fallback').length;
+  const failed = runtime.assetDetails.filter(item => item.status === 'missing').length;
+  runtime.assetStatus = `${loaded} loaded / ${fallback} fallback / ${failed} missing`;
+}
+
+function prepareRuntimeModel(model) {
+  model.traverse(obj => {
+    if (!obj.isMesh) return;
+    obj.castShadow = true;
+    obj.receiveShadow = true;
+    if (obj.material) {
+      obj.material.side = obj.material.side ?? THREE.FrontSide;
+      obj.material.needsUpdate = true;
+    }
+  });
+}
+
+function loadRuntimeAsset(asset) {
+  if (asset.status === 'active' || !asset.targetPath?.endsWith('.glb')) {
+    markAssetDetail(asset.id, asset.status === 'active' ? 'active' : 'fallback');
+    return;
+  }
+  const slot = runtimeAssetSlots[asset.id];
+  if (!slot) {
+    markAssetDetail(asset.id, 'fallback');
+    return;
+  }
+  gltfLoader.load(
+    asset.targetPath,
+    gltf => {
+      const model = gltf.scene;
+      model.name = `${asset.id}-loaded-glb`;
+      prepareRuntimeModel(model);
+      slot.place(model);
+      scene.add(model);
+      slot.fallback.forEach(obj => { obj.visible = false; });
+      markAssetDetail(asset.id, 'loaded');
+    },
+    undefined,
+    () => {
+      markAssetDetail(asset.id, 'missing');
+    }
+  );
+}
+
 fetch('/assets/paradise-asset-manifest.json')
   .then(res => res.ok ? res.json() : Promise.reject(new Error(`asset manifest ${res.status}`)))
   .then(manifest => {
-    const active = manifest.assets.filter(asset => asset.status === 'active').length;
-    const needed = manifest.assets.filter(asset => asset.status !== 'active').length;
-    runtime.assetStatus = `${active} active / ${needed} needed`;
+    runtime.assetDetails = [];
+    manifest.assets.forEach(loadRuntimeAsset);
   })
   .catch(() => {
     runtime.assetStatus = 'manifest unavailable';
