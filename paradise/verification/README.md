@@ -110,6 +110,12 @@ taken with Playwright Chromium at `1440x900`.
   adding a touch control rail. Playwright verified the controls render as a grid,
   Cast/Reel update game state, and View cycles to the water camera without
   runtime errors.
+- `paradise-game-v2-sunset-storm.png`: live V2 capture after adding time-of-day
+  and weather presets that drive sky colors, fog density, sun/fill/practical
+  light intensity, ocean wind, foam, water tint, and optics strength.
+- `paradise-game-v2-night-bar.png`: live V2 night/calm bar capture from the same
+  preset system. It proves the scene can shift mood coherently, while also
+  showing the remaining primitive-character limitation.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.

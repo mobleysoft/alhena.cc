@@ -125,6 +125,17 @@ body.clean .caption {
     <button data-view="bar">Bar</button>
     <button data-view="dog">Dog</button>
   </div>
+  <div class="row" aria-label="Time presets">
+    <button data-time="dawn">Dawn</button>
+    <button data-time="noon">Noon</button>
+    <button data-time="sunset">Sunset</button>
+    <button data-time="night">Night</button>
+  </div>
+  <div class="row" aria-label="Weather presets">
+    <button data-weather="calm">Calm</button>
+    <button data-weather="breeze">Breeze</button>
+    <button data-weather="storm">Storm</button>
+  </div>
 </div>
 <div class="caption">Space/tap casts and reels · drag to orbit · wheel to dolly</div>
 <div class="mobile-controls" aria-label="Fishing controls">
@@ -206,14 +217,21 @@ housePractical.name = 'v2-warm-house-window-light';
 housePractical.position.set(-11.2, 1.7, 6.1);
 scene.add(housePractical);
 
+const skyUniforms = {
+  uSunDir: { value: sun.position.clone().normalize() },
+  uZenith: { value: new THREE.Color(0x3a94d1) },
+  uHorizon: { value: new THREE.Color(0xf5ba61) },
+  uLower: { value: new THREE.Color(0x78b8c2) },
+  uCloud: { value: 0.23 },
+  uSunBloom: { value: 1.0 }
+};
+
 const skyDome = new THREE.Mesh(
   new THREE.SphereGeometry(360, 64, 32),
   new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
-    uniforms: {
-      uSunDir: { value: sun.position.clone().normalize() }
-    },
+    uniforms: skyUniforms,
     vertexShader: `
       varying vec3 vDir;
       void main() {
@@ -225,6 +243,11 @@ const skyDome = new THREE.Mesh(
     fragmentShader: `
       precision highp float;
       uniform vec3 uSunDir;
+      uniform vec3 uZenith;
+      uniform vec3 uHorizon;
+      uniform vec3 uLower;
+      uniform float uCloud;
+      uniform float uSunBloom;
       varying vec3 vDir;
       float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123); }
       float noise(vec2 p) {
@@ -242,18 +265,15 @@ const skyDome = new THREE.Mesh(
       }
       void main() {
         float h = clamp(vDir.y * .5 + .5, 0.0, 1.0);
-        vec3 zenith = vec3(.23, .58, .82);
-        vec3 horizon = vec3(.96, .73, .38);
-        vec3 lower = vec3(.47, .72, .76);
-        vec3 sky = mix(lower, zenith, smoothstep(.48, 1.0, h));
-        sky = mix(horizon, sky, smoothstep(.40, .62, h));
+        vec3 sky = mix(uLower, uZenith, smoothstep(.48, 1.0, h));
+        sky = mix(uHorizon, sky, smoothstep(.40, .62, h));
         float sd = max(dot(normalize(vDir), normalize(uSunDir)), 0.0);
-        sky += vec3(1.0, .78, .38) * pow(sd, 620.0) * 3.4;
-        sky += vec3(1.0, .66, .30) * pow(sd, 7.0) * .42;
+        sky += vec3(1.0, .78, .38) * pow(sd, 620.0) * 3.4 * uSunBloom;
+        sky += vec3(1.0, .66, .30) * pow(sd, 7.0) * .42 * uSunBloom;
         vec2 cloudUv = vec2(atan(vDir.z, vDir.x) * .9, h * 3.4);
         float clouds = smoothstep(.57, .76, fbm(cloudUv * vec2(2.5, 1.1)));
         clouds *= smoothstep(.52, .72, h) * (1.0 - smoothstep(.90, 1.0, h));
-        sky = mix(sky, vec3(.94,.98,1.0), clouds * .23);
+        sky = mix(sky, vec3(.94,.98,1.0), clouds * uCloud);
         sky = sky / (sky + vec3(1.0));
         sky = pow(sky, vec3(1.0 / 2.2));
         gl_FragColor = vec4(sky, 1.0);
@@ -402,9 +422,15 @@ const eyeMat = new THREE.MeshBasicMaterial({ color: 0x080504 });
 
 const oceanUniforms = {
   uTime: { value: 0 },
+  uWind: { value: 10.8 },
   uSun: { value: sun.position.clone().normalize() },
   uSky: { value: new THREE.Color(0x9fd6e6) },
   uHorizon: { value: new THREE.Color(0xffd08a) },
+  uDeep: { value: new THREE.Color(0x00061d) },
+  uMid: { value: new THREE.Color(0x011a34) },
+  uShallow: { value: new THREE.Color(0x053e50) },
+  uFogTint: { value: new THREE.Color(0x9ecbd9) },
+  uFoamPower: { value: 1.0 },
   uGold: { value: 1.0 }
 };
 
@@ -412,6 +438,7 @@ const oceanMat = new THREE.ShaderMaterial({
   uniforms: oceanUniforms,
   vertexShader: `
     uniform float uTime;
+    uniform float uWind;
     varying vec3 vWorld;
     varying vec2 vUv;
     varying float vCrest;
@@ -423,7 +450,7 @@ const oceanMat = new THREE.ShaderMaterial({
     float hash(float n) { return fract(sin(n) * 43758.5453123); }
     void component(float i, out vec2 dir, out float k, out float omega, out float amp, out float phase) {
       float t = i / 27.0;
-      float wind = 10.8;
+      float wind = uWind;
       float wp = 0.13 * G / wind * 6.28318530718;
       float wMin = wp * .45;
       float wMax = wp * 4.9;
@@ -475,6 +502,11 @@ const oceanMat = new THREE.ShaderMaterial({
     uniform vec3 uSun;
     uniform vec3 uSky;
     uniform vec3 uHorizon;
+    uniform vec3 uDeep;
+    uniform vec3 uMid;
+    uniform vec3 uShallow;
+    uniform vec3 uFogTint;
+    uniform float uFoamPower;
     uniform float uGold;
     varying vec3 vWorld;
     varying vec2 vUv;
@@ -513,9 +545,9 @@ const oceanMat = new THREE.ShaderMaterial({
       float facing = clamp(dot(n, v), 0.0, 1.0);
       float fresnel = .0204 + .9796 * pow(1.0 - facing, 5.0);
       float depth = smoothstep(2.5, -92.0, vWorld.z);
-      vec3 deep = vec3(.000, .022, .115);
-      vec3 mid = vec3(.004, .100, .205);
-      vec3 shallow = vec3(.020, .245, .315);
+      vec3 deep = uDeep;
+      vec3 mid = uMid;
+      vec3 shallow = uShallow;
       vec3 body = mix(shallow, deep, depth);
       body = mix(body, mid, smoothstep(.08, .55, 1.0 - abs(depth - .45)));
       float scatter = pow(max(dot(n, -uSun), 0.0), 1.55) * (1.0 - depth) * (0.7 + vShore * .55);
@@ -535,9 +567,9 @@ const oceanMat = new THREE.ShaderMaterial({
       float streaks = smoothstep(.60, .82, fbm(vec2(windUv.x * .22 - uTime * .035, windUv.y * 1.6 + uTime * .12)));
       float shoreFoam = smoothstep(-8.4, -2.0, vWorld.z) * smoothstep(.48, .80, fbm(vec2(vWorld.x * 1.9, uTime * .56)));
       col += vec3(1.0, .91, .62) * (specTight + specWide + glitter);
-      col = mix(col, vec3(.90,.985,1.0), clamp(foam * .50 + shoreFoam * .28 + streaks * foam * .20, 0.0, .58));
+      col = mix(col, vec3(.90,.985,1.0), clamp((foam * .50 + shoreFoam * .28 + streaks * foam * .20) * uFoamPower, 0.0, .68));
       float fog = smoothstep(-42.0, -142.0, vWorld.z);
-      col = mix(col, vec3(.62,.80,.86), fog * .14);
+      col = mix(col, uFogTint, fog * .14);
       col = mix(col, vec3(.82,.93,.95), smoothstep(.8, 0.0, cameraPosition.y) * .06);
       col = col / (col + vec3(1.0));
       col = pow(col, vec3(1.0 / 2.2));
@@ -556,7 +588,8 @@ scene.add(ocean);
 
 const waterOpticsUniforms = {
   uTime: { value: 0 },
-  uSun: { value: sun.position.clone().normalize() }
+  uSun: { value: sun.position.clone().normalize() },
+  uOpticsPower: { value: 1.0 }
 };
 
 const waterOpticsMat = new THREE.ShaderMaterial({
@@ -608,6 +641,7 @@ const waterOpticsMat = new THREE.ShaderMaterial({
     precision highp float;
     uniform float uTime;
     uniform vec3 uSun;
+    uniform float uOpticsPower;
     varying vec3 vWorld;
     varying float vLift;
     float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123); }
@@ -632,7 +666,7 @@ const waterOpticsMat = new THREE.ShaderMaterial({
       float glintMask = smoothstep(.79, .96, fbm(uv * vec2(3.8, 1.4) + vec2(uTime * .30, -uTime * .11)));
       float crest = smoothstep(.10, .54, vLift);
       float shore = smoothstep(-13.0, -2.0, vWorld.z);
-      float alpha = (windLines * .18 + crossing * .09 + glintMask * crest * .25 + shore * .16) * distanceFade;
+      float alpha = (windLines * .18 + crossing * .09 + glintMask * crest * .25 + shore * .16) * distanceFade * uOpticsPower;
       vec3 color = mix(vec3(.45,.92,1.0), vec3(1.0,.86,.48), glintMask * .65 + shore * .24);
       gl_FragColor = vec4(color, alpha);
     }
@@ -1132,6 +1166,72 @@ const views = {
   dog: { pos: [4.85, 1.28, 8.15], target: [1.55, .52, 5.62] }
 };
 
+const timePresets = {
+  dawn: {
+    bg: 0x78bdd5, fog: 0x9fd0dc, density: cinematic ? .0034 : .0065,
+    zenith: 0x3a94d1, horizon: 0xf5ba61, lower: 0x78b8c2,
+    sky: 0x9fd6e6, waterHorizon: 0xffd08a, sun: 0xffcf83,
+    sunIntensity: 4.2, fill: 1.15, bloom: 1.0, gold: 1.0
+  },
+  noon: {
+    bg: 0x7bcaf0, fog: 0x9ed5e4, density: cinematic ? .0022 : .0048,
+    zenith: 0x1685da, horizon: 0xbfe7f0, lower: 0x75bdcf,
+    sky: 0xaadff1, waterHorizon: 0xd0f4ff, sun: 0xfff1c1,
+    sunIntensity: 4.9, fill: 1.35, bloom: .62, gold: .68
+  },
+  sunset: {
+    bg: 0xc48a70, fog: 0xd2a47d, density: cinematic ? .0030 : .0058,
+    zenith: 0x375c89, horizon: 0xff8848, lower: 0x9d8272,
+    sky: 0x8db9ce, waterHorizon: 0xff9c5c, sun: 0xff9a45,
+    sunIntensity: 3.9, fill: .98, bloom: 1.45, gold: 1.55
+  },
+  night: {
+    bg: 0x071523, fog: 0x0d2636, density: cinematic ? .0026 : .0046,
+    zenith: 0x071533, horizon: 0x25324f, lower: 0x0e2b3d,
+    sky: 0x223b58, waterHorizon: 0x2d4770, sun: 0x9ab8ff,
+    sunIntensity: 1.45, fill: .55, bloom: .18, gold: .22
+  }
+};
+
+const weatherPresets = {
+  calm: { wind: 7.4, foam: .62, optics: .72, cloud: .12 },
+  breeze: { wind: 10.8, foam: 1.0, optics: 1.0, cloud: .23 },
+  storm: { wind: 16.4, foam: 1.95, optics: 1.42, cloud: .58 }
+};
+
+let activeTime = 'dawn';
+let activeWeather = 'breeze';
+
+function applyEnvironment(timeName = activeTime, weatherName = activeWeather) {
+  activeTime = timePresets[timeName] ? timeName : 'dawn';
+  activeWeather = weatherPresets[weatherName] ? weatherName : 'breeze';
+  const time = timePresets[activeTime];
+  const weather = weatherPresets[activeWeather];
+  scene.background.setHex(time.bg);
+  scene.fog.color.setHex(time.fog);
+  scene.fog.density = time.density * (activeWeather === 'storm' ? 1.52 : 1.0);
+  sun.color.setHex(time.sun);
+  sun.intensity = time.sunIntensity * (activeWeather === 'storm' ? .72 : 1.0);
+  hemi.intensity = (cinematic ? 1.42 : 1.15) * (activeTime === 'night' ? .46 : 1.0);
+  oceanFill.intensity = time.fill * (activeWeather === 'storm' ? .78 : 1.0);
+  barPractical.intensity = (activeTime === 'night' ? 4.2 : 2.6) * (cinematic ? 1 : .62);
+  housePractical.intensity = (activeTime === 'night' ? 3.0 : 1.9) * (cinematic ? 1 : .62);
+  skyUniforms.uZenith.value.setHex(time.zenith);
+  skyUniforms.uHorizon.value.setHex(time.horizon);
+  skyUniforms.uLower.value.setHex(time.lower);
+  skyUniforms.uCloud.value = weather.cloud;
+  skyUniforms.uSunBloom.value = time.bloom;
+  oceanUniforms.uSky.value.setHex(time.sky);
+  oceanUniforms.uHorizon.value.setHex(time.waterHorizon);
+  oceanUniforms.uFogTint.value.setHex(time.fog);
+  oceanUniforms.uWind.value = weather.wind;
+  oceanUniforms.uFoamPower.value = weather.foam;
+  oceanUniforms.uGold.value = time.gold;
+  waterOpticsUniforms.uOpticsPower.value = weather.optics;
+  document.querySelectorAll('[data-time]').forEach(b => b.classList.toggle('active', b.dataset.time === activeTime));
+  document.querySelectorAll('[data-weather]').forEach(b => b.classList.toggle('active', b.dataset.weather === activeWeather));
+}
+
 function setView(name) {
   const view = views[name] || views.shore;
   camera.position.set(...view.pos);
@@ -1144,7 +1244,14 @@ document.querySelectorAll('[data-view]').forEach(button => {
     setView(button.dataset.view);
   });
 });
+document.querySelectorAll('[data-time]').forEach(button => {
+  button.addEventListener('click', () => applyEnvironment(button.dataset.time, activeWeather));
+});
+document.querySelectorAll('[data-weather]').forEach(button => {
+  button.addEventListener('click', () => applyEnvironment(activeTime, button.dataset.weather));
+});
 setView(query.get('view') || 'shore');
+applyEnvironment(query.get('time') || 'dawn', query.get('weather') || 'breeze');
 
 function resize() {
   camera.aspect = innerWidth / innerHeight;
