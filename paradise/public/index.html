@@ -125,6 +125,14 @@ button { font: inherit; color: inherit; }
   transition: opacity 420ms ease;
 }
 body.started .hint { opacity: 1; }
+body.cinematic .hint {
+  opacity: 0.34;
+}
+body.cinematic .hud {
+  opacity: 0;
+  transform: translateY(-10px);
+  pointer-events: none;
+}
 
 .hud {
   position: fixed;
@@ -359,7 +367,7 @@ body.started .hud { opacity: 1; transform: none; }
 <canvas id="water" aria-hidden="true"></canvas>
 <canvas id="world" aria-label="Paradise ocean fishing game"></canvas>
 <div class="veil"></div>
-<div class="hint">Tap/click to cast · space reels · motion can cast on mobile</div>
+<div class="hint" id="hint">Tap/click to cast · space reels · C or double-tap hides controls</div>
 
 <section class="intro" id="intro">
   <div class="intro-card">
@@ -433,6 +441,7 @@ const weatherReadout = document.getElementById('weather-readout');
 const catchCard = document.getElementById('catch-card');
 const catchFish = document.getElementById('catch-fish');
 const catchName = document.getElementById('catch-name');
+const hintEl = document.getElementById('hint');
 let waterProgram = null;
 
 const TIMES = {
@@ -494,6 +503,9 @@ const state = {
   catches: JSON.parse(localStorage.getItem('paradise_fish_log') || '{}'),
   motion: false,
   lastMotionAt: 0,
+  cinematic: false,
+  lastTapAt: 0,
+  tapTimer: null,
   dpr: 1,
   w: 0,
   h: 0,
@@ -829,6 +841,18 @@ function updateControlState() {
   weatherReadout.textContent = `${state.time} / ${WEATHER[state.weather].label}`;
 }
 
+function setCinematic(enabled) {
+  state.cinematic = enabled;
+  document.body.classList.toggle('cinematic', enabled);
+  hintEl.textContent = enabled
+    ? 'Cinematic view · press C or double-tap to restore controls'
+    : 'Tap/click to cast · space reels · C or double-tap hides controls';
+}
+
+function toggleCinematic() {
+  setCinematic(!state.cinematic);
+}
+
 function chooseFish() {
   const rareBonus = state.weather === 'storm' ? 1.8 : state.weather === 'overcast' ? 1.22 : 1;
   const weighted = FISH.map((fish, i) => ({ fish, weight: fish.rarity * (i >= 4 ? rareBonus : 1) }));
@@ -974,6 +998,7 @@ function drawSky(t, time, weather) {
   drawClouds(t, weather, skyH);
   drawAtmosphere(t, time, weather, skyH);
   drawDistantLand(t, time, weather, skyH);
+  drawBirds(t, time, weather, skyH);
 }
 
 function drawAtmosphere(t, time, weather, skyH) {
@@ -1016,6 +1041,26 @@ function drawDistantLand(t, time, weather, skyH) {
   ctx.lineTo(0, base + 10);
   ctx.closePath();
   ctx.fill();
+  ctx.restore();
+}
+
+function drawBirds(t, time, weather, skyH) {
+  if (state.time === 'night' || weather.rain > 0.2) return;
+  const w = state.w;
+  ctx.save();
+  ctx.globalAlpha = 0.18 + time.light * 0.12;
+  ctx.strokeStyle = 'rgba(35,48,55,0.62)';
+  ctx.lineWidth = 1.4;
+  for (let i = 0; i < 5; i++) {
+    const x = (w + 160 - ((t * (0.018 + i * 0.004) + i * 227) % (w + 320))) - 80;
+    const y = skyH * (0.2 + ((i * 17) % 28) / 100);
+    const wing = 5 + Math.sin(t * 0.008 + i) * 2;
+    ctx.beginPath();
+    ctx.moveTo(x - 10, y);
+    ctx.quadraticCurveTo(x - 4, y - wing, x, y);
+    ctx.quadraticCurveTo(x + 4, y - wing, x + 10, y);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -1103,6 +1148,7 @@ function drawWater(t, time, weather) {
   foam.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = foam;
   ctx.fillRect(0, foamY - 18, w, 42);
+  drawSurfFlecks(t, top, bottom, weather);
 
   ctx.save();
   ctx.globalCompositeOperation = 'screen';
@@ -1124,6 +1170,23 @@ function drawWater(t, time, weather) {
 
   drawFishShadows(t, top, bottom);
   drawBobber(t);
+  ctx.restore();
+}
+
+function drawSurfFlecks(t, top, bottom, weather) {
+  const w = state.w;
+  const foamBase = bottom - (bottom - top) * 0.09;
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  for (let i = 0; i < 90; i++) {
+    const x = (i * 89.7 + Math.sin(t * 0.001 + i) * 28) % w;
+    const y = foamBase + Math.sin(i * 11.31 + t * 0.004) * (5 + weather.wave * 8);
+    const alpha = (0.04 + weather.foam * 0.13) * (0.45 + 0.55 * Math.sin(t * 0.003 + i));
+    ctx.fillStyle = `rgba(244,253,255,${alpha})`;
+    ctx.beginPath();
+    ctx.ellipse(x, y, 1.6 + (i % 5) * 0.9, 0.55 + (i % 3) * 0.25, Math.sin(i) * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -1191,11 +1254,52 @@ function drawShore(t, time) {
   ctx.restore();
 
   drawSandGrain(t, y, time);
+  drawWetSandCaustics(t, y, time);
+  drawShellsAndPebbles(t, y, time);
   drawBeachHouse(w * 0.11, h * 0.735, 1.14, time);
   drawBlackLab(w * 0.31, h * 0.82, 1.18);
   drawForegroundPlants(w * 0.965, h * 0.87, 1.0, time);
   drawRod(t);
   drawBarAndAlhena(w * 0.80, h * 0.725);
+}
+
+function drawWetSandCaustics(t, shoreTop, time) {
+  const w = state.w, h = state.h;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, shoreTop - 6, w, h - shoreTop);
+  ctx.clip();
+  ctx.globalCompositeOperation = 'screen';
+  ctx.globalAlpha = 0.16 * time.light;
+  ctx.strokeStyle = 'rgba(255,244,196,0.5)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 20; i++) {
+    const y = shoreTop + 12 + i * 7;
+    ctx.beginPath();
+    for (let x = -20; x <= w + 20; x += 16) {
+      const yy = y + Math.sin(x * 0.026 + t * 0.0024 + i) * 4 + Math.sin(x * 0.071 - t * 0.0018) * 1.4;
+      if (x === -20) ctx.moveTo(x, yy);
+      else ctx.lineTo(x, yy);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawShellsAndPebbles(t, shoreTop, time) {
+  const w = state.w, h = state.h;
+  ctx.save();
+  ctx.globalAlpha = 0.22 + time.light * 0.18;
+  for (let i = 0; i < 46; i++) {
+    const x = (i * 137.9) % w;
+    const y = shoreTop + 25 + ((i * 41.3) % Math.max(20, h - shoreTop - 36));
+    const s = 0.7 + (i % 7) * 0.18;
+    ctx.fillStyle = i % 4 === 0 ? '#f5dfb1' : i % 4 === 1 ? '#805e45' : i % 4 === 2 ? '#ceb27c' : '#5d4b3c';
+    ctx.beginPath();
+    ctx.ellipse(x, y, 2.8 * s, 1.5 * s, Math.sin(i * 2.1), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 function drawSandGrain(t, top, time) {
@@ -1580,15 +1684,35 @@ startBtn.addEventListener('click', () => {
   intro.classList.add('hidden');
 });
 
-canvas.addEventListener('pointerdown', () => {
+function primaryAction() {
+  if (state.mode === 'idle') cast();
+  else if (state.mode === 'bite') reel();
+}
+
+canvas.addEventListener('pointerdown', event => {
   if (!state.started) {
     state.started = true;
     document.body.classList.add('started');
     intro.classList.add('hidden');
     return;
   }
-  if (state.mode === 'idle') cast();
-  else if (state.mode === 'bite') reel();
+  const now = performance.now();
+  if (now - state.lastTapAt < 320) {
+    clearTimeout(state.tapTimer);
+    state.lastTapAt = 0;
+    toggleCinematic();
+    return;
+  }
+  state.lastTapAt = now;
+  if (event.pointerType === 'touch') {
+    clearTimeout(state.tapTimer);
+    state.tapTimer = setTimeout(() => {
+      state.lastTapAt = 0;
+      primaryAction();
+    }, 330);
+    return;
+  }
+  primaryAction();
 });
 
 castBtn.addEventListener('click', () => {
@@ -1610,8 +1734,11 @@ document.querySelectorAll('[data-weather]').forEach(btn => btn.addEventListener(
 window.addEventListener('keydown', e => {
   if (e.code === 'Space') {
     e.preventDefault();
-    if (state.mode === 'idle') cast();
-    else if (state.mode === 'bite') reel();
+    primaryAction();
+  }
+  if (e.code === 'KeyC') {
+    e.preventDefault();
+    toggleCinematic();
   }
 });
 
