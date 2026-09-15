@@ -1131,9 +1131,10 @@ const waterMat = new THREE.ShaderMaterial({
       water = mix(water, fogColor, pow(fogT, 1.5) * 0.34);
       water = water / (water + vec3(1.0));
       water = pow(water, vec3(1.0 / 2.2));
-      float horizonFade = smoothstep(-92.0, -42.0, vWorld.z);
-      float alpha = mix(0.08, 0.20, smoothstep(0.08, 0.96, vUv.y)) * horizonFade;
-      alpha = max(alpha, clamp(foamDensity * 0.28 + shore * 0.03, 0.0, 0.34));
+      float horizonFade = smoothstep(-98.0, -38.0, vWorld.z);
+      float nearMask = smoothstep(-9.0, -18.0, vWorld.z);
+      float alpha = mix(0.018, 0.090, smoothstep(0.08, 0.96, vUv.y)) * horizonFade * nearMask;
+      alpha = max(alpha, clamp((foamDensity * 0.16 + shore * 0.018) * nearMask, 0.0, 0.18));
       gl_FragColor = vec4(water, alpha);
     }
   `,
@@ -1143,9 +1144,9 @@ const waterMat = new THREE.ShaderMaterial({
 
 const water = new THREE.Mesh(new THREE.PlaneGeometry(180, 126, 220, 150), waterMat);
 water.rotation.x = -Math.PI / 2;
-water.position.set(0, -0.06, -66);
+water.position.set(0, -0.06, -72);
 water.receiveShadow = true;
-water.visible = query.get('meshwater') === '1';
+water.visible = query.get('meshwater') !== '0';
 scene.add(water);
 
 let reflectiveWater = null;

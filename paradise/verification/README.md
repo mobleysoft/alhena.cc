@@ -32,6 +32,10 @@ taken with Playwright Chromium at `1440x900`.
   returns height, analytic gradient, curvature, and energy from one spectrum.
 - `paradise-jonswap-ocean-tuned.png`: production capture after reducing the
   blanket reflection/fog washout and deepening the spectral water body.
+- `paradise-nearfield-water-cinematic.png`: production capture after turning the
+  offshore Three.js water mesh into a low-opacity parallax/specular carrier on
+  top of the Pandora-style full-screen shader. It improves depth slightly
+  without returning to the earlier washed-out beach failure mode.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.
