@@ -465,7 +465,18 @@ const furTex = makeTexture(512, (ctx, s) => {
 furTex.repeat.set(1.8, 1.0);
 
 const sandMat = new THREE.MeshStandardMaterial({ map: sandTex, bumpMap: sandTex, bumpScale: .09, roughness: .95, color: 0xd8b46e });
-const wetSandMat = new THREE.MeshPhysicalMaterial({ color: 0x8aa9a1, roughness: .28, metalness: .02, clearcoat: .4, clearcoatRoughness: .25, transparent: true, opacity: .64 });
+const wetSandMat = new THREE.MeshPhysicalMaterial({
+  map: washTex,
+  bumpMap: washTex,
+  bumpScale: .035,
+  color: 0x6f9c9c,
+  roughness: .18,
+  metalness: .02,
+  clearcoat: .62,
+  clearcoatRoughness: .18,
+  transparent: true,
+  opacity: .70
+});
 const woodMat = new THREE.MeshStandardMaterial({ map: woodTex, bumpMap: woodTex, bumpScale: .055, roughness: .76, color: 0x8e6036 });
 const darkWoodMat = new THREE.MeshStandardMaterial({ map: woodTex, bumpMap: woodTex, bumpScale: .04, roughness: .82, color: 0x5a351d });
 const barFaceMat = new THREE.MeshStandardMaterial({ map: woodTex, bumpMap: woodTex, bumpScale: .05, roughness: .78, color: 0x6f3f24 });

@@ -162,6 +162,10 @@ taken with Playwright Chromium at `1440x900`.
   opacity, and moving shallow-water highlights at the beach/ocean boundary. This
   makes the shoreline transition more legible and less like two intersecting
   planes, while still requiring authored terrain/water integration for AAA.
+- `paradise-game-v2-wet-sand-material.png`: live shore capture after binding the
+  procedural wash texture into the wet-sand material as color and bump detail,
+  raising clearcoat, and tuning opacity/roughness so the surf edge has more
+  reflective material response instead of reading as a flat translucent strip.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.
