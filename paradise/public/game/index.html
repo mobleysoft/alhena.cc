@@ -253,7 +253,7 @@ const presets = {
   storm: {
     bg: 0x394f61, fog: 0x40576a, exposure: .82,
     sun: [-24,12,12], sunColor: 0x9cb5c7,
-    wind: 18.0, chop: 2.25, foam: 0.18, skyTint: [0.03, 0.08, 0.14], gold: .12
+    wind: 16.0, chop: 1.72, foam: 0.34, skyTint: [0.03, 0.08, 0.14], gold: .12
   }
 };
 let activePreset = presets.dawn;
@@ -397,10 +397,66 @@ function makeSkyTexture() {
 
 const skyBackdrop = new THREE.Mesh(
   new THREE.PlaneGeometry(760, 260),
-  new THREE.MeshBasicMaterial({ map: makeSkyTexture(), depthWrite: false })
+  new THREE.ShaderMaterial({
+    depthWrite: false,
+    depthTest: false,
+    uniforms: {
+      uTime: { value: 0 },
+      uSkyTint: { value: new THREE.Vector3(0.08, 0.18, 0.32) },
+      uGold: { value: 1.0 },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      precision highp float;
+      uniform float uTime;
+      uniform vec3 uSkyTint;
+      uniform float uGold;
+      varying vec2 vUv;
+      float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123); }
+      float noise(vec2 p){
+        vec2 i=floor(p), f=fract(p), u=f*f*(3.0-2.0*f);
+        return mix(mix(hash(i),hash(i+vec2(1,0)),u.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y);
+      }
+      float fbm(vec2 p) {
+        float v = 0.0;
+        float a = 0.5;
+        for (int i = 0; i < 5; i++) {
+          v += noise(p) * a;
+          p *= 2.05;
+          a *= 0.48;
+        }
+        return v;
+      }
+      void main() {
+        vec2 uv = vUv;
+        vec3 zenith = uSkyTint * 2.45 + vec3(0.04, 0.08, 0.15);
+        vec3 horizon = mix(vec3(0.30, 0.54, 0.64), vec3(1.0, 0.64, 0.24), uGold);
+        vec3 sky = mix(horizon, zenith, smoothstep(0.20, 0.95, uv.y));
+        vec2 sunUv = vec2(0.36, 0.55);
+        float sun = exp(-distance(uv, sunUv) * 18.0) * uGold;
+        float rays = pow(max(0.0, 1.0 - distance(uv, sunUv) * 2.2), 3.0) * .20 * uGold;
+        sky += vec3(1.0, 0.84, 0.48) * (sun * 1.2 + rays);
+        float clouds = fbm(vec2(uv.x * 4.8 + uTime * .012, uv.y * 10.0));
+        float cloudMask = smoothstep(.58, .78, clouds) * smoothstep(.18, .52, uv.y) * (1.0 - smoothstep(.86, 1.0, uv.y));
+        sky = mix(sky, vec3(.92, .98, 1.0), cloudMask * (.20 + .20 * uGold));
+        float storm = clamp(1.0 - uGold * 1.6, 0.0, 1.0);
+        sky = mix(sky, vec3(.16, .23, .30), storm * smoothstep(.45, 1.0, uv.y) * .55);
+        sky = sky / (sky + vec3(1.0));
+        sky = pow(sky, vec3(1.0 / 2.2));
+        gl_FragColor = vec4(sky, 1.0);
+      }
+    `
+  })
 );
 skyBackdrop.position.set(0, 58, -190);
 scene.add(skyBackdrop);
+const skyUniforms = skyBackdrop.material.uniforms;
 
 const sunDisk = new THREE.Mesh(
   new THREE.CircleGeometry(5.2, 64),
@@ -588,12 +644,12 @@ const waterMat = new THREE.ShaderMaterial({
       vec2 foamUv = spectralPos * 12.0 + vec2(uTime * 0.03, -uTime * 0.025);
       float foamH = abs(h);
       float foam = smoothstep(uFoamT * 0.72, uFoamT * 1.2, foamH);
-      float foamNoise = hash(floor(foamUv * 8.0) + floor(vec2(uTime * 1.5)));
-      float foamDensity = foam * smoothstep(0.36, 0.72, foamNoise);
+      float foamNoise = noise(foamUv * 0.68);
+      float foamDensity = foam * smoothstep(0.58, 0.86, foamNoise);
       float shore = smoothstep(0.82, 1.0, vUv.y) * (0.5 + 0.5 * sin(vWorld.x * 1.7 + uTime * 2.1));
       vec3 dispR = vec3(0.04, 0.0, 0.0) * abs(h - oceanHeight(spectralPos + vec2(0.002, 0.0))) * foamDensity * 12.0;
       vec3 dispB = vec3(0.0, 0.0, 0.06) * abs(h - oceanHeight(spectralPos - vec2(0.002, 0.0))) * foamDensity * 12.0;
-      water = mix(water, vec3(0.88, 0.95, 0.98), clamp(foamDensity * 0.86 + shore * 0.62, 0.0, 1.0));
+      water = mix(water, vec3(0.88, 0.95, 0.98), clamp(foamDensity * 0.46 + shore * 0.62, 0.0, 1.0));
       water += dispR + dispB + vec3(0.025, 0.0, 0.035) * foamDensity * noise(foamUv * 0.4);
       float fogT = clamp((1.0 - vUv.y) * 1.35, 0.0, 1.0);
       vec3 fogColor = uSkyTint + vec3(0.06, 0.10, 0.20);
@@ -1124,6 +1180,10 @@ function setPreset(name) {
   waterUniforms.uSkyTint.value.set(...activePreset.skyTint);
   waterUniforms.uGold.value = activePreset.gold;
   waterUniforms.uChop.value = activePreset.chop;
+  skyUniforms.uSkyTint.value.set(...activePreset.skyTint);
+  skyUniforms.uGold.value = activePreset.gold;
+  sunDisk.material.color.setHex(activePreset.sunColor);
+  sunDisk.material.opacity = Math.max(.18, activePreset.gold * .78);
 }
 
 document.querySelectorAll('[data-time]').forEach(btn => btn.addEventListener('click', () => setPreset(btn.dataset.time)));
@@ -1179,6 +1239,7 @@ function animate(now) {
   const dt = Math.min(0.05, (now - lastNow) * 0.001);
   lastNow = now;
   waterUniforms.uTime.value = t;
+  skyUniforms.uTime.value = t;
   if (tour) {
     targetAngle += .0018;
     desiredCamera.x = 3.4 + Math.sin(targetAngle) * 4.2;
