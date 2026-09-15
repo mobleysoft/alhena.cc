@@ -519,6 +519,8 @@ const state = {
   catches: JSON.parse(localStorage.getItem('paradise_fish_log') || '{}'),
   motion: false,
   lastMotionAt: 0,
+  splashes: [],
+  camera: { x: 0, y: 0, tx: 0, ty: 0 },
   cinematic: false,
   lastTapAt: 0,
   tapTimer: null,
@@ -890,6 +892,7 @@ function cast() {
   state.fish = chooseFish();
   state.biteAt = state.lastCastAt + 1600 + Math.random() * 3000;
   state.bobber = { x: state.w * (0.42 + Math.random() * 0.24), y: state.h * (0.56 + Math.random() * 0.11), dip: 0 };
+  createSplash(state.bobber.x, state.bobber.y, 1.1);
   castBtn.textContent = 'waiting';
   setTension(16);
   status('Line out past the foam. Watch the bobber.');
@@ -899,6 +902,7 @@ function cast() {
 function bite(now) {
   state.mode = 'bite';
   state.biteEndsAt = now + 1500 + Math.random() * 900;
+  if (state.bobber) createSplash(state.bobber.x, state.bobber.y + 8, 0.7);
   castBtn.textContent = 'reel';
   status('<strong>Bite.</strong> Reel now.');
   pulse([40, 55, 40, 55, 80]);
@@ -906,6 +910,7 @@ function bite(now) {
 
 function miss() {
   state.mode = 'idle';
+  if (state.bobber) createSplash(state.bobber.x, state.bobber.y + 10, 0.42);
   state.bobber = null;
   castBtn.textContent = 'cast line';
   setTension(0);
@@ -916,6 +921,7 @@ function miss() {
 function reel() {
   if (state.mode !== 'bite') return;
   const fish = state.fish || chooseFish();
+  if (state.bobber) createSplash(state.bobber.x, state.bobber.y, 1.45);
   state.catches[fish.name] = (state.catches[fish.name] || 0) + 1;
   saveLog();
   renderCatalog();
@@ -931,6 +937,12 @@ function reel() {
   catchCard.classList.add('visible');
   setTimeout(() => catchCard.classList.remove('visible'), 1300);
   pulse([30, 42, 30]);
+}
+
+function createSplash(x, y, strength = 1) {
+  const now = performance.now();
+  state.splashes.push({ x, y, strength, born: now, ttl: 980 + strength * 340 });
+  if (state.splashes.length > 16) state.splashes.splice(0, state.splashes.length - 16);
 }
 
 function clearLog() {
@@ -969,6 +981,7 @@ function onMotion(event) {
 
 function drawSky(t, time, weather) {
   const w = state.w, h = state.h;
+  const cam = state.camera;
   const skyH = h * 0.54;
   const haze = weather.haze + weather.cloud * 0.13;
   const top = mix(time.skyTop, '#7c8592', haze);
@@ -985,8 +998,8 @@ function drawSky(t, time, weather) {
     ctx.save();
     ctx.fillStyle = '#eef7ff';
     for (let i = 0; i < 80; i++) {
-      const x = (i * 193.7) % w;
-      const y = (i * 71.3) % (skyH * 0.72);
+      const x = ((i * 193.7) % w) - cam.x * 10;
+      const y = ((i * 71.3) % (skyH * 0.72)) - cam.y * 5;
       const r = ((i * 17) % 3) * 0.35 + 0.45;
       ctx.globalAlpha = time.stars * (0.35 + 0.65 * Math.sin(t * 0.001 + i));
       ctx.beginPath();
@@ -996,8 +1009,8 @@ function drawSky(t, time, weather) {
     ctx.restore();
   }
 
-  const sx = w * time.sunX;
-  const sy = h * time.sunY;
+  const sx = w * time.sunX - cam.x * 20;
+  const sy = h * time.sunY - cam.y * 8;
   const sunR = state.time === 'night' ? 22 : 44;
   const rg = ctx.createRadialGradient(sx, sy, 2, sx, sy, sunR * 3.6);
   rg.addColorStop(0, time.sun);
@@ -1090,8 +1103,8 @@ function drawClouds(t, weather, skyH) {
   const cloudTone = night ? 'rgba(24,29,42,' : 'rgba(245,242,225,';
   const shadowTone = night ? 'rgba(8,11,20,' : 'rgba(95,108,112,';
   for (let i = 0; i < 6; i++) {
-    const baseX = ((i * 337 + t * (0.004 + i * 0.0007)) % (w + 560)) - 280;
-    const y = skyH * (0.13 + ((i * 31) % 34) / 100);
+    const baseX = ((i * 337 + t * (0.004 + i * 0.0007)) % (w + 560)) - 280 - state.camera.x * (8 + i * 2);
+    const y = skyH * (0.13 + ((i * 31) % 34) / 100) - state.camera.y * 5;
     const scale = 0.9 + ((i * 23) % 80) / 100;
     const width = 230 * scale * (0.86 + weather.cloud);
     const height = 34 * scale * (0.8 + weather.cloud * 0.8);
@@ -1189,6 +1202,36 @@ function drawWater(t, time, weather) {
 
   drawFishShadows(t, top, bottom);
   drawBobber(t);
+  drawSplashes(t);
+  ctx.restore();
+}
+
+function drawSplashes(t) {
+  const now = performance.now();
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  state.splashes = state.splashes.filter(s => {
+    const age = now - s.born;
+    const p = age / s.ttl;
+    if (p >= 1) return false;
+    const alpha = (1 - p) * (0.42 + s.strength * 0.18);
+    const radius = 8 + p * (64 + s.strength * 30);
+    ctx.strokeStyle = `rgba(236,252,255,${alpha})`;
+    ctx.lineWidth = 1.6 * (1 - p) + 0.4;
+    ctx.beginPath();
+    ctx.ellipse(s.x, s.y + Math.sin(t * 0.006 + s.x) * 2, radius, radius * 0.18, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    for (let i = 0; i < 9; i++) {
+      const a = i * 0.698 + s.x * 0.01;
+      const dx = Math.cos(a) * radius * 0.42;
+      const dy = Math.sin(a) * radius * 0.12 - p * 18;
+      ctx.fillStyle = `rgba(255,255,255,${alpha * 0.72})`;
+      ctx.beginPath();
+      ctx.arc(s.x + dx, s.y + dy, Math.max(0.8, (1 - p) * 2.7 * s.strength), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return true;
+  });
   ctx.restore();
 }
 
@@ -1876,6 +1919,8 @@ function roundRect(x, y, w, h, r) {
 function frame(t) {
   const time = TIMES[state.time];
   const weather = WEATHER[state.weather];
+  state.camera.x += (state.camera.tx - state.camera.x) * 0.035;
+  state.camera.y += (state.camera.ty - state.camera.y) * 0.035;
   drawWaterShader(t, time, weather);
   ctx.clearRect(0, 0, state.w, state.h);
   drawSky(t, time, weather);
@@ -1942,6 +1987,11 @@ canvas.addEventListener('pointerdown', event => {
   }
   primaryAction();
 });
+
+window.addEventListener('pointermove', event => {
+  state.camera.tx = clamp01(event.clientX / Math.max(1, state.w)) * 2 - 1;
+  state.camera.ty = clamp01(event.clientY / Math.max(1, state.h)) * 2 - 1;
+}, { passive: true });
 
 castBtn.addEventListener('click', () => {
   if (state.mode === 'idle') cast();
