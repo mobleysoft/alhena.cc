@@ -199,6 +199,11 @@ taken with Playwright Chromium at `1440x900`.
   restrained grain. This improves screenshot focus and perceived contrast while
   keeping gameplay untouched; it is a post/composition bridge, not a substitute
   for authored high-fidelity scene assets.
+- `paradise-game-v2-shoreline-microgeometry.png`: live presentation-mode shore
+  capture after adding small 3D shoreline micro-forms: reflective tide pools,
+  wet rock clusters, and driftwood. This gives the foreground more geometric
+  depth than texture-only sand, while keeping the scene lightweight enough for
+  the current Cloudflare-hosted browser build.
 - `scripts/verify-game.sh`: production verifier now covers the legacy canvas
   game, the root launcher, and the primary `/game-v2/` route. It syntax-checks
   both module scripts, validates asset budgets, checks root CTA markers, and
