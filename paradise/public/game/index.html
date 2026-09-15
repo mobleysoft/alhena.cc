@@ -359,10 +359,12 @@ body.runtime-failed .runtime-error { display: block; }
 import * as THREE from 'three';
 import { GLTFLoader } from 'https://unpkg.com/three@0.168.0/examples/jsm/loaders/GLTFLoader.js';
 
+const query = new URLSearchParams(window.location.search);
 const canvas = document.getElementById('stage');
 const oceanCanvas = document.getElementById('ocean-pass');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, premultipliedAlpha: false, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.1));
+const qualityMode = query.get('quality') || 'safe';
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, qualityMode === 'cinematic' ? 1.35 : 1.1));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setClearColor(0x000000, 0);
 renderer.shadowMap.enabled = true;
@@ -529,9 +531,9 @@ function makeOceanPass(canvas) {
       float fresnel = 0.0204 + 0.9796 * pow(1.0 - ndv, 5.0);
       vec3 refl = skyColor(vec2(uv.x + n.x * .075, horizon + d * .56 + n.z * .06), reflect(-viewDir, n));
 
-      vec3 deep = vec3(0.003, 0.020, 0.070);
-      vec3 mid = vec3(0.012, 0.118, 0.185);
-      vec3 shallow = vec3(0.040, 0.240, 0.315);
+      vec3 deep = vec3(0.002, 0.014, 0.060);
+      vec3 mid = vec3(0.006, 0.092, 0.155);
+      vec3 shallow = vec3(0.026, 0.188, 0.260);
       float nearShore = smoothstep(0.55, 1.0, d);
       float farDepth = smoothstep(0.07, 0.42, d) * (1.0 - nearShore * 0.44);
       vec3 body = mix(mid, shallow, nearShore);
@@ -551,6 +553,9 @@ function makeOceanPass(canvas) {
       float foam = clamp(crestEnergy * microFoam + shoreFoam * .50, 0.0, .86);
 
       vec3 water = mix(body, refl, fresnel * mix(.55, .92, grazing));
+      float spectralRidges = pow(clamp(slope * 0.62 + curvature * 0.32, 0.0, 1.0), 1.35);
+      float windLines = smoothstep(.44, .88, fbm(vec2(p.x * .08 + h * 1.7, p.y * .18 - uTime * .26)));
+      water += vec3(.02, .13, .15) * spectralRidges * windLines * smoothstep(.02, .78, d);
       vec3 sunDir = normalize(vec3(-0.34, .86, .38));
       vec3 halfV = normalize(viewDir + sunDir);
       float spec = pow(max(dot(n, halfV), 0.0), mix(58.0, 220.0, smoothstep(0.10, 0.92, d)));
@@ -559,10 +564,10 @@ function makeOceanPass(canvas) {
       water = mix(water, vec3(.88, .97, .99), foam * .46);
       water += vec3(.12, .03, .18) * foam * curvature * 0.08;
 
-      float farHaze = smoothstep(0.30, 0.0, d);
-      vec3 fog = mix(vec3(.25, .38, .45), vec3(.70, .78, .78), uGold * .18);
-      water = mix(water, fog, farHaze * .82);
-      water = mix(water, vec3(.055, .145, .18), smoothstep(.82, 1.0, d) * .08);
+      float farHaze = smoothstep(0.24, 0.0, d);
+      vec3 fog = mix(vec3(.20, .33, .39), vec3(.58, .67, .67), uGold * .14);
+      water = mix(water, fog, farHaze * .46);
+      water = mix(water, vec3(.035, .110, .150), smoothstep(.82, 1.0, d) * .12);
       return water;
     }
     void main() {
@@ -1106,7 +1111,7 @@ const water = new THREE.Mesh(new THREE.PlaneGeometry(180, 126, 220, 150), waterM
 water.rotation.x = -Math.PI / 2;
 water.position.set(0, -0.06, -66);
 water.receiveShadow = true;
-water.visible = new URLSearchParams(window.location.search).get('meshwater') === '1';
+water.visible = query.get('meshwater') === '1';
 scene.add(water);
 
 const shoreGeo = new THREE.PlaneGeometry(100, 42, 170, 70);
@@ -1905,7 +1910,8 @@ fetch('/assets/paradise-asset-manifest.json')
 
 const views = {
   wide: { pos: [2.4, 2.18, 12.2], look: [1.4, .78, -7.8], note: 'Full shoreline, dock, bar, dog, and ocean establishing view.' },
-  water: { pos: [2.6, 1.28, 4.9], look: [1.0, .28, -42], note: 'Low shore-water view.' },
+  water: { pos: [-5.8, 1.36, 7.8], look: [-4.8, .22, -46], note: 'Low shore-water view: spectral ocean shader, sky reflection, foam, and haze.' },
+  ocean: { pos: [-1.0, 1.18, 6.2], look: [-1.4, .20, -70], note: 'Clean ocean study view.' },
   dock: { pos: [-7.8, 2.35, 7.8], look: [-1.0, .78, -8.5], note: 'Dock and cast lane.' },
   dog: { pos: [5.1, 1.18, 7.1], look: [3.0, .62, 5.18], note: 'Black lab companion view; GLB rig slot replaces this fallback.' },
   bar: { pos: [6.75, 2.35, 8.3], look: [6.8, 1.24, 3.22], note: 'Alhena bartender slot.' },
@@ -2056,7 +2062,17 @@ document.getElementById('mobile-clean').addEventListener('pointerdown', ev => {
   ev.preventDefault();
   document.body.classList.toggle('clean');
 });
-if (new URLSearchParams(window.location.search).get('dog') === 'rig') setDogRenderMode(true);
+function applyInitialPresentationState() {
+  const requestedTime = query.get('time');
+  const requestedView = query.get('view');
+  if (query.get('clean') === '1') document.body.classList.add('clean');
+  if (query.get('dog') === 'rig') setDogRenderMode(true);
+  if (requestedTime && presets[requestedTime]) setPreset(requestedTime);
+  if (requestedView && views[requestedView]) setView(requestedView);
+  if (qualityMode === 'cinematic') {
+    setStatus('Cinematic water pass: higher DPR spectral ocean shader. Add meshwater=1 only for mesh testing.');
+  }
+}
 
 window.addEventListener('keydown', ev => {
   const k = ev.key.toLowerCase();
@@ -2133,6 +2149,7 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 setPreset('dawn');
+applyInitialPresentationState();
 
 let lastNow = performance.now();
 let pageVisible = !document.hidden;
