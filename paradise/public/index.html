@@ -468,7 +468,7 @@ body.started .touch-controls {
 }
 </style>
 </head>
-<body data-water-system="pandorachat-webgl2-jonswap-ocean-v8-root-composite-ocean-pass-v5">
+<body data-water-system="pandorachat-webgl2-jonswap-ocean-v8-root-composite-ocean-pass-v6">
 <iframe id="ocean-pass-frame" title="PandoraChat spectral ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
 <canvas id="water" aria-hidden="true"></canvas>
 <canvas id="world" aria-label="Paradise ocean fishing game"></canvas>
@@ -480,8 +480,8 @@ body.started .touch-controls {
   <div class="intro-card">
     <div class="intro-kicker">Alhena presents</div>
     <div class="intro-title">Paradise</div>
-    <p class="intro-copy">A 3D shoreline fishing prototype with a PandoraChat-style spectral ocean shader, time-of-day lighting, weather-driven water, a beach bar, Alhena, and a black lab in the sand.</p>
-    <button class="start" id="start">Launch 3D shore</button>
+    <p class="intro-copy">A shoreline fishing prototype centered on the PandoraChat spectral ocean pass: JONSWAP-inspired waves, analytical normals, Fresnel reflection, weather, cast/reel interaction, Alhena, and the black lab.</p>
+    <button class="start" id="start">Launch best V3 build</button>
     <a class="rebuild-link" href="/game/?view=ocean&quality=cinematic">Legacy canvas prototype</a>
     <br>
     <a class="rebuild-link" href="/game-v3/">V3 authored 3D rebuild gate</a>
@@ -3109,9 +3109,7 @@ function drawFilmGrade(t, time, weather) {
 }
 
 startBtn.addEventListener('click', () => {
-  state.started = true;
-  document.body.classList.add('started');
-  intro.classList.add('hidden');
+  location.href = '/game-v3/three/?time=dawn&weather=breeze';
 });
 
 function primaryAction() {
