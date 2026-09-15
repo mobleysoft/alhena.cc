@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Paradise Ocean Pass</title>
+<style>
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #07131b; }
+canvas { display: block; width: 100vw; height: 100vh; }
+</style>
+</head>
+<body data-water-system="paradise-standalone-pandorachat-jonswap-ocean-v1">
+<canvas id="ocean"></canvas>
+<script>
+const canvas = document.getElementById('ocean');
+const gl = canvas.getContext('webgl', { alpha: false, antialias: false, depth: false, stencil: false, premultipliedAlpha: false });
+const query = new URLSearchParams(location.search);
+const palettes = {
+  dawn: { skyTop: [0.12,0.31,0.48], skyMid: [0.42,0.67,0.79], horizon: [0.90,0.70,0.45], sun: [1.00,0.88,0.55], near: [0.04,0.42,0.55], far: [0.33,0.64,0.72], sunPos: [0.38,0.29], light: 0.86 },
+  noon: { skyTop: [0.20,0.53,0.86], skyMid: [0.47,0.78,0.93], horizon: [0.84,0.94,0.98], sun: [1.00,0.96,0.80], near: [0.12,0.52,0.64], far: [0.39,0.76,0.84], sunPos: [0.58,0.18], light: 1.08 },
+  sunset: { skyTop: [0.14,0.10,0.24], skyMid: [0.78,0.38,0.32], horizon: [1.00,0.78,0.45], sun: [1.00,0.55,0.30], near: [0.08,0.24,0.34], far: [0.66,0.38,0.38], sunPos: [0.75,0.38], light: 0.78 },
+  night: { skyTop: [0.02,0.04,0.10], skyMid: [0.06,0.13,0.25], horizon: [0.18,0.28,0.40], sun: [0.72,0.86,1.00], near: [0.03,0.09,0.15], far: [0.10,0.25,0.36], sunPos: [0.68,0.24], light: 0.42 },
+};
+const weathers = {
+  calm: { wind: 0.38, chop: 0.24, foam: 0.24, haze: 0.06, cloud: 0.04 },
+  breeze: { wind: 0.62, chop: 0.52, foam: 0.38, haze: 0.09, cloud: 0.12 },
+  overcast: { wind: 0.54, chop: 0.44, foam: 0.35, haze: 0.30, cloud: 0.60 },
+  storm: { wind: 0.92, chop: 1.08, foam: 0.70, haze: 0.44, cloud: 0.86 },
+};
+const timeKey = palettes[query.get('time')] ? query.get('time') : 'dawn';
+const weatherKey = weathers[query.get('weather')] ? query.get('weather') : 'breeze';
+const palette = palettes[timeKey];
+const weather = weathers[weatherKey];
+
+if (!gl) {
+  document.body.style.background = 'linear-gradient(#8fc8df 0%, #ffd28a 42%, #8bcbd4 43%, #227f9d 100%)';
+  throw new Error('WebGL unavailable');
+}
+
+const vertexSource = `
+attribute vec2 a_position;
+void main() { gl_Position = vec4(a_position, 0.0, 1.0); }
+`;
+
+const fragmentSource = `
+precision highp float;
+uniform vec2 u_res;
+uniform float u_time;
+uniform float u_wind;
+uniform float u_chop;
+uniform float u_foam;
+uniform float u_haze;
+uniform float u_cloud;
+uniform float u_light;
+uniform vec3 u_sky_top;
+uniform vec3 u_sky_mid;
+uniform vec3 u_horizon;
+uniform vec3 u_sun_color;
+uniform vec3 u_sea_near;
+uniform vec3 u_sea_far;
+uniform vec2 u_sun;
+
+const float PI = 3.14159265359;
+const float TAU = 6.28318530718;
+const float G = 9.81;
+
+float hash(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+float noise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+float fbm(vec2 p) {
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 5; i++) {
+    v += noise(p) * a;
+    p = mat2(1.63, -1.08, 1.08, 1.63) * p + 7.31;
+    a *= 0.52;
+  }
+  return v;
+}
+float jonswapSpectrum(float omega, float wp) {
+  float sigma = omega <= wp ? 0.07 : 0.09;
+  float peak = exp(-pow(omega - wp, 2.0) / (2.0 * sigma * sigma * wp * wp));
+  return 0.0081 * G * G / pow(omega, 5.0) * exp(-1.25 * pow(wp / omega, 4.0)) * pow(3.3, peak);
+}
+void waveComponent(float i, float windSpeed, out vec2 dir, out float k, out float omega, out float amp, out float phase) {
+  float t = i / 39.0;
+  float wp = 0.13 * G / max(windSpeed, 1.5) * TAU;
+  float wMin = wp * 0.38;
+  float wMax = wp * 7.80;
+  omega = wMin * pow(wMax / wMin, t);
+  k = omega * omega / G;
+  float spectrum = jonswapSpectrum(omega, wp);
+  float spread = mix(1.18, 0.12, smoothstep(0.0, 1.0, t));
+  float theta = -PI * 0.5 + (t - 0.5) * PI * spread + 0.24 + (hash(vec2(i, 8.31)) - 0.5) * 0.34;
+  dir = normalize(vec2(cos(theta), sin(theta)));
+  float longSet = mix(1.26, 0.70, smoothstep(0.42, 1.0, t));
+  amp = clamp(sqrt(2.0 * spectrum * ((wMax - wMin) / 40.0)) * 0.74 * windSpeed / 12.0 * longSet, 0.0, 2.35);
+  phase = hash(vec2(i * 19.19, 3.7)) * TAU;
+}
+struct Sample { float h; vec2 grad; float curve; float energy; };
+Sample sampleOcean(vec2 p, float windSpeed) {
+  Sample s;
+  s.h = 0.0; s.grad = vec2(0.0); s.curve = 0.0; s.energy = 0.0;
+  for (int i = 0; i < 40; i++) {
+    vec2 dir; float k; float omega; float amp; float phase;
+    waveComponent(float(i), windSpeed, dir, k, omega, amp, phase);
+    float w = dot(dir, p) * k - omega * u_time + phase;
+    float sw = sin(w), cw = cos(w);
+    s.h += amp * sw;
+    s.grad += dir * (amp * k * cw);
+    s.curve += -amp * k * k * sw;
+    s.energy += amp * amp * k;
+  }
+  float scale = 0.50 + u_chop * 0.78;
+  s.h *= scale; s.grad *= scale; s.curve *= scale;
+  s.energy = clamp(s.energy * 0.095, 0.0, 1.0);
+  return s;
+}
+vec3 acesTone(vec3 x) {
+  return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
+}
+vec3 skyColor(vec2 uv, vec2 q) {
+  vec3 sky = mix(u_horizon, u_sky_mid, smoothstep(0.30, 0.64, uv.y));
+  sky = mix(sky, u_sky_top, smoothstep(0.56, 1.0, uv.y));
+  float sun = exp(-distance(uv, u_sun) * 18.0);
+  float glow = exp(-distance(uv, u_sun) * 3.4);
+  sky += u_sun_color * (sun * 0.72 + glow * 0.10) * u_light;
+  float clouds = smoothstep(0.48, 0.80, fbm(vec2(uv.x * 3.3 + u_time * 0.008, uv.y * 5.8)));
+  clouds *= smoothstep(0.42, 0.82, uv.y) * smoothstep(1.08, 0.70, uv.y);
+  sky = mix(sky, mix(vec3(0.84,0.90,0.92), vec3(0.44,0.50,0.52), u_haze), clouds * (0.05 + u_cloud * 0.22));
+  return sky;
+}
+vec3 oceanColor(vec2 uv, vec2 q, float horizon) {
+  float d = clamp((horizon - uv.y) / horizon, 0.0, 1.0);
+  float farField = smoothstep(0.030, 0.26, d);
+  float nearShore = smoothstep(0.58, 1.0, d);
+  float windSpeed = mix(4.8, 19.5, clamp(u_wind, 0.0, 1.0));
+  float range = min(170.0, 1.0 / max(0.034, pow(d + 0.030, 1.86)));
+  vec2 p = vec2(q.x * range * 3.05, range * 5.12 - u_time * (0.34 + windSpeed * 0.018));
+  p += vec2(fbm(p * 0.045 + vec2(7.0, u_time * 0.02)), fbm(p * 0.075 + vec2(-3.0, -u_time * 0.018))) * 0.35 * u_chop;
+  Sample s = sampleOcean(p, windSpeed);
+  vec2 micro = vec2(fbm(p * vec2(0.52, 2.4) + vec2(u_time * 0.11, -u_time * 0.06)), fbm(p * vec2(1.8, 0.48) + vec2(-u_time * 0.16, u_time * 0.04))) - 0.5;
+  vec3 n = normalize(vec3(-s.grad.x, 1.0, -s.grad.y) + vec3(micro.x, 0.0, micro.y) * (0.16 + u_chop * 0.16));
+  vec3 viewDir = normalize(vec3(q.x * 0.48, d * 0.58 + 0.12, 1.0));
+  float fresnel = 0.0204 + 0.9796 * pow(1.0 - clamp(dot(n, viewDir), 0.0, 1.0), 5.0);
+  vec3 reflected = skyColor(vec2(uv.x + n.x * 0.05, horizon + d * 0.52 + n.z * 0.08), q);
+  vec3 deep = mix(u_sea_far * 0.34, vec3(0.002, 0.015, 0.050), 0.46);
+  vec3 middle = mix(u_sea_far, u_sea_near, 0.34);
+  vec3 shallow = mix(u_sea_near, vec3(0.035, 0.32, 0.34), 0.34);
+  vec3 body = mix(deep, middle, smoothstep(0.04, 0.66, d));
+  body = mix(body, shallow, nearShore);
+  float slope = clamp(length(s.grad) * 1.05, 0.0, 1.0);
+  float curve = clamp(abs(s.curve) * 0.12 + s.energy * 0.42, 0.0, 1.0);
+  float caustics = smoothstep(0.62, 0.92, fbm(p * vec2(0.42, 1.18) + micro * 0.7));
+  body += vec3(0.00, 0.34, 0.31) * pow(max(dot(n, normalize(vec3(-0.22, 0.74, 0.62))), 0.0), 1.6) * d * 0.32;
+  body += vec3(0.10, 0.58, 0.52) * caustics * nearShore * (1.0 - u_haze) * 0.13;
+  vec3 col = mix(body, reflected, clamp(fresnel * 0.74 + slope * 0.055, 0.0, 0.72));
+  float sunPath = pow(max(0.0, 1.0 - abs(uv.x - u_sun.x) * 4.8), 3.0) * pow(1.0 - abs(d - 0.26), 2.4);
+  float glints = smoothstep(0.68, 0.96, fbm(p * vec2(4.8, 1.25) + vec2(u_time * 0.28, -u_time * 0.10)));
+  float specular = pow(max(dot(reflect(-normalize(vec3(-0.34, .86, .38)), n), viewDir), 0.0), 36.0) * glints * sunPath * (0.32 + u_chop * 0.78) * u_light;
+  float crestEnergy = smoothstep(0.05, 0.42, abs(s.h)) * max(slope, curve);
+  float streaks = smoothstep(0.48, 0.86, fbm(vec2(p.x * 0.09 - u_time * 0.035, p.y * 1.65 + u_time * 0.15)));
+  float foamNoise = fbm(p * vec2(0.86, 1.95) + vec2(u_time * 0.08, -u_time * 0.05));
+  float microFoam = smoothstep(0.36 + (1.0 - u_foam) * 0.22, 0.86, abs(s.h) + slope * 0.14) * smoothstep(0.42, 0.82, foamNoise);
+  float shoreLine = 0.86 + sin(p.x * 0.065 + u_time * 0.70) * 0.018;
+  float shoreFoam = smoothstep(0.045, 0.0, abs(d - shoreLine)) * smoothstep(0.42, 0.82, fbm(vec2(p.x * 0.58, u_time * 0.42)));
+  float foam = clamp((crestEnergy * microFoam * (0.46 + streaks * 0.72) + shoreFoam * 0.88) * (0.45 + u_foam * 1.55), 0.0, 1.0);
+  float swellShadow = smoothstep(0.40, 0.84, fbm(vec2(p.x * 0.025 - u_time * 0.012, p.y * 0.15 + u_time * 0.035)));
+  col = mix(col, col * vec3(0.58, 0.74, 0.80), swellShadow * smoothstep(0.04, 0.82, 1.0 - d) * 0.32);
+  col += vec3(0.018, 0.19, 0.22) * streaks * smoothstep(0.02, 0.88, d) * 1.45;
+  col += vec3(1.0, 0.84, 0.48) * specular;
+  col = mix(col, vec3(0.91, 0.975, 1.0), foam * 0.58);
+  float horizonFog = pow(1.0 - d, 2.85) * (0.18 + u_haze * 0.62);
+  col = mix(col, mix(u_horizon, vec3(0.55,0.66,0.69), u_haze), horizonFog);
+  return col;
+}
+void main() {
+  vec2 uv = gl_FragCoord.xy / u_res;
+  vec2 q = (gl_FragCoord.xy * 2.0 - u_res) / min(u_res.x, u_res.y);
+  float horizon = 0.415 + sin(q.x * 1.4 + u_time * 0.04) * 0.004;
+  vec3 col = skyColor(uv, q);
+  if (uv.y < horizon) col = mix(col, oceanColor(uv, q, horizon), smoothstep(0.0, 0.006, horizon - uv.y));
+  col = mix(col, vec3(0.55,0.62,0.64), u_haze * 0.22);
+  col *= 0.66 + u_light * 0.42;
+  float vignette = smoothstep(1.05, 0.20, length((uv - 0.5) * vec2(1.02, 0.86)));
+  col *= 0.76 + vignette * 0.34;
+  col = acesTone(col * 1.12);
+  col = pow(col, vec3(0.4545));
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+function compile(type, source) {
+  const shader = gl.createShader(type);
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader));
+  return shader;
+}
+const program = gl.createProgram();
+gl.attachShader(program, compile(gl.VERTEX_SHADER, vertexSource));
+gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fragmentSource));
+gl.linkProgram(program);
+if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
+gl.useProgram(program);
+const buffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+const position = gl.getAttribLocation(program, 'a_position');
+gl.enableVertexAttribArray(position);
+gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+const u = Object.fromEntries(['res','time','wind','chop','foam','haze','cloud','light','sky_top','sky_mid','horizon','sun_color','sea_near','sea_far','sun'].map(name => [name, gl.getUniformLocation(program, `u_${name}`)]));
+
+function resize() {
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  canvas.width = Math.floor(innerWidth * dpr);
+  canvas.height = Math.floor(innerHeight * dpr);
+  gl.viewport(0, 0, canvas.width, canvas.height);
+}
+function v3(loc, value) { gl.uniform3f(loc, value[0], value[1], value[2]); }
+function frame(now) {
+  gl.useProgram(program);
+  gl.uniform2f(u.res, canvas.width, canvas.height);
+  gl.uniform1f(u.time, now * 0.001);
+  gl.uniform1f(u.wind, weather.wind);
+  gl.uniform1f(u.chop, weather.chop);
+  gl.uniform1f(u.foam, weather.foam);
+  gl.uniform1f(u.haze, weather.haze);
+  gl.uniform1f(u.cloud, weather.cloud);
+  gl.uniform1f(u.light, palette.light);
+  v3(u.sky_top, palette.skyTop);
+  v3(u.sky_mid, palette.skyMid);
+  v3(u.horizon, palette.horizon);
+  v3(u.sun_color, palette.sun);
+  v3(u.sea_near, palette.near);
+  v3(u.sea_far, palette.far);
+  gl.uniform2f(u.sun, palette.sunPos[0], 1.0 - palette.sunPos[1]);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  requestAnimationFrame(frame);
+}
+addEventListener('resize', resize);
+resize();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
