@@ -100,7 +100,7 @@ document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x91cfe0);
-scene.fog = new THREE.FogExp2(0x9fd0dc, 0.011);
+scene.fog = new THREE.FogExp2(0x9fd0dc, 0.0065);
 
 const camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.05, 650);
 camera.position.set(13.0, 4.2, 17.5);
@@ -126,6 +126,80 @@ sun.shadow.camera.bottom = -25;
 sun.shadow.camera.near = 1;
 sun.shadow.camera.far = 90;
 scene.add(sun);
+
+const skyDome = new THREE.Mesh(
+  new THREE.SphereGeometry(360, 64, 32),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    depthWrite: false,
+    uniforms: {
+      uSunDir: { value: sun.position.clone().normalize() }
+    },
+    vertexShader: `
+      varying vec3 vDir;
+      void main() {
+        vec4 world = modelMatrix * vec4(position, 1.0);
+        vDir = normalize(world.xyz);
+        gl_Position = projectionMatrix * viewMatrix * world;
+      }
+    `,
+    fragmentShader: `
+      precision highp float;
+      uniform vec3 uSunDir;
+      varying vec3 vDir;
+      float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123); }
+      float noise(vec2 p) {
+        vec2 i = floor(p), f = fract(p), u = f*f*(3.0-2.0*f);
+        return mix(mix(hash(i),hash(i+vec2(1,0)),u.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y);
+      }
+      float fbm(vec2 p) {
+        float v = 0.0, a = .5;
+        for (int i = 0; i < 5; i++) {
+          v += noise(p) * a;
+          p = mat2(1.86,-.72,.72,1.86) * p + 4.1;
+          a *= .48;
+        }
+        return v;
+      }
+      void main() {
+        float h = clamp(vDir.y * .5 + .5, 0.0, 1.0);
+        vec3 zenith = vec3(.23, .58, .82);
+        vec3 horizon = vec3(.96, .73, .38);
+        vec3 lower = vec3(.47, .72, .76);
+        vec3 sky = mix(lower, zenith, smoothstep(.48, 1.0, h));
+        sky = mix(horizon, sky, smoothstep(.40, .62, h));
+        float sd = max(dot(normalize(vDir), normalize(uSunDir)), 0.0);
+        sky += vec3(1.0, .78, .38) * pow(sd, 620.0) * 3.4;
+        sky += vec3(1.0, .66, .30) * pow(sd, 7.0) * .42;
+        vec2 cloudUv = vec2(atan(vDir.z, vDir.x) * .9, h * 3.4);
+        float clouds = smoothstep(.57, .76, fbm(cloudUv * vec2(2.5, 1.1)));
+        clouds *= smoothstep(.52, .72, h) * (1.0 - smoothstep(.90, 1.0, h));
+        sky = mix(sky, vec3(.94,.98,1.0), clouds * .23);
+        sky = sky / (sky + vec3(1.0));
+        sky = pow(sky, vec3(1.0 / 2.2));
+        gl_FragColor = vec4(sky, 1.0);
+      }
+    `
+  })
+);
+skyDome.name = 'v2-procedural-sky-dome';
+scene.add(skyDome);
+
+const sunDisk = new THREE.Mesh(
+  new THREE.CircleGeometry(6.0, 64),
+  new THREE.MeshBasicMaterial({ color: 0xffe69b, transparent: true, opacity: .82, depthWrite: false, fog: false })
+);
+sunDisk.name = 'v2-low-sun-disk';
+sunDisk.position.set(-68, 48, -155);
+scene.add(sunDisk);
+
+const sunGlow = new THREE.Mesh(
+  new THREE.CircleGeometry(20, 96),
+  new THREE.MeshBasicMaterial({ color: 0xffce77, transparent: true, opacity: .055, depthWrite: false, fog: false, blending: THREE.AdditiveBlending })
+);
+sunGlow.name = 'v2-volumetric-sun-glow';
+sunGlow.position.copy(sunDisk.position);
+scene.add(sunGlow);
 
 function makeTexture(size, painter) {
   const canvas = document.createElement('canvas');
@@ -229,6 +303,7 @@ const oceanMat = new THREE.ShaderMaterial({
       vec2 wp = p.xz * .15;
       float h = 0.0;
       vec2 lateral = vec2(0.0);
+      vec2 grad = vec2(0.0);
       float crest = 0.0;
       for (int j = 0; j < 28; j++) {
         float i = float(j);
@@ -236,8 +311,10 @@ const oceanMat = new THREE.ShaderMaterial({
         component(i, dir, k, omega, amp, phase);
         float a = dot(dir, wp) * k - omega * uTime + phase;
         h += amp * sin(a);
-        lateral += dir * cos(a) * amp * .28;
-        crest += abs(amp * k * cos(a));
+        float ca = cos(a);
+        lateral += dir * ca * amp * .28;
+        grad += dir * (amp * k * ca);
+        crest += abs(amp * k * ca);
       }
       float shoreFade = smoothstep(-1.0, -9.0, p.z);
       p.xz += lateral * shoreFade;
@@ -245,7 +322,7 @@ const oceanMat = new THREE.ShaderMaterial({
       vCrest = clamp(crest * .22, 0.0, 1.0);
       vec4 world = modelMatrix * vec4(p, 1.0);
       vWorld = world.xyz;
-      vNormal = normalize(normalMatrix * normal);
+      vNormal = normalize(normalMatrix * vec3(-grad.x * shoreFade, 1.0, -grad.y * shoreFade));
       gl_Position = projectionMatrix * viewMatrix * world;
     }
   `,
@@ -275,23 +352,25 @@ const oceanMat = new THREE.ShaderMaterial({
     }
     void main() {
       vec3 n = normalize(vNormal);
+      vec2 micro = vec2(fbm(vWorld.xz * 1.9 + vec2(uTime * .08, 0.0)), fbm(vWorld.zx * 2.7 + vec2(0.0, -uTime * .07))) - .5;
+      n = normalize(n + vec3(micro.x, 0.0, micro.y) * .16);
       vec3 v = normalize(cameraPosition - vWorld);
       vec3 r = reflect(-v, n);
       float fresnel = .0204 + .9796 * pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 5.0);
       float depth = smoothstep(7.5, -75.0, vWorld.z);
-      vec3 deep = vec3(.004, .035, .115);
-      vec3 shallow = vec3(.035, .245, .275);
+      vec3 deep = vec3(.001, .038, .145);
+      vec3 shallow = vec3(.015, .235, .285);
       vec3 body = mix(shallow, deep, depth);
       float scatter = pow(max(dot(n, -uSun), 0.0), 1.7) * (1.0 - depth);
       body += vec3(.04, .38, .33) * scatter * .42;
       vec3 reflectedSky = mix(vec3(.93,.73,.42), uSky, smoothstep(-.08, .7, r.y));
-      vec3 col = mix(body, reflectedSky, fresnel * .72);
+      vec3 col = mix(body, reflectedSky, fresnel * .48);
       float spec = pow(max(dot(reflect(-uSun, n), v), 0.0), 170.0) * 2.4 * uGold;
       float foam = smoothstep(.42, .84, vCrest) * smoothstep(.42, .78, fbm(vWorld.xz * .55 + vec2(uTime * .08, -uTime * .03)));
       float shoreFoam = smoothstep(-6.8, -2.0, vWorld.z) * smoothstep(.56, .84, fbm(vec2(vWorld.x * 1.7, uTime * .5)));
       col += vec3(1.0, .90, .62) * spec;
       col = mix(col, vec3(.88,.98,1.0), clamp(foam * .38 + shoreFoam * .16, 0.0, .46));
-      col = mix(col, vec3(.72,.82,.84), smoothstep(-38.0, -120.0, vWorld.z) * .25);
+      col = mix(col, vec3(.66,.82,.86), smoothstep(-52.0, -132.0, vWorld.z) * .14);
       col = col / (col + vec3(1.0));
       col = pow(col, vec3(1.0 / 2.2));
       gl_FragColor = vec4(col, .96);
@@ -330,6 +409,32 @@ wet.position.set(0, -.095, -2.6);
 wet.receiveShadow = true;
 scene.add(wet);
 
+const islandMat = new THREE.MeshBasicMaterial({ color: 0x5f8790, transparent: true, opacity: .36, depthWrite: false });
+for (const [x, z, sx, sy, rz] of [[-42, -126, 20, 2.7, .18], [-12, -138, 30, 3.5, -.08], [23, -128, 24, 2.9, .14], [55, -145, 36, 4.0, -.16]]) {
+  const island = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 7), islandMat);
+  island.name = 'v2-atmospheric-distant-island';
+  island.position.set(x, 1.6, z);
+  island.scale.set(sx, sy, sx * .28);
+  island.rotation.y = Math.PI / 7 + rz;
+  scene.add(island);
+}
+
+const foamMat = new THREE.LineBasicMaterial({ color: 0xeafff8, transparent: true, opacity: .22 });
+const shoreFoam = [];
+for (let row = 0; row < 6; row++) {
+  const pts = [];
+  for (let i = 0; i < 96; i++) {
+    const x = -44 + i * .92;
+    const z = -4.2 - row * .28 + Math.sin(i * .25 + row * .9) * .09;
+    pts.push(new THREE.Vector3(x, .012 + row * .004, z));
+  }
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), foamMat.clone());
+  line.name = 'v2-animated-shoreline-foam-contour';
+  line.userData = { row, base: pts.map(p => p.clone()) };
+  scene.add(line);
+  shoreFoam.push(line);
+}
+
 function box(name, size, pos, mat) {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), mat);
   mesh.name = name;
@@ -346,6 +451,16 @@ function cyl(name, radius, height, pos, rot, mat, seg = 20) {
   mesh.rotation.set(...rot);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
+  scene.add(mesh);
+  return mesh;
+}
+function contactShadow(name, x, z, sx, sz, opacity = .22) {
+  const mat = new THREE.MeshBasicMaterial({ color: 0x241205, transparent: true, opacity, depthWrite: false });
+  const mesh = new THREE.Mesh(new THREE.CircleGeometry(1, 48), mat);
+  mesh.name = name;
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.set(x, -.035, z);
+  mesh.scale.set(sx, sz, 1);
   scene.add(mesh);
   return mesh;
 }
@@ -368,6 +483,7 @@ for (let i = 0; i < 9; i++) {
 }
 
 box('v2-beach-house-body', [5.8, 2.5, 3.9], [-11.2, 1.05, 4.3], woodMat);
+contactShadow('v2-beach-house-soft-contact-shadow', -11.2, 4.9, 3.9, 2.2, .24);
 const roof = new THREE.Mesh(new THREE.ConeGeometry(4.1, 1.8, 4), new THREE.MeshStandardMaterial({ color: 0x6f2618, roughness: .76 }));
 roof.name = 'v2-beach-house-hip-roof';
 roof.position.set(-11.2, 2.95, 4.3);
@@ -380,7 +496,22 @@ box('v2-warm-window', [1.1, 1.2, .08], [-11.2, 1.17, 6.28], glassMat);
 box('v2-bar-base', [6.6, 1.14, 1.35], [7.7, .50, 4.0], darkWoodMat);
 box('v2-bar-counter', [7.1, .24, 1.8], [7.7, 1.24, 4.0], woodMat);
 box('v2-bar-canopy', [7.4, .16, 2.4], [7.7, 2.28, 3.9], new THREE.MeshStandardMaterial({ color: 0xc99b55, roughness: .9 }));
+contactShadow('v2-bar-soft-contact-shadow', 7.7, 4.4, 3.8, 1.1, .22);
 for (const x of [4.1, 11.3]) for (const z of [2.85, 5.0]) cyl('v2-bar-post', .09, 2.3, [x, 1.15, z], [0,0,0], darkWoodMat, 14);
+for (const [x, z, h] of [[5.45, 3.08, .46], [5.78, 3.05, .58], [9.75, 3.06, .50], [10.08, 3.08, .38]]) {
+  cyl('v2-glass-bottle-on-bar', .075, h, [x, 1.55 + h * .5, z], [0,0,0], glassMat, 18);
+}
+const shellMat = new THREE.MeshStandardMaterial({ color: 0xf3dfb6, roughness: .6 });
+const pebbleMat = new THREE.MeshStandardMaterial({ color: 0x5e5144, roughness: .92 });
+for (let i = 0; i < 70; i++) {
+  const shell = new THREE.Mesh(i % 4 ? new THREE.SphereGeometry(.075, 12, 7) : new THREE.DodecahedronGeometry(.07, 0), i % 4 ? shellMat : pebbleMat);
+  shell.name = i % 4 ? 'v2-beach-shell-detail' : 'v2-beach-pebble-detail';
+  shell.position.set(-32 + ((i * 7.7) % 64), -.02 + (i % 4 ? .04 : .05), 2.0 + (i / 70) * 18 + Math.sin(i * 1.7) * .8);
+  shell.rotation.set(Math.sin(i) * .5, i * .7, Math.cos(i) * .3);
+  shell.scale.set(1 + Math.sin(i) * .35, .18, .65 + Math.cos(i * .7) * .2);
+  shell.castShadow = shell.receiveShadow = true;
+  scene.add(shell);
+}
 
 function makeAlhena() {
   const g = new THREE.Group();
@@ -492,6 +623,8 @@ const clock = new THREE.Clock();
 function animate() {
   const t = clock.getElapsedTime();
   oceanUniforms.uTime.value = t;
+  sunDisk.lookAt(camera.position);
+  sunGlow.lookAt(camera.position);
   controls.update();
   alhena.rotation.y = Math.sin(t * .45) * .06;
   dog.position.x = 1.6 + Math.sin(t * .55) * .42;
@@ -507,6 +640,17 @@ function animate() {
     f.position.x += Math.sin(t * f.userData.speed + f.userData.phase) * .008;
     f.position.y = -.52 + Math.sin(t * .8 + i) * .12;
     f.rotation.y = Math.sin(t * .6 + i) * .18;
+  });
+  shoreFoam.forEach(line => {
+    const pos = line.geometry.attributes.position;
+    const base = line.userData.base;
+    const row = line.userData.row;
+    for (let i = 0; i < pos.count; i++) {
+      const p = base[i];
+      pos.setXYZ(i, p.x, p.y + Math.sin(t * 1.3 + i * .11 + row) * .006, p.z + Math.sin(t * .8 + i * .17 + row) * .08);
+    }
+    line.material.opacity = .12 + Math.sin(t * .9 + row) * .035;
+    pos.needsUpdate = true;
   });
   renderer.render(scene, camera);
   requestAnimationFrame(animate);

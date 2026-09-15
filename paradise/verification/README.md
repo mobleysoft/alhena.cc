@@ -45,6 +45,15 @@ taken with Playwright Chromium at `1440x900`.
 - `paradise-game-v2-layout.png`: live V2 capture after moving the spectral ocean
   mesh offshore and widening the default camera. This establishes the cleaner
   replacement architecture for future PBR/GLB asset iteration.
+- `paradise-game-v2-atmosphere.png`: live V2 capture after adding the procedural
+  sky dome, sun billboard, horizon islands, shoreline foam contours, analytic
+  wave normals, and additional beach/bar prop details; rejected as over-fogged.
+- `paradise-game-v2-atmosphere-tuned.png`: live V2 capture after reducing fog,
+  softening the sun bloom, deepening water color, and lowering reflected-sky
+  washout.
+- `paradise-game-v2-final-atmosphere.png`: final live capture for this pass;
+  verifies the `/game-v2/` route remains renderable after linking it from the
+  Paradise landing page.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.
