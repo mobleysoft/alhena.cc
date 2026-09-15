@@ -9,6 +9,9 @@ taken with Playwright Chromium at `1440x900`.
 - `paradise-ocean-ridgefield-cinematic.png`: production capture after adding a live
   Three.js spectral ridge field so the ocean has perspective surface lines
   without re-enabling the washed-out mesh carrier.
+- `paradise-material-cinematic.png`: production capture after adding a warmer sun
+  halo, wet-sand reflection, and beach microgeometry for stronger foreground
+  material read.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.

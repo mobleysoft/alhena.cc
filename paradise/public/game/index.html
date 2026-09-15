@@ -865,10 +865,24 @@ const skyUniforms = skyBackdrop.material.uniforms;
 
 const sunDisk = new THREE.Mesh(
   new THREE.CircleGeometry(5.2, 64),
-  new THREE.MeshBasicMaterial({ color: 0xffedaa, transparent: true, opacity: .78, depthWrite: false })
+  new THREE.MeshBasicMaterial({ color: 0xffd276, transparent: true, opacity: .82, depthWrite: false, fog: false })
 );
 sunDisk.position.set(-55, 38, -184);
 scene.add(sunDisk);
+const sunHalo = new THREE.Mesh(
+  new THREE.CircleGeometry(16.5, 96),
+  new THREE.MeshBasicMaterial({
+    color: 0xffd58a,
+    transparent: true,
+    opacity: .16,
+    depthWrite: false,
+    fog: false,
+    blending: THREE.AdditiveBlending
+  })
+);
+sunHalo.name = 'warm-volumetric-sun-halo';
+sunHalo.position.copy(sunDisk.position);
+scene.add(sunHalo);
 
 const waterUniforms = {
   uTime: { value: 0 },
@@ -1175,11 +1189,11 @@ scene.add(shore);
 const wetSand = new THREE.Mesh(
   new THREE.PlaneGeometry(100, 6, 90, 8),
   new THREE.MeshStandardMaterial({
-    color: 0x8aa7a0,
-    roughness: .34,
+    color: 0x7d958d,
+    roughness: .22,
     metalness: .05,
     transparent: true,
-    opacity: .18
+    opacity: .24
   })
 );
 wetSand.name = 'reflective-wet-sand-transition';
@@ -1188,6 +1202,20 @@ wetSand.position.set(0, -0.105, -1.5);
 wetSand.receiveShadow = true;
 wetSand.visible = true;
 scene.add(wetSand);
+
+const wetSandReflectionMat = new THREE.MeshBasicMaterial({
+  color: 0xffd087,
+  transparent: true,
+  opacity: .075,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending
+});
+const wetSandReflection = new THREE.Mesh(new THREE.PlaneGeometry(44, 1.6, 1, 1), wetSandReflectionMat);
+wetSandReflection.name = 'warm-sun-reflection-on-wet-sand';
+wetSandReflection.rotation.x = -Math.PI / 2;
+wetSandReflection.rotation.z = -.05;
+wetSandReflection.position.set(-13.5, -0.035, -1.05);
+scene.add(wetSandReflection);
 
 const shallowsMat = new THREE.MeshBasicMaterial({ color: 0xb7e7e1, transparent: true, opacity: .03, depthWrite: false });
 for (let i = 0; i < 4; i++) {
@@ -1217,6 +1245,26 @@ for (let i = 0; i < 3; i++) {
   band.visible = false;
   scene.add(band);
   causticBands.push(band);
+}
+
+const beachShellMat = new THREE.MeshStandardMaterial({ color: 0xf4dfb6, roughness: .62 });
+const beachPebbleMat = new THREE.MeshStandardMaterial({ color: 0x655849, roughness: .9 });
+const beachDetails = [];
+for (let i = 0; i < 58; i++) {
+  const isShell = i % 3 !== 0;
+  const geom = isShell ? new THREE.SphereGeometry(.09, 14, 7) : new THREE.DodecahedronGeometry(.065, 0);
+  const mesh = new THREE.Mesh(geom, isShell ? beachShellMat : beachPebbleMat);
+  const lane = i / 58;
+  const x = -24 + ((i * 7.31) % 48);
+  const z = THREE.MathUtils.lerp(.2, 18.5, lane) + Math.sin(i * 2.1) * .9;
+  mesh.name = isShell ? 'beach-shell-microgeometry' : 'beach-pebble-microgeometry';
+  mesh.position.set(x, -0.005 + (isShell ? .03 : .04), z);
+  mesh.rotation.set(Math.sin(i) * .55, Math.cos(i * .7) * 2.8, Math.sin(i * 1.3) * .4);
+  mesh.scale.set(1.0 + Math.sin(i * 1.9) * .42, .18 + Math.cos(i) * .04, .62 + Math.sin(i * .8) * .25);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  beachDetails.push(mesh);
 }
 
 function contactShadow(name, x, z, sx, sz, opacity = .24) {
@@ -2086,6 +2134,9 @@ function setPreset(name) {
   skyUniforms.uGold.value = activePreset.gold;
   sunDisk.material.color.setHex(activePreset.sunColor);
   sunDisk.material.opacity = Math.max(.18, activePreset.gold * .78);
+  sunHalo.material.color.setHex(activePreset.sunColor);
+  sunHalo.material.opacity = Math.max(.035, activePreset.gold * .15);
+  wetSandReflection.material.opacity = Math.max(.018, activePreset.gold * .075);
 }
 
 document.querySelectorAll('[data-time]').forEach(btn => btn.addEventListener('click', () => setPreset(btn.dataset.time)));
@@ -2225,6 +2276,10 @@ function animate(now) {
   oceanPass?.render(t, activePreset);
   waterUniforms.uTime.value = t;
   skyUniforms.uTime.value = t;
+  sunDisk.lookAt(camera.position);
+  sunHalo.lookAt(camera.position);
+  wetSandReflection.position.x = -13.5 + Math.sin(t * .18) * .7;
+  wetSandReflection.scale.x = 1.0 + Math.sin(t * .31) * .055;
   oceanRidges.forEach(line => {
     const pos = line.geometry.attributes.position;
     const { row, z, halfWidth, cols, phase } = line.userData;
