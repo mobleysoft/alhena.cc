@@ -1114,6 +1114,48 @@ water.receiveShadow = true;
 water.visible = query.get('meshwater') === '1';
 scene.add(water);
 
+const oceanRidgeMat = new THREE.LineBasicMaterial({
+  color: 0x9fe8e2,
+  transparent: true,
+  opacity: qualityMode === 'cinematic' ? .19 : .13,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending
+});
+const oceanShadowRidgeMat = new THREE.LineBasicMaterial({
+  color: 0x123947,
+  transparent: true,
+  opacity: .12,
+  depthWrite: false
+});
+const oceanRidges = [];
+function makeOceanRidgeField() {
+  const group = new THREE.Group();
+  group.name = 'spectral-ridge-field-perspective-water-lines';
+  const rows = qualityMode === 'cinematic' ? 48 : 34;
+  const cols = qualityMode === 'cinematic' ? 84 : 62;
+  for (let row = 0; row < rows; row++) {
+    const farT = row / Math.max(1, rows - 1);
+    const z = THREE.MathUtils.lerp(-8.5, -92, farT * farT);
+    const halfWidth = THREE.MathUtils.lerp(9, 82, Math.sqrt(farT));
+    const positions = new Float32Array(cols * 3);
+    const geom = new THREE.BufferGeometry();
+    for (let col = 0; col < cols; col++) {
+      const xT = col / Math.max(1, cols - 1);
+      positions[col * 3] = THREE.MathUtils.lerp(-halfWidth, halfWidth, xT);
+      positions[col * 3 + 1] = .035;
+      positions[col * 3 + 2] = z;
+    }
+    geom.setAttribute('position', new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage));
+    const line = new THREE.Line(geom, row % 5 === 0 ? oceanShadowRidgeMat : oceanRidgeMat);
+    line.userData = { row, z, halfWidth, cols, phase: row * 1.931 };
+    oceanRidges.push(line);
+    group.add(line);
+  }
+  return group;
+}
+const oceanRidgeField = makeOceanRidgeField();
+scene.add(oceanRidgeField);
+
 const shoreGeo = new THREE.PlaneGeometry(100, 42, 170, 70);
 const shorePos = shoreGeo.attributes.position;
 for (let i = 0; i < shorePos.count; i++) {
@@ -2183,6 +2225,20 @@ function animate(now) {
   oceanPass?.render(t, activePreset);
   waterUniforms.uTime.value = t;
   skyUniforms.uTime.value = t;
+  oceanRidges.forEach(line => {
+    const pos = line.geometry.attributes.position;
+    const { row, z, halfWidth, cols, phase } = line.userData;
+    const farT = row / Math.max(1, oceanRidges.length - 1);
+    const swell = .020 + farT * .135;
+    for (let i = 0; i < cols; i++) {
+      const xT = i / Math.max(1, cols - 1);
+      const x = THREE.MathUtils.lerp(-halfWidth, halfWidth, xT);
+      const packet = Math.sin(x * .19 + z * .045 - t * (1.0 + activePreset.wind * .018) + phase);
+      const cross = Math.sin(x * .43 - z * .018 + t * .42 + phase * .37);
+      pos.setXYZ(i, x, .035 + packet * swell + cross * swell * .28, z + packet * .06);
+    }
+    pos.needsUpdate = true;
+  });
   if (tour) {
     targetAngle += .0018;
     desiredCamera.x = 2.2 + Math.sin(targetAngle) * 5.2;
