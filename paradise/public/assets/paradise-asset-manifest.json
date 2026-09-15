@@ -61,6 +61,20 @@
       ]
     },
     {
+      "id": "beach_house_billboard",
+      "type": "transparent-environment-card",
+      "targetPath": "/assets/beach-house-billboard.png",
+      "status": "active",
+      "loadByDefault": true,
+      "currentFallback": "procedural beach house mesh behind ?housemesh=1",
+      "requirements": [
+        "transparent high-resolution beach house cutout",
+        "warm lit window and readable material detail",
+        "grounded contact shadow",
+        "future replacement by authored GLB/PBR environment kit"
+      ]
+    },
+    {
       "id": "black_lab_rig",
       "type": "rigged-animal",
       "targetPath": "/assets/models/black-lab.glb",

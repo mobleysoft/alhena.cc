@@ -258,6 +258,7 @@ const experimentalShallowWater = query.get('shallowwater') === '1';
 const useDogBillboard = query.get('dogmesh') !== '1';
 const useAlhenaBillboard = query.get('alhenamesh') !== '1';
 const useBarBillboard = query.get('barmesh') !== '1';
+const useHouseBillboard = query.get('housemesh') !== '1';
 document.body.classList.toggle('presentation', presentation);
 document.body.classList.toggle('clean', query.get('clean') === '1');
 document.body.dataset.waterArchitecture = canonicalPandoraWaterOnly
@@ -1423,6 +1424,29 @@ box('v2-beach-house-window-trim-top', [1.35, .08, .10], [-11.2, 1.81, 6.34], tri
 box('v2-beach-house-window-trim-bottom', [1.35, .08, .10], [-11.2, .52, 6.34], trimMat);
 box('v2-beach-house-window-trim-left', [.08, 1.30, .10], [-11.9, 1.17, 6.34], trimMat);
 box('v2-beach-house-window-trim-right', [.08, 1.30, .10], [-10.5, 1.17, 6.34], trimMat);
+const houseBillboardTexture = new THREE.TextureLoader().load('/assets/beach-house-billboard.png');
+houseBillboardTexture.colorSpace = THREE.SRGBColorSpace;
+houseBillboardTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+const houseBillboard = new THREE.Group();
+houseBillboard.name = 'v2-high-fidelity-transparent-beach-house-billboard';
+houseBillboard.position.set(-8.85, 1.12, 4.82);
+const houseCard = new THREE.Mesh(
+  new THREE.PlaneGeometry(5.95, 4.96),
+  new THREE.MeshBasicMaterial({
+    map: houseBillboardTexture,
+    transparent: true,
+    alphaTest: .05,
+    depthWrite: false,
+    toneMapped: true
+  })
+);
+houseCard.name = 'v2-beach-house-photo-cutout-card';
+houseCard.position.y = .92;
+houseBillboard.add(houseCard);
+houseBillboard.visible = useHouseBillboard;
+scene.add(houseBillboard);
+const houseBillboardShadow = contactShadow('v2-beach-house-billboard-contact-shadow', -8.85, 5.1, 2.55, 1.05, .18);
+houseBillboardShadow.visible = useHouseBillboard;
 
 const barBase = box('v2-bar-base', [6.6, .92, 1.18], [7.7, .39, 4.0], barFaceMat);
 const barCounter = box('v2-bar-counter', [7.1, .16, 1.62], [7.7, .96, 4.0], woodMat);
@@ -2310,10 +2334,15 @@ function setView(name) {
   scene.traverse(obj => {
     if (!obj.name) return;
     if (hideForWaterStudy.some(pattern => pattern.test(obj.name))) obj.visible = !waterStudy;
+    if (/^v2-beach-house-(body|hip-roof|door|window-trim|soft-contact-shadow)/.test(obj.name) || /^v2-warm-window/.test(obj.name)) {
+      obj.visible = !waterStudy && !useHouseBillboard;
+    }
     if (/^v2-bar/.test(obj.name) || /^v2-glass-bottle/.test(obj.name) || /^v2-low-beach-bar/.test(obj.name)) {
       obj.visible = !waterStudy && !useBarBillboard;
     }
   });
+  houseBillboard.visible = !waterStudy && useHouseBillboard;
+  houseBillboardShadow.visible = !waterStudy && useHouseBillboard;
   barBillboard.visible = !waterStudy && useBarBillboard;
   barBillboardShadow.visible = !waterStudy && useBarBillboard;
   dog.visible = !waterStudy && !useDogBillboard;
@@ -2418,6 +2447,9 @@ function animate() {
   alhenaBillboard.lookAt(new THREE.Vector3(camera.position.x, alhenaBillboard.position.y, camera.position.z));
   alhenaBillboard.rotation.z = Math.sin(t * .58) * .010;
   alhenaBillboardShadow.material.opacity = useAlhenaBillboard ? .15 + Math.sin(t * .7) * .012 : 0;
+  houseBillboard.lookAt(new THREE.Vector3(camera.position.x, houseBillboard.position.y, camera.position.z));
+  houseBillboard.rotation.z = Math.sin(t * .11) * .003;
+  houseBillboardShadow.material.opacity = useHouseBillboard ? .15 + Math.sin(t * .31) * .008 : 0;
   barBillboard.lookAt(new THREE.Vector3(camera.position.x, barBillboard.position.y, camera.position.z));
   barBillboard.rotation.z = Math.sin(t * .18) * .004;
   barBillboardShadow.material.opacity = useBarBillboard ? .18 + Math.sin(t * .38) * .010 : 0;
