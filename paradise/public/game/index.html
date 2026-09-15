@@ -392,17 +392,17 @@ function makeSkyTexture() {
 }
 
 const skyBackdrop = new THREE.Mesh(
-  new THREE.PlaneGeometry(260, 120),
+  new THREE.PlaneGeometry(760, 260),
   new THREE.MeshBasicMaterial({ map: makeSkyTexture(), depthWrite: false })
 );
-skyBackdrop.position.set(0, 25, -126);
+skyBackdrop.position.set(0, 58, -190);
 scene.add(skyBackdrop);
 
 const sunDisk = new THREE.Mesh(
   new THREE.CircleGeometry(5.2, 64),
   new THREE.MeshBasicMaterial({ color: 0xffedaa, transparent: true, opacity: .78, depthWrite: false })
 );
-sunDisk.position.set(-28, 22, -122);
+sunDisk.position.set(-55, 38, -184);
 scene.add(sunDisk);
 
 const waterUniforms = {
