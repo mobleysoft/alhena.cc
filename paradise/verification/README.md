@@ -142,6 +142,11 @@ taken with Playwright Chromium at `1440x900`.
   attention shifts, ear flops, and bite-reactive tail motion. This improves the
   black-lab placeholder's readability but also reinforces that true quality now
   requires an imported rigged dog model with authored skeletal animation.
+- `paradise-game-v2-bar-composition.png`: live focused bar capture after adding
+  more Alhena silhouette/face/hair/accessory detail, subtle bartender idle
+  animation, a warmer planked bar front, reduced counter/canopy mass, and a
+  pulled-back camera. It improves presentation readability while preserving the
+  conclusion that a real rigged character asset is required for AAA quality.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.

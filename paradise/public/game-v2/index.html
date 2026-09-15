@@ -425,6 +425,7 @@ const sandMat = new THREE.MeshStandardMaterial({ map: sandTex, bumpMap: sandTex,
 const wetSandMat = new THREE.MeshPhysicalMaterial({ color: 0x8aa9a1, roughness: .28, metalness: .02, clearcoat: .4, clearcoatRoughness: .25, transparent: true, opacity: .64 });
 const woodMat = new THREE.MeshStandardMaterial({ map: woodTex, bumpMap: woodTex, bumpScale: .055, roughness: .76, color: 0x8e6036 });
 const darkWoodMat = new THREE.MeshStandardMaterial({ map: woodTex, bumpMap: woodTex, bumpScale: .04, roughness: .82, color: 0x5a351d });
+const barFaceMat = new THREE.MeshStandardMaterial({ map: woodTex, bumpMap: woodTex, bumpScale: .05, roughness: .78, color: 0x6f3f24 });
 const glassMat = new THREE.MeshPhysicalMaterial({ color: 0xbaedf1, roughness: .04, transmission: .45, thickness: .4, transparent: true, opacity: .66, emissive: 0x183840, emissiveIntensity: .10 });
 const clothMat = new THREE.MeshStandardMaterial({ map: clothTex, bumpMap: clothTex, bumpScale: .025, color: 0x43abc1, roughness: .72 });
 const apronMat = new THREE.MeshStandardMaterial({ map: apronTex, bumpMap: apronTex, bumpScale: .018, color: 0xd9b66e, roughness: .78 });
@@ -827,11 +828,16 @@ roof.castShadow = true;
 scene.add(roof);
 box('v2-warm-window', [1.1, 1.2, .08], [-11.2, 1.17, 6.28], glassMat);
 
-box('v2-bar-base', [6.6, 1.14, 1.35], [7.7, .50, 4.0], darkWoodMat);
-box('v2-bar-counter', [7.1, .24, 1.8], [7.7, 1.14, 4.0], woodMat);
-box('v2-bar-canopy', [7.4, .13, 2.4], [7.7, 2.82, 3.9], new THREE.MeshStandardMaterial({ color: 0xc99b55, roughness: .9 }));
+box('v2-bar-base', [6.6, .92, 1.18], [7.7, .39, 4.0], barFaceMat);
+box('v2-bar-counter', [7.1, .16, 1.62], [7.7, .96, 4.0], woodMat);
+box('v2-bar-canopy', [7.4, .10, 2.25], [7.7, 3.02, 3.9], new THREE.MeshStandardMaterial({ color: 0xc99b55, roughness: .9 }));
 contactShadow('v2-bar-soft-contact-shadow', 7.7, 4.4, 3.8, 1.1, .22);
 for (const x of [4.1, 11.3]) for (const z of [2.85, 5.0]) cyl('v2-bar-post', .09, 2.85, [x, 1.43, z], [0,0,0], darkWoodMat, 14);
+for (let i = 0; i < 6; i++) {
+  const x = 4.75 + i * 1.18;
+  box('v2-bar-front-warm-plank-line', [.045, .74, .035], [x, .43, 4.71], woodMat);
+}
+box('v2-bar-front-upper-highlight', [6.2, .055, .04], [7.7, .86, 4.72], woodMat);
 for (const [x, z, h] of [[5.45, 3.08, .46], [5.78, 3.05, .58], [9.75, 3.06, .50], [10.08, 3.08, .38]]) {
   cyl('v2-glass-bottle-on-bar', .075, h, [x, 1.55 + h * .5, z], [0,0,0], glassMat, 18);
 }
@@ -898,6 +904,7 @@ function makeAlhena() {
   g.position.set(7.7, 1.60, 3.16);
   const torso = new THREE.Mesh(new THREE.CapsuleGeometry(.36, .88, 10, 24), clothMat);
   torso.position.y = .12;
+  torso.scale.set(.86, 1.0, .72);
   const skirt = new THREE.Mesh(new THREE.CylinderGeometry(.54, .38, .58, 28), clothMat);
   skirt.name = 'v2-alhena-dress-skirt';
   skirt.position.y = -.46;
@@ -908,6 +915,10 @@ function makeAlhena() {
   const hair = new THREE.Mesh(new THREE.SphereGeometry(.31, 32, 16), furMat);
   hair.position.set(0, .94, -.11);
   hair.scale.set(1.05, .82, .68);
+  const hairCap = new THREE.Mesh(new THREE.SphereGeometry(.305, 32, 12, 0, Math.PI * 2, 0, Math.PI * .62), furMat);
+  hairCap.name = 'v2-alhena-shaped-hair-cap';
+  hairCap.position.set(0, .98, .02);
+  hairCap.scale.set(1.06, .72, .82);
   const bun = new THREE.Mesh(new THREE.SphereGeometry(.13, 18, 9), furMat);
   bun.name = 'v2-alhena-hair-bun';
   bun.position.set(0, .97, -.32);
@@ -921,10 +932,26 @@ function makeAlhena() {
     const eye = new THREE.Mesh(new THREE.SphereGeometry(.022, 10, 6), eyeMat);
     eye.position.set(x, .88, .265);
     g.add(eye);
+    const eyeCatch = new THREE.Mesh(new THREE.SphereGeometry(.006, 6, 4), new THREE.MeshBasicMaterial({ color: 0xeefcff }));
+    eyeCatch.name = 'v2-alhena-eye-catchlight';
+    eyeCatch.position.set(x - .006, .888, .282);
+    g.add(eyeCatch);
     const brow = new THREE.Mesh(new THREE.CapsuleGeometry(.007, .07, 3, 8), furMat);
     brow.position.set(x, .93, .27);
     brow.rotation.z = x < 0 ? .18 : -.18;
     g.add(brow);
+    const cheek = new THREE.Mesh(new THREE.SphereGeometry(.026, 10, 5), new THREE.MeshBasicMaterial({ color: 0xc57f66, transparent: true, opacity: .42 }));
+    cheek.name = 'v2-alhena-warm-cheek';
+    cheek.position.set(x * 1.62, .805, .282);
+    cheek.scale.set(1.45, .55, .25);
+    g.add(cheek);
+  }
+  for (const x of [-.285, .285]) {
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(.045, 12, 6), skinMat);
+    ear.name = 'v2-alhena-ear';
+    ear.position.set(x, .86, .035);
+    ear.scale.set(.52, 1.0, .28);
+    g.add(ear);
   }
   const nose = new THREE.Mesh(new THREE.ConeGeometry(.025, .075, 10), skinMat);
   nose.name = 'v2-alhena-nose';
@@ -941,7 +968,15 @@ function makeAlhena() {
   const drink = new THREE.Mesh(new THREE.CylinderGeometry(.045, .06, .18, 18), glassMat);
   drink.name = 'v2-alhena-tray-glass';
   drink.position.set(-.56, .13, .24);
+  const drinkGlow = new THREE.Mesh(new THREE.SphereGeometry(.040, 10, 6), new THREE.MeshBasicMaterial({ color: 0xffd98a, transparent: true, opacity: .40 }));
+  drinkGlow.name = 'v2-alhena-drink-warm-glow';
+  drinkGlow.position.set(-.56, .18, .24);
+  const necklace = new THREE.Mesh(new THREE.TorusGeometry(.13, .008, 5, 28, Math.PI * 1.38), new THREE.MeshStandardMaterial({ color: 0xd8b34f, roughness: .25, metalness: .75 }));
+  necklace.name = 'v2-alhena-necklace';
+  necklace.position.set(0, .58, .18);
+  necklace.rotation.x = Math.PI * .46;
   const arms = [];
+  const hands = [];
   for (const x of [-.44, .44]) {
     const arm = new THREE.Mesh(new THREE.CapsuleGeometry(.055, .58, 6, 12), skinMat);
     arm.position.set(x, .28, .12);
@@ -951,12 +986,13 @@ function makeAlhena() {
     const hand = new THREE.Mesh(new THREE.SphereGeometry(.07, 14, 8), skinMat);
     hand.name = 'v2-alhena-hand';
     hand.position.set(x < 0 ? -.61 : .61, .02, .22);
+    hands.push(hand);
     g.add(hand);
   }
-  g.add(torso, skirt, neck, head, hair, bun, apron, apronTie, nose, smile, tray, drink);
+  g.add(torso, skirt, neck, head, hair, hairCap, bun, apron, apronTie, nose, smile, tray, drink, drinkGlow, necklace);
   g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   scene.add(g);
-  g.userData = { arms, tray, drink };
+  g.userData = { torso, head, hair, hairCap, bun, arms, hands, tray, drink, drinkGlow, necklace, smile };
   return g;
 }
 const alhena = makeAlhena();
@@ -1224,7 +1260,7 @@ for (let i = 0; i < 12; i++) {
 const views = {
   shore: { pos: [13.0, 4.2, 17.5], target: [-1.2, .75, -8.5] },
   water: { pos: [-7.2, 2.15, -10.5], target: [-17.0, .25, -82] },
-  bar: { pos: [8.10, 2.55, 8.25], target: [7.58, 1.58, 3.10] },
+  bar: { pos: [8.9, 2.95, 9.8], target: [7.55, 1.76, 3.02] },
   dog: { pos: [4.85, 1.28, 8.15], target: [1.55, .52, 5.62] }
 };
 
@@ -1366,11 +1402,21 @@ function animate() {
   sunGlow.lookAt(camera.position);
   controls.update();
   alhena.rotation.y = Math.sin(t * .45) * .06;
+  alhena.userData.torso.scale.y = 1.0 + Math.sin(t * 1.2) * .018;
+  alhena.userData.head.rotation.y = Math.sin(t * .62) * .10 + (play.bite ? -.18 : 0);
+  alhena.userData.head.rotation.x = Math.sin(t * .48) * .035 + (play.bite ? -.045 : 0);
+  alhena.userData.hair.rotation.y = alhena.userData.head.rotation.y * .35;
+  alhena.userData.hairCap.rotation.y = alhena.userData.head.rotation.y * .45;
+  alhena.userData.bun.position.y = .97 + Math.sin(t * 1.1 + .8) * .010;
   alhena.userData.arms.forEach((arm, i) => {
-    arm.rotation.z = (i === 0 ? -.55 : .55) + Math.sin(t * 1.1 + i) * .045;
+    arm.rotation.z = (i === 0 ? -.55 : .55) + Math.sin(t * 1.1 + i) * .045 + (play.bite ? (i === 0 ? -.05 : .05) : 0);
+    alhena.userData.hands[i].position.y = .02 + Math.sin(t * 1.1 + i) * .014;
   });
   alhena.userData.tray.position.y = .02 + Math.sin(t * 1.0) * .012;
   alhena.userData.drink.position.y = .13 + Math.sin(t * 1.0) * .012;
+  alhena.userData.drinkGlow.position.y = .18 + Math.sin(t * 1.0) * .012;
+  alhena.userData.necklace.rotation.z = Math.sin(t * .9) * .035;
+  alhena.userData.smile.scale.x = 1.0 + (play.bite ? .12 : Math.sin(t * .7) * .03);
   dog.position.x = 1.6 + Math.sin(t * .55) * .42;
   dog.position.y = .43 + Math.max(0, Math.sin(t * 2.2)) * .025;
   dog.rotation.y = -.16 + Math.sin(t * .55 + .7) * .28;
