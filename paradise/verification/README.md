@@ -189,6 +189,11 @@ taken with Playwright Chromium at `1440x900`.
   public launcher now opens the Three.js rebuild in `presentation=1` mode. The
   HUD is subdued rather than fully hidden, the scene remains playable, and the
   `H` key toggles a `hud-hidden` class for clean capture/showcase moments.
+- `paradise-game-v2-cinematic-atmosphere.png`: live presentation-mode shore
+  capture after adding preset-driven volumetric sun shafts and layered ocean
+  mist cards. This improves sky/ocean depth and golden-hour readability without
+  relying on more flat prop art; it is still a bridge until real HDRI, authored
+  skyboxes, and PBR scene assets replace the procedural stand-ins.
 - `scripts/verify-game.sh`: production verifier now covers the legacy canvas
   game, the root launcher, and the primary `/game-v2/` route. It syntax-checks
   both module scripts, validates asset budgets, checks root CTA markers, and

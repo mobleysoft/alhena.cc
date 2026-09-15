@@ -94,6 +94,8 @@ v2_markers=(
   "v2-pbr-sky-ocean-environment-map"
   "v2-layered-shorebreak-wash-sheet"
   "v2-layered-atmospheric-cloud-bank"
+  "v2-cinematic-atmospheric-sun-shafts"
+  "v2-layered-depth-mist-over-ocean"
   "v2-black-lab-procedural-rig-standin"
   "v2-alhena-bartender-procedural-standin"
   "v2-near-surface-fish-glint"

@@ -340,6 +340,28 @@ sunGlow.name = 'v2-volumetric-sun-glow';
 sunGlow.position.copy(sunDisk.position);
 scene.add(sunGlow);
 
+const sunShafts = new THREE.Group();
+sunShafts.name = 'v2-cinematic-atmospheric-sun-shafts';
+scene.add(sunShafts);
+for (let i = 0; i < 8; i++) {
+  const ray = new THREE.Mesh(
+    new THREE.PlaneGeometry(7.5 + i * 2.6, 95 + i * 8),
+    new THREE.MeshBasicMaterial({
+      color: 0xffd27c,
+      transparent: true,
+      opacity: .020 - i * .0012,
+      depthWrite: false,
+      fog: false,
+      blending: THREE.AdditiveBlending
+    })
+  );
+  ray.name = 'v2-golden-hour-volumetric-light-shaft';
+  ray.position.set(-45 + i * 13, 19 - i * .55, -91 - i * 4);
+  ray.rotation.z = -.93 + i * .045;
+  ray.renderOrder = 1;
+  sunShafts.add(ray);
+}
+
 const cloudMat = new THREE.MeshBasicMaterial({ color: 0xf4fbff, transparent: true, opacity: .18, depthWrite: false, fog: false });
 const cloudBank = new THREE.Group();
 cloudBank.name = 'v2-layered-atmospheric-cloud-bank';
@@ -359,6 +381,27 @@ const horizonHaze = new THREE.Mesh(
 horizonHaze.name = 'v2-ocean-horizon-haze-gradient-card';
 horizonHaze.position.set(0, 5.5, -120);
 scene.add(horizonHaze);
+
+const mistBands = [];
+for (let i = 0; i < 5; i++) {
+  const band = new THREE.Mesh(
+    new THREE.PlaneGeometry(190 - i * 18, 5.4 + i * 1.25, 1, 1),
+    new THREE.MeshBasicMaterial({
+      color: 0xd6eef0,
+      transparent: true,
+      opacity: .052 - i * .006,
+      depthWrite: false,
+      fog: false,
+      blending: THREE.NormalBlending
+    })
+  );
+  band.name = 'v2-layered-depth-mist-over-ocean';
+  band.position.set(0, 2.2 + i * 1.2, -50 - i * 19);
+  band.renderOrder = 2;
+  scene.add(band);
+  mistBands.push(band);
+}
+
 
 function makeTexture(size, painter) {
   const canvas = document.createElement('canvas');
@@ -1622,6 +1665,14 @@ function applyEnvironment(timeName = activeTime, weatherName = activeWeather) {
   skyUniforms.uSunBloom.value = time.bloom;
   horizonHaze.material.color.setHex(time.fog);
   horizonHaze.material.opacity = (activeTime === 'night' ? .08 : .16) + weather.cloud * .16;
+  sunShafts.children.forEach((ray, i) => {
+    ray.material.color.setHex(time.sun);
+    ray.material.opacity = (activeTime === 'night' ? .003 : activeTime === 'noon' ? .009 : .020) * time.bloom * (1 - i * .06);
+  });
+  mistBands.forEach((band, i) => {
+    band.material.color.setHex(activeTime === 'sunset' ? 0xffd0aa : activeTime === 'night' ? 0x284862 : 0xd6eef0);
+    band.material.opacity = ((activeTime === 'night' ? .030 : .052) + weather.cloud * .025) * (1 - i * .12);
+  });
   cloudBank.children.forEach((cloud, i) => {
     cloud.material.color.setHex(activeTime === 'sunset' ? 0xffd2b2 : activeTime === 'night' ? 0x4d6284 : 0xf4fbff);
     cloud.material.opacity = ((activeTime === 'night' ? .08 : .13) + weather.cloud * .22) * (i % 3 === 0 ? .72 : 1);
@@ -1681,6 +1732,14 @@ function animate() {
   sunDisk.lookAt(camera.position);
   sunGlow.lookAt(camera.position);
   horizonHaze.lookAt(camera.position);
+  sunShafts.children.forEach((ray, i) => {
+    ray.lookAt(camera.position);
+    ray.rotation.z += -.93 + i * .045 + Math.sin(t * .12 + i) * .012;
+  });
+  mistBands.forEach((band, i) => {
+    band.lookAt(camera.position);
+    band.position.x = Math.sin(t * .06 + i * 1.7) * (.22 + i * .05);
+  });
   cloudBank.children.forEach((cloud, i) => {
     cloud.lookAt(camera.position);
     cloud.position.x += Math.sin(t * .07 + i) * .0018;
