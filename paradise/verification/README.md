@@ -171,6 +171,11 @@ taken with Playwright Chromium at `1440x900`.
   cleats, a coiled rope, beach-house door/window trim, a warmer bar face, bar
   plank highlights, and stools. A first shingle attempt was rejected before
   commit because it created jagged roof artifacts.
+- `scripts/verify-game.sh`: production verifier now covers the legacy canvas
+  game, the root launcher, and the primary `/game-v2/` route. It syntax-checks
+  both module scripts, validates asset budgets, checks root CTA markers, and
+  verifies V2 markers for the JONSWAP ocean, shorebreak, atmosphere, fish,
+  mobile controls, character stand-ins, and runtime asset loading.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.
