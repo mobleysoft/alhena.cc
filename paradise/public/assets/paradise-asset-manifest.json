@@ -9,6 +9,7 @@
       "type": "rigged-character",
       "targetPath": "/assets/models/alhena-bartender.glb",
       "status": "needed",
+      "loadByDefault": false,
       "currentFallback": "procedural modest bartender mesh",
       "requirements": [
         "modest beach bartender wardrobe",
@@ -22,6 +23,7 @@
       "type": "rigged-animal",
       "targetPath": "/assets/models/black-lab.glb",
       "status": "needed",
+      "loadByDefault": false,
       "currentFallback": "procedural articulated black lab mesh",
       "requirements": [
         "walk, idle, sniff, sit, tail-wag, and look-at-player animations",
@@ -33,7 +35,8 @@
       "id": "shoreline_environment",
       "type": "environment",
       "targetPath": "/assets/models/paradise-shoreline.glb",
-      "status": "needed",
+      "status": "candidate",
+      "loadByDefault": false,
       "currentFallback": "procedural shore, dock, bar, beach house, shells, rocks, sea oats",
       "requirements": [
         "authored shoreline terrain",
@@ -46,6 +49,7 @@
       "type": "shader-system",
       "targetPath": "inline:game/index.html#makeOceanPass+waterMat",
       "status": "active",
+      "loadByDefault": true,
       "currentFallback": "none",
       "requirements": [
         "JONSWAP-inspired wave stack",

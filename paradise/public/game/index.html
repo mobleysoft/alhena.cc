@@ -1997,6 +1997,11 @@ function prepareRuntimeModel(model) {
 }
 
 function loadRuntimeAsset(asset) {
+  const shouldLoadCandidate = query.get('assets') === '1' || query.get(`asset_${asset.id}`) === '1';
+  if (asset.loadByDefault === false && !shouldLoadCandidate) {
+    markAssetDetail(asset.id, 'candidate');
+    return;
+  }
   if (asset.status === 'active' || !asset.targetPath?.endsWith('.glb')) {
     markAssetDetail(asset.id, asset.status === 'active' ? 'active' : 'fallback');
     return;

@@ -17,6 +17,12 @@ taken with Playwright Chromium at `1440x900`.
 - `paradise-water3d-offshore-cinematic.png`: adjusted `water3d=1` capture after
   lazy-loading the dependency and moving the reflector offshore; still kept
   experimental because the visible banding is weaker than the shader-first path.
+- `paradise-shoreline-glb-cinematic.png`: first production capture after adding
+  `paradise-shoreline.glb`; rejected as a default because the candidate terrain
+  over-darkened the foreground.
+- `paradise-candidate-default-cinematic.png`: production capture after changing
+  runtime model slots to candidate-only loading unless `assets=1`; verifies the
+  default visual is restored while the GLB remains deployed for testing.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.

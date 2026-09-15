@@ -33,7 +33,7 @@ for (const slot of pipeline.slots) {
 
   const absolute = path.join(root, slot.path);
   if (!existsSync(absolute)) {
-    rows.push({ id: slot.id, status: slot.required ? 'MISSING_REQUIRED' : 'missing_optional', sizeMiB: 0, path: slot.path });
+    rows.push({ id: slot.id, status: slot.required ? 'MISSING_REQUIRED' : 'missing_optional', sizeMiB: 0, path: slot.path, loadByDefault: false });
     if (slot.required) fail(`${slot.id} required asset is missing at ${slot.path}`);
     continue;
   }
@@ -42,7 +42,9 @@ for (const slot of pipeline.slots) {
   const sizeMiB = mib(info.size);
   presentBytes += info.size;
   if (sizeMiB > slot.maxMiB) fail(`${slot.id} is ${sizeMiB.toFixed(2)} MiB, over ${slot.maxMiB} MiB budget`);
-  rows.push({ id: slot.id, status: 'present', sizeMiB: Number(sizeMiB.toFixed(2)), path: slot.path });
+  const manifestEntry = (runtimeManifest.assets || []).find(asset => asset.id === slot.id) || {};
+  const status = manifestEntry.status === 'candidate' || manifestEntry.loadByDefault === false ? 'present_candidate' : 'present';
+  rows.push({ id: slot.id, status, sizeMiB: Number(sizeMiB.toFixed(2)), path: slot.path, loadByDefault: manifestEntry.loadByDefault !== false });
 }
 
 const totalMiB = mib(presentBytes);
