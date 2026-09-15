@@ -59,6 +59,25 @@ taken with Playwright Chromium at `1440x900`.
 - `paradise-game-v2-play-cast.png`: live V2 capture after pressing Space and
   clicking Reel in production; verifies the bobber, line, bite status, and
   tension meter path.
+- `paradise-game-v2-dog-rig.png`: live V2 capture after adding dog paw, collar,
+  ear, eye, and rim-light geometry; rejected as a weak proof because V2 had not
+  yet wired initial `view` query routing.
+- `paradise-game-v2-alhena-bar.png`: live V2 capture after adding Alhena tray,
+  drink, apron, face, hair, and arm detail; rejected as a weak proof because V2
+  had not yet wired initial `view` query routing.
+- `paradise-game-v2-focused-dog.png`: live V2 focused dog capture after wiring
+  `?view=dog`; proves the procedural rig is more readable but still needs a real
+  skeletal GLB/animation asset to approach AAA.
+- `paradise-game-v2-focused-bar.png`: live V2 focused bar capture after wiring
+  `?view=bar`; rejected because the canopy/counter occluded Alhena too heavily.
+- `paradise-game-v2-character-dog-final.png`: live V2 dog composition after
+  camera refinement; verifies a stronger procedural black-lab stand-in with
+  paws, collar, ears, eyes, body bob, tail wag, and gait animation.
+- `paradise-game-v2-character-bar-final.png`: live V2 bar composition before the
+  final canopy/counter correction; kept as regression evidence.
+- `paradise-game-v2-character-bar-composed.png`: live V2 bar composition after
+  raising the canopy, lowering the counter, lifting Alhena, and retargeting the
+  camera so the bartender reads as a character instead of an occluded blob.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.
