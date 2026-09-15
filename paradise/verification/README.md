@@ -204,6 +204,16 @@ taken with Playwright Chromium at `1440x900`.
   wet rock clusters, and driftwood. This gives the foreground more geometric
   depth than texture-only sand, while keeping the scene lightweight enough for
   the current Cloudflare-hosted browser build.
+- `paradise-game-v2-pandorachat-water-pass-final.png`: live clean water capture
+  after restoring the old PandoraChat architecture as a dedicated full-screen
+  WebGL ocean pass behind the Three.js scene. The pass uses a JONSWAP-inspired
+  spectrum, analytical normals, Fresnel/sky reflection, subsurface color, foam,
+  fog, and ACES-style tone mapping. In `view=water`, shore props and the V2 mesh
+  water are hidden so the proven optical shader can be evaluated directly.
+- `paradise-game-v2-dog-four-beat-gait.png`: live dog-focused capture after
+  replacing simple sine bobbing with a procedural quadruped stand-in that stores
+  base transforms, offsets paw/hock/shoulder phases, plants paws, sniffs, wags,
+  and reacts to bite state. This remains a placeholder pending a real rigged GLB.
 - `scripts/verify-game.sh`: production verifier now covers the legacy canvas
   game, the root launcher, and the primary `/game-v2/` route. It syntax-checks
   both module scripts, validates asset budgets, checks root CTA markers, and

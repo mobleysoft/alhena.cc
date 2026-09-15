@@ -10,6 +10,10 @@
 html, body { width: 100%; height: 100%; overflow: hidden; background: #06101a; color: #f8ebc7; font-family: ui-sans-serif, system-ui, sans-serif; }
 canvas { display: block; width: 100vw; height: 100vh; }
 body { touch-action: none; }
+#ocean-pass,
+.three-pass { position: fixed; inset: 0; width: 100%; height: 100%; }
+#ocean-pass { z-index: 0; background: #07131b; }
+.three-pass { z-index: 1; }
 .lens {
   position: fixed;
   inset: 0;
@@ -164,6 +168,7 @@ body.clean .caption {
 </style>
 </head>
 <body>
+<canvas id="ocean-pass" data-water-system="v2-pandorachat-fullscreen-ocean-pass" aria-hidden="true"></canvas>
 <div class="lens" aria-hidden="true"></div>
 <div class="hud">
   <div class="kicker">Paradise V2 · real 3D architecture</div>
@@ -220,9 +225,12 @@ const cinematic = query.get('quality') === 'cinematic';
 const presentation = query.get('presentation') === '1' || query.get('showcase') === '1';
 document.body.classList.toggle('presentation', presentation);
 document.body.classList.toggle('clean', query.get('clean') === '1');
-const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+const oceanCanvas = document.getElementById('ocean-pass');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, premultipliedAlpha: false, powerPreference: 'high-performance' });
+renderer.domElement.className = 'three-pass';
 renderer.setPixelRatio(Math.min(devicePixelRatio, cinematic ? 2 : 1.75));
 renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x000000, 0);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -230,7 +238,7 @@ renderer.toneMappingExposure = cinematic ? 1.12 : 1.05;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(cinematic ? 0x78bdd5 : 0x91cfe0);
+scene.background = null;
 scene.fog = new THREE.FogExp2(0x9fd0dc, cinematic ? 0.0034 : 0.0065);
 
 const camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.05, 650);
@@ -634,6 +642,220 @@ const furMat = new THREE.MeshStandardMaterial({ map: furTex, bumpMap: furTex, bu
 const furRimMat = new THREE.MeshStandardMaterial({ map: furTex, bumpMap: furTex, bumpScale: .030, color: 0x3b2f27, roughness: .50, metalness: .03, envMapIntensity: .30 });
 const eyeMat = new THREE.MeshBasicMaterial({ color: 0x080504 });
 
+function makePandoraOceanPass(canvas) {
+  const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+  if (!gl) return null;
+  const vertex = `attribute vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }`;
+  const fragment = `
+    precision highp float;
+    uniform vec2 uRes;
+    uniform float uTime;
+    uniform float uGold;
+    uniform float uWind;
+    uniform float uChop;
+    uniform float uFoamT;
+    uniform vec3 uSkyTint;
+    const float PI = 3.14159265359;
+    const float TAU = 6.28318530718;
+    const float G = 9.81;
+    float hash(float n){ return fract(sin(n) * 43758.5453123); }
+    float hash2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+    float noise(vec2 p) {
+      vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
+      return mix(mix(hash2(i), hash2(i + vec2(1.0, 0.0)), u.x), mix(hash2(i + vec2(0.0, 1.0)), hash2(i + vec2(1.0, 1.0)), u.x), u.y);
+    }
+    float fbm(vec2 p) {
+      float v = 0.0, a = 0.5;
+      for (int i = 0; i < 5; i++) {
+        v += noise(p) * a;
+        p = mat2(1.7, -1.05, 1.05, 1.7) * p + 13.7;
+        a *= 0.48;
+      }
+      return v;
+    }
+    void waveComponent(float i, out vec2 dir, out float k, out float omega, out float amp, out float phase) {
+      float t = i / 31.0;
+      float spread = mix(1.05, 0.12, smoothstep(0.0, 1.0, t));
+      float theta = -PI * 0.5 + (t - 0.5) * PI * spread + 0.22 + (hash(i * 8.31) - 0.5) * 0.34;
+      dir = normalize(vec2(cos(theta), sin(theta)));
+      float wind = max(uWind, 1.5);
+      float wp = 0.13 * G / wind * TAU;
+      float wMin = wp * 0.50;
+      float wMax = wp * 3.50;
+      omega = wMin * pow(wMax / wMin, t);
+      k = omega * omega / G;
+      float sigma = omega <= wp ? 0.07 : 0.09;
+      float peak = exp(-pow(omega - wp, 2.0) / (2.0 * sigma * sigma * wp * wp));
+      float spectrum = 0.0081 * G * G / pow(omega, 5.0) * exp(-1.25 * pow(wp / omega, 4.0)) * pow(3.3, peak);
+      amp = clamp(sqrt(2.0 * spectrum * ((wMax - wMin) / 32.0)) * 0.52 * wind / 12.0 * uChop, 0.0, 2.20);
+      phase = hash(i * 19.19 + 3.7) * TAU;
+    }
+    struct WaveSample {
+      float h;
+      vec2 grad;
+      float curvature;
+      float energy;
+    };
+    WaveSample sampleJonswapSurface(vec2 p) {
+      WaveSample s;
+      s.h = 0.0;
+      s.grad = vec2(0.0);
+      s.curvature = 0.0;
+      s.energy = 0.0;
+      for (int i = 0; i < 32; i++) {
+        vec2 dir; float k; float omega; float amp; float phase;
+        waveComponent(float(i), dir, k, omega, amp, phase);
+        float w = dot(dir, p) * k - omega * uTime + phase;
+        float sw = sin(w);
+        float cw = cos(w);
+        s.h += amp * sw;
+        s.grad += dir * (amp * k * cw);
+        s.curvature += -amp * k * k * sw;
+        s.energy += amp * amp * k;
+      }
+      s.energy = clamp(s.energy * 0.08, 0.0, 1.0);
+      return s;
+    }
+    vec3 waterNormal(vec2 p, float px) {
+      WaveSample s = sampleJonswapSurface(p);
+      vec3 macro = normalize(vec3(-s.grad.x, 1.0, -s.grad.y));
+      float microScale = mix(28.0, 74.0, clamp(px * 6.0, 0.0, 1.0));
+      vec2 capillary = vec2(
+        fbm(p * microScale + vec2(uTime * .24, -uTime * .17)),
+        fbm(p * (microScale * 1.93) + vec2(-uTime * .31, uTime * .19))
+      ) - 0.5;
+      vec2 windRipple = vec2(
+        sin(dot(p, vec2(1.7, 3.1)) + uTime * 1.7),
+        cos(dot(p, vec2(-2.4, 1.9)) - uTime * 1.2)
+      ) * 0.026;
+      return normalize(macro + vec3(capillary.x + windRipple.x, 0.0, capillary.y + windRipple.y) * (0.10 + uWind * 0.014));
+    }
+    vec3 skyColor(vec2 uv) {
+      vec3 zenith = uSkyTint * 2.5 + vec3(0.035, 0.08, 0.15);
+      vec3 horizonCol = mix(vec3(0.30, 0.47, 0.55), vec3(0.70, 0.52, 0.28), uGold * 0.36);
+      vec3 sky = mix(horizonCol, zenith, smoothstep(0.36, 1.0, uv.y));
+      vec2 sunUv = vec2(0.34, 0.58);
+      float sun = exp(-distance(uv, sunUv) * 18.0);
+      float glow = exp(-distance(uv, sunUv) * 3.7);
+      float clouds = smoothstep(0.48, 0.78, fbm(vec2(uv.x * 3.2 + uTime * .008, uv.y * 5.5)));
+      clouds *= smoothstep(0.45, 0.82, uv.y) * smoothstep(1.08, 0.72, uv.y);
+      sky = mix(sky, vec3(0.78, 0.86, 0.90), clouds * (0.07 + uGold * 0.06));
+      sky += vec3(1.0, 0.70, 0.32) * (sun * .48 + glow * .055) * uGold;
+      return sky;
+    }
+    vec3 acesTone(vec3 x) {
+      return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
+    }
+    vec3 oceanColor(vec2 uv, vec2 q, float horizon) {
+      float d = clamp((horizon - uv.y) / horizon, 0.0, 1.0);
+      float range = 1.0 / max(0.024, pow(d + 0.016, 1.86));
+      vec2 p = vec2(q.x * range * 2.42, range * 3.95 - uTime * (0.34 + uWind * 0.017));
+      p += vec2(sampleJonswapSurface(p * 0.21 + 8.0).h, sampleJonswapSurface(p * 0.17 - 4.0).h) * 0.028 * uChop;
+      WaveSample sample = sampleJonswapSurface(p);
+      vec3 n = waterNormal(p, range * 0.010);
+      float h = sample.h;
+      float curvature = clamp(abs(sample.curvature) * 0.105 + sample.energy * 0.36, 0.0, 1.0);
+      float slope = clamp(length(sample.grad) * 0.82 + (1.0 - n.y) * 2.2, 0.0, 1.0);
+      vec3 viewDir = normalize(vec3(q.x * .48, d * .42 + .13, 1.0));
+      float fresnel = 0.0204 + 0.9796 * pow(1.0 - clamp(dot(n, viewDir), 0.0, 1.0), 5.0);
+      vec3 refl = skyColor(vec2(uv.x + n.x * .095, horizon + d * .60 + n.z * .075));
+      vec3 deep = vec3(0.001, 0.020, 0.085);
+      vec3 mid = vec3(0.004, 0.112, 0.185);
+      vec3 shallow = vec3(0.018, 0.215, 0.285);
+      float nearShore = smoothstep(0.55, 1.0, d);
+      float farDepth = smoothstep(0.07, 0.42, d) * (1.0 - nearShore * 0.44);
+      vec3 body = mix(mid, shallow, nearShore);
+      body = mix(body, deep, farDepth * 0.70);
+      float transmission = smoothstep(-0.22, 0.38, h) * smoothstep(0.14, 0.94, d);
+      float sss = pow(max(dot(n, normalize(vec3(-0.34, 0.84, 0.40))), 0.0), 2.0);
+      body += vec3(0.00, 0.42, 0.36) * transmission * 0.22;
+      body += vec3(0.08, 0.30, 0.26) * sss * nearShore * (0.18 + uGold * 0.08);
+      body += vec3(0.0, 0.20, 0.23) * curvature * 0.16;
+      float crestEnergy = smoothstep(0.10, 0.48, abs(h)) * max(slope, curvature);
+      float foamNoise = fbm(p * 5.6 + vec2(uTime * .08, -uTime * .05));
+      float microFoam = smoothstep(uFoamT * .50, uFoamT * 1.18, abs(h)) * smoothstep(.48, .84, foamNoise);
+      float shoreLine = 0.218 + 0.012 * sin(q.x * 3.4 + uTime * .18);
+      float shoreFoam = smoothstep(0.030, 0.0, abs(uv.y - shoreLine)) * smoothstep(.34, .82, fbm(vec2(q.x * 24.0, uTime * .42)));
+      float foam = clamp(crestEnergy * microFoam + smoothstep(0.08, 0.38, -sample.curvature) * .26 + shoreFoam * .50, 0.0, .86);
+      vec3 water = mix(body, refl, fresnel * mix(.36, .68, smoothstep(0.0, 0.18, d)));
+      float windLines = smoothstep(.42, .88, fbm(vec2(p.x * .08 + h * 1.7, p.y * .18 - uTime * .26)));
+      water += vec3(.025, .185, .205) * pow(clamp(slope * .62 + curvature * .32, 0.0, 1.0), 1.35) * windLines * smoothstep(.02, .78, d) * 1.45;
+      vec3 sunDir = normalize(vec3(-0.34, .86, .38));
+      float spec = pow(max(dot(n, normalize(viewDir + sunDir)), 0.0), mix(58.0, 220.0, smoothstep(0.10, 0.92, d)));
+      float glints = smoothstep(.62, .96, fbm(p * 31.0 + vec2(uTime * .55, -uTime * .21)));
+      water += vec3(1.0, .84, .46) * spec * glints * (0.9 + uGold * 1.6);
+      water = mix(water, vec3(.88, .97, .99), foam * .46);
+      water = mix(water, mix(vec3(.20, .33, .39), vec3(.58, .67, .67), uGold * .14), smoothstep(0.24, 0.0, d) * .28);
+      return water;
+    }
+    void main() {
+      vec2 uv = gl_FragCoord.xy / uRes;
+      vec2 q = (gl_FragCoord.xy * 2.0 - uRes) / min(uRes.x, uRes.y);
+      float horizon = 0.405 + 0.008 * sin(q.x * 1.3 + uTime * .04);
+      vec3 col = skyColor(uv);
+      if (uv.y < horizon) {
+        col = mix(col, oceanColor(uv, q, horizon), smoothstep(0.0, 0.006, clamp((horizon - uv.y) / horizon, 0.0, 1.0)));
+      }
+      col *= 1.0 - dot(q, q) * 0.035;
+      col = acesTone(col * 1.18);
+      col = pow(col, vec3(1.0 / 2.2));
+      gl_FragColor = vec4(col, 1.0);
+    }`;
+  function compile(type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader));
+    return shader;
+  }
+  const program = gl.createProgram();
+  gl.attachShader(program, compile(gl.VERTEX_SHADER, vertex));
+  gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fragment));
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
+  const buffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+  const pos = gl.getAttribLocation(program, 'p');
+  const uniforms = {
+    res: gl.getUniformLocation(program, 'uRes'),
+    time: gl.getUniformLocation(program, 'uTime'),
+    gold: gl.getUniformLocation(program, 'uGold'),
+    wind: gl.getUniformLocation(program, 'uWind'),
+    chop: gl.getUniformLocation(program, 'uChop'),
+    foamT: gl.getUniformLocation(program, 'uFoamT'),
+    skyTint: gl.getUniformLocation(program, 'uSkyTint')
+  };
+  return {
+    render(time, preset) {
+      const dpr = Math.min(window.devicePixelRatio || 1, cinematic ? 1.35 : 1.0);
+      const w = Math.max(1, Math.floor(canvas.clientWidth * dpr));
+      const h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.useProgram(program);
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      gl.enableVertexAttribArray(pos);
+      gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
+      gl.uniform2f(uniforms.res, canvas.width, canvas.height);
+      gl.uniform1f(uniforms.time, time);
+      gl.uniform1f(uniforms.gold, preset.gold);
+      gl.uniform1f(uniforms.wind, preset.wind);
+      gl.uniform1f(uniforms.chop, preset.chop);
+      gl.uniform1f(uniforms.foamT, preset.foamT);
+      gl.uniform3f(uniforms.skyTint, preset.skyTint[0], preset.skyTint[1], preset.skyTint[2]);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
+  };
+}
+
+const pandoraOceanPass = makePandoraOceanPass(oceanCanvas);
+let pandoraOceanPreset = { gold: 1.0, wind: 10.8, chop: 1.0, foamT: .32, skyTint: [.08, .18, .32] };
+if (pandoraOceanPass) skyDome.visible = false;
+
 const oceanUniforms = {
   uTime: { value: 0 },
   uWind: { value: 10.8 },
@@ -822,10 +1044,11 @@ const oceanMat = new THREE.ShaderMaterial({
       col = pow(col, vec3(.86));
       col = vec3(1.0) - exp(-col * .88);
       col = pow(col, vec3(1.0 / 2.2));
-      gl_FragColor = vec4(col, 1.0);
+      gl_FragColor = vec4(col, .52);
     }
   `,
-  transparent: false
+  transparent: true,
+  depthWrite: false
 });
 
 const ocean = new THREE.Mesh(new THREE.PlaneGeometry(210, 156, cinematic ? 360 : 260, cinematic ? 252 : 190), oceanMat);
@@ -1347,24 +1570,33 @@ function makeDog() {
   const legs = [];
   const paws = [];
   const joints = [];
+  const gaitPlan = [];
+  let gaitIndex = 0;
   for (const x of [-.42, .42]) for (const z of [-.18, .18]) {
+    const phase = [0, Math.PI, Math.PI, 0][gaitIndex++];
     const leg = new THREE.Mesh(new THREE.CapsuleGeometry(.055, .42, 6, 10), furMat);
     leg.position.set(x, -.34, z);
+    leg.userData.base = leg.position.clone();
+    leg.userData.phase = phase;
     const hock = new THREE.Mesh(new THREE.CapsuleGeometry(.045, .26, 6, 8), furRimMat);
     hock.name = 'v2-black-lab-hock-segment';
     hock.position.set(x + .04, -.50, z);
     hock.rotation.z = x < 0 ? -.16 : .16;
+    hock.userData.base = hock.position.clone();
     const paw = new THREE.Mesh(new THREE.SphereGeometry(.075, 12, 6), furRimMat);
     paw.name = 'v2-black-lab-paw';
     paw.position.set(x + .05, -.57, z);
     paw.scale.set(1.35, .45, .8);
+    paw.userData.base = paw.position.clone();
     const shoulder = new THREE.Mesh(new THREE.SphereGeometry(.070, 12, 6), furRimMat);
     shoulder.name = 'v2-black-lab-shoulder-hip-joint';
     shoulder.position.set(x, -.16, z);
     shoulder.scale.set(1.0, .72, .82);
+    shoulder.userData.base = shoulder.position.clone();
     legs.push(leg);
     joints.push({ hock, shoulder });
     paws.push(paw);
+    gaitPlan.push({ phase, fore: x > 0, left: z < 0 });
     g.add(leg);
     g.add(hock);
     g.add(shoulder);
@@ -1399,7 +1631,7 @@ function makeDog() {
   backRim.position.set(-.03, .22, -.24);
   backRim.rotation.set(Math.PI / 2, 0, Math.PI / 2);
   g.add(body, chest, haunch, head, muzzle, nose, tail, earL, earR, collar, tag, backRim);
-  g.userData = { body, chest, haunch, head, tail, legs, paws, joints, ears: [earL, earR] };
+  g.userData = { body, chest, haunch, head, tail, legs, paws, joints, ears: [earL, earR], gaitPlan };
   g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   scene.add(g);
   return g;
@@ -1649,7 +1881,7 @@ for (let i = 0; i < 12; i++) {
 
 const views = {
   shore: { pos: [13.0, 4.2, 17.5], target: [-1.2, .75, -8.5] },
-  water: { pos: [-7.2, 2.15, -10.5], target: [-17.0, .25, -82] },
+  water: { pos: [-5.8, 1.36, 7.8], target: [-4.8, .22, -46] },
   bar: { pos: [8.9, 2.95, 9.8], target: [7.55, 1.76, 3.02] },
   dog: { pos: [4.85, 1.28, 8.15], target: [1.55, .52, 5.62] }
 };
@@ -1728,7 +1960,7 @@ function applyEnvironment(timeName = activeTime, weatherName = activeWeather) {
   const time = timePresets[activeTime];
   const weather = weatherPresets[activeWeather];
   installPbrEnvironment(time);
-  scene.background.setHex(time.bg);
+  if (scene.background) scene.background.setHex(time.bg);
   scene.fog.color.setHex(time.fog);
   scene.fog.density = time.density * (activeWeather === 'storm' ? 1.52 : 1.0);
   sun.color.setHex(time.sun);
@@ -1768,6 +2000,14 @@ function applyEnvironment(timeName = activeTime, weatherName = activeWeather) {
   oceanUniforms.uGold.value = time.gold;
   waterOpticsUniforms.uWind.value = weather.wind;
   waterOpticsUniforms.uOpticsPower.value = weather.optics;
+  const sky = new THREE.Color(time.sky);
+  pandoraOceanPreset = {
+    gold: time.gold,
+    wind: weather.wind,
+    chop: THREE.MathUtils.clamp(weather.wind / 10.8, .62, 1.72),
+    foamT: THREE.MathUtils.clamp(.48 / Math.max(weather.foam, .48), .22, .62),
+    skyTint: [sky.r * .36, sky.g * .42, sky.b * .54]
+  };
   document.querySelectorAll('[data-time]').forEach(b => b.classList.toggle('active', b.dataset.time === activeTime));
   document.querySelectorAll('[data-weather]').forEach(b => b.classList.toggle('active', b.dataset.weather === activeWeather));
 }
@@ -1776,6 +2016,41 @@ function setView(name) {
   const view = views[name] || views.shore;
   camera.position.set(...view.pos);
   controls.target.set(...view.target);
+  const waterStudy = name === 'water';
+  const hideForWaterStudy = [
+    /^v2-sculpted-beach/,
+    /^v2-reflective-wet-sand/,
+    /^v2-layered-shorebreak/,
+    /^v2-animated-shoreline/,
+    /^v2-weathered-dock/,
+    /^v2-dock-/,
+    /^v2-coiled-rope/,
+    /^v2-beach-house/,
+    /^v2-beach-shell/,
+    /^v2-beach-pebble/,
+    /^v2-reflective-shoreline/,
+    /^v2-left-wet-rock/,
+    /^v2-right-wet-rock/,
+    /^v2-bleached-driftwood/,
+    /^v2-beach-palm/,
+    /^v2-sea-grass/,
+    /^v2-warm-window/,
+    /^v2-bar/,
+    /^v2-glass-bottle/,
+    /^v2-low-beach-bar/,
+    /^v2-alhena/,
+    /^v2-black-lab/
+  ];
+  scene.traverse(obj => {
+    if (!obj.name) return;
+    if (hideForWaterStudy.some(pattern => pattern.test(obj.name))) obj.visible = !waterStudy;
+  });
+  ocean.visible = !waterStudy;
+  waterOptics.visible = !waterStudy;
+  fish.forEach(f => { f.visible = !waterStudy; });
+  bobber.visible = !waterStudy;
+  red.visible = !waterStudy;
+  fishingLine.visible = !waterStudy;
   document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === name));
 }
 
@@ -1806,6 +2081,7 @@ function animate() {
   const dt = Math.min(clock.getDelta(), .05);
   const t = clock.getElapsedTime();
   const now = performance.now();
+  pandoraOceanPass?.render(t, pandoraOceanPreset);
   oceanUniforms.uTime.value = t;
   waterOpticsUniforms.uTime.value = t;
   sunDisk.lookAt(camera.position);
@@ -1850,29 +2126,40 @@ function animate() {
   alhena.userData.drinkGlow.position.y = .18 + Math.sin(t * 1.0) * .012;
   alhena.userData.necklace.rotation.z = Math.sin(t * .9) * .035;
   alhena.userData.smile.scale.x = 1.0 + (play.bite ? .12 : Math.sin(t * .7) * .03);
-  dog.position.x = 1.6 + Math.sin(t * .55) * .42;
-  dog.position.y = .43 + Math.max(0, Math.sin(t * 2.2)) * .025;
-  dog.rotation.y = -.16 + Math.sin(t * .55 + .7) * .28;
-  dog.userData.body.scale.y = .82 + Math.sin(t * 1.6) * .018;
-  dog.userData.chest.position.y = .02 + Math.sin(t * 1.6 + .4) * .012;
-  dog.userData.haunch.position.y = Math.sin(t * 1.6 + 1.1) * .010;
-  dog.userData.head.rotation.y = Math.sin(t * 1.1) * .22 + (play.bite ? .18 : 0);
-  dog.userData.head.rotation.x = -.08 + Math.sin(t * .74) * .06 + (play.bite ? -.10 : 0);
-  dog.userData.tail.rotation.z = 1.0 + Math.sin(t * (play.bite ? 7.4 : 5.2)) * (play.bite ? .48 : .34);
-  dog.userData.tail.rotation.y = Math.sin(t * 3.2) * .14;
+  const sniff = Math.sin(t * .36);
+  const stepClock = t * (play.bite ? 6.2 : 3.15);
+  dog.name = 'v2-black-lab-procedural-four-beat-gait-standin';
+  dog.position.x = 1.6 + Math.sin(t * .34) * .34 + Math.sin(t * .77) * .08;
+  dog.position.z = 5.7 + Math.cos(t * .29) * .20;
+  dog.position.y = .43 + Math.max(0, Math.sin(stepClock * 2.0)) * .018;
+  dog.rotation.y = -.18 + sniff * .26 + Math.sin(t * .91 + .7) * .08;
+  dog.userData.body.scale.y = .82 + Math.sin(t * 1.25) * .014;
+  dog.userData.chest.position.y = .02 + Math.sin(t * 1.25 + .4) * .010;
+  dog.userData.haunch.position.y = Math.sin(t * 1.25 + 1.1) * .009;
+  dog.userData.head.rotation.y = sniff * .34 + Math.sin(t * 1.3) * .06 + (play.bite ? .22 : 0);
+  dog.userData.head.rotation.x = -.10 + Math.sin(t * .84) * .045 + (sniff < -.72 ? -.16 : 0) + (play.bite ? -.10 : 0);
+  dog.userData.tail.rotation.z = 1.0 + Math.sin(t * (play.bite ? 7.4 : 4.5)) * (play.bite ? .52 : .28);
+  dog.userData.tail.rotation.y = Math.sin(t * 2.6) * .18;
   dog.userData.ears.forEach((ear, i) => {
     ear.rotation.z = Math.sin(t * 2.1 + i) * .06 + (play.bite ? (i ? -.06 : .06) : 0);
   });
   dog.userData.legs.forEach((leg, i) => {
-    const gait = Math.sin(t * 4.3 + i * Math.PI * .5);
-    const lift = Math.max(0, gait);
-    leg.rotation.x = gait * .34;
-    leg.rotation.z = (i < 2 ? -.08 : .08) + Math.sin(t * 2.1 + i) * .035;
-    dog.userData.joints[i].hock.rotation.x = -gait * .22;
-    dog.userData.joints[i].hock.position.y = -.50 + lift * .032;
-    dog.userData.joints[i].shoulder.position.y = -.16 + Math.sin(t * 4.3 + i * Math.PI * .5) * .015;
-    dog.userData.paws[i].position.y = -.57 + lift * .060;
-    dog.userData.paws[i].position.x = (i < 2 ? -.42 : .42) + .05 + Math.cos(t * 4.3 + i) * .038;
+    const plan = dog.userData.gaitPlan[i];
+    const cycle = Math.sin(stepClock + plan.phase);
+    const lift = Math.max(0, cycle);
+    const plant = 1 - lift;
+    const reach = Math.cos(stepClock + plan.phase) * (plan.fore ? .055 : .045);
+    leg.rotation.x = cycle * (plan.fore ? .30 : .24);
+    leg.rotation.z = (plan.left ? -.08 : .08) + Math.sin(t * 1.4 + i) * .018;
+    dog.userData.joints[i].hock.rotation.x = -cycle * .24 - lift * .18;
+    dog.userData.joints[i].hock.position.copy(dog.userData.joints[i].hock.userData.base);
+    dog.userData.joints[i].hock.position.y += lift * .040;
+    dog.userData.joints[i].shoulder.position.copy(dog.userData.joints[i].shoulder.userData.base);
+    dog.userData.joints[i].shoulder.position.y += Math.sin(stepClock + plan.phase) * .010;
+    dog.userData.paws[i].position.copy(dog.userData.paws[i].userData.base);
+    dog.userData.paws[i].position.y += lift * .075;
+    dog.userData.paws[i].position.x += reach * lift - reach * .35 * plant;
+    dog.userData.paws[i].scale.y = .45 + plant * .035;
   });
   if (play.cast && !play.bite && now > play.biteAt) {
     play.bite = true;
