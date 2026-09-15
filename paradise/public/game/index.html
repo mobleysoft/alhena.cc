@@ -463,9 +463,9 @@ const waterMat = new THREE.ShaderMaterial({
   `,
 });
 
-const water = new THREE.Mesh(new THREE.PlaneGeometry(180, 170, 150, 150), waterMat);
+const water = new THREE.Mesh(new THREE.PlaneGeometry(180, 126, 150, 110), waterMat);
 water.rotation.x = -Math.PI / 2;
-water.position.set(0, -0.06, -58);
+water.position.set(0, -0.06, -66);
 water.receiveShadow = true;
 scene.add(water);
 
@@ -484,6 +484,22 @@ shore.rotation.x = -Math.PI / 2;
 shore.position.set(0, -0.12, 9.8);
 shore.receiveShadow = true;
 scene.add(shore);
+
+const wetSand = new THREE.Mesh(
+  new THREE.PlaneGeometry(100, 6, 90, 8),
+  new THREE.MeshStandardMaterial({
+    color: 0x8aa7a0,
+    roughness: .34,
+    metalness: .05,
+    transparent: true,
+    opacity: .42
+  })
+);
+wetSand.name = 'reflective-wet-sand-transition';
+wetSand.rotation.x = -Math.PI / 2;
+wetSand.position.set(0, -0.105, -1.5);
+wetSand.receiveShadow = true;
+scene.add(wetSand);
 
 function box(name, size, pos, material) {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
@@ -535,7 +551,7 @@ const goldFoamMat = new THREE.LineBasicMaterial({ color: 0xffd47c, transparent: 
 const shoreFoamLines = [];
 for (let row = 0; row < 7; row++) {
   const pts = [];
-  const z = -0.4 + row * .42;
+  const z = -4.2 + row * .36;
   for (let i = 0; i < 86; i++) {
     const x = -28 + i * .66;
     pts.push(new THREE.Vector3(x, .035 + row * .006, z + Math.sin(i * .23 + row) * .12));
