@@ -1948,7 +1948,8 @@ function drawBarAndAlhena(x, y, t, time) {
   const a = ALHENA[state.alhena % ALHENA.length];
   ctx.save();
   ctx.translate(x, y);
-  drawContactShadow(-8, 101, 112, 19, 0.34);
+  drawContactShadow(-8, 103, 122, 21, 0.38);
+  drawBarBacklight(time);
   const barGrad = ctx.createLinearGradient(-80, 0, 80, 80);
   barGrad.addColorStop(0, '#5b351e');
   barGrad.addColorStop(1, '#1b100b');
@@ -1970,6 +1971,7 @@ function drawBarAndAlhena(x, y, t, time) {
   ctx.fillStyle = 'rgba(255,255,255,0.08)';
   roundRect(-98, 22, 72, 5, 3);
   ctx.fill();
+  drawBarWetVarnish(time);
   ctx.fillStyle = 'rgba(255,221,120,0.64)';
   ctx.font = '9px DM Sans';
   ctx.fillText('ALHENA', -64, 66);
@@ -1999,6 +2001,7 @@ function drawBarAndAlhena(x, y, t, time) {
   ctx.lineTo(-32, 68);
   ctx.closePath();
   ctx.fill();
+  drawFabricMicrofolds(-24, 25 + breath, 36, 43, a.dress, t, time);
   ctx.strokeStyle = `rgba(255,255,255,${0.08 + time.light * 0.08})`;
   ctx.lineWidth = 1;
   for (let i = 0; i < 5; i++) {
@@ -2023,6 +2026,7 @@ function drawBarAndAlhena(x, y, t, time) {
   ctx.beginPath();
   ctx.arc(-9, -12 + breath * 0.25, 15, 0, Math.PI * 2);
   ctx.fill();
+  drawFacePlanes(-9, -12 + breath * 0.25, a, time);
   ctx.fillStyle = mix(a.skin, '#3a1d16', 0.28);
   ctx.beginPath();
   ctx.ellipse(-10, -1 + breath * 0.2, 10, 4, 0, 0, Math.PI * 2);
@@ -2049,6 +2053,7 @@ function drawBarAndAlhena(x, y, t, time) {
   ctx.beginPath();
   ctx.ellipse(5, -11, 5, 13, 0.12, 0, Math.PI * 2);
   ctx.fill();
+  drawHairStrandVolume(-10, -18, a.hair, t, time);
   ctx.strokeStyle = `rgba(255,255,255,${0.05 + time.light * 0.05})`;
   ctx.lineWidth = 1;
   for (let i = 0; i < 8; i++) {
@@ -2083,6 +2088,7 @@ function drawBarAndAlhena(x, y, t, time) {
   ctx.beginPath();
   ctx.arc(-9, 2, 20, Math.PI * 1.12, Math.PI * 1.88);
   ctx.stroke();
+  drawCharacterOcclusion(time);
   ctx.fillStyle = 'rgba(255,230,164,0.68)';
   ctx.beginPath();
   ctx.arc(-23, -8, 2, 0, Math.PI * 2);
@@ -2093,6 +2099,139 @@ function drawBarAndAlhena(x, y, t, time) {
   ctx.beginPath();
   ctx.moveTo(-32, 68);
   ctx.quadraticCurveTo(-12, 78 + Math.sin(t * 0.002) * 2, 14, 68);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawBarBacklight(time) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  const glow = ctx.createRadialGradient(-7, 30, 5, -7, 30, 142);
+  glow.addColorStop(0, `rgba(255,219,142,${0.08 + time.light * 0.1})`);
+  glow.addColorStop(0.5, `rgba(73,199,212,${0.045 + time.light * 0.04})`);
+  glow.addColorStop(1, 'rgba(73,199,212,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.ellipse(-5, 47, 138, 88, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawBarWetVarnish(time) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  const shine = ctx.createLinearGradient(-98, 22, 82, 40);
+  shine.addColorStop(0, 'rgba(255,255,255,0.02)');
+  shine.addColorStop(0.28, `rgba(255,238,188,${0.18 * time.light})`);
+  shine.addColorStop(0.44, 'rgba(255,255,255,0.025)');
+  shine.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = shine;
+  roundRect(-100, 22, 188, 10, 7);
+  ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.strokeStyle = 'rgba(10,7,4,0.32)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 5; i++) {
+    const y = 48 + i * 9;
+    ctx.beginPath();
+    ctx.moveTo(-87, y);
+    ctx.bezierCurveTo(-36, y - 4, 18, y + 5, 70, y - 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawFabricMicrofolds(x, y, w, h, color, t, time) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x + 4, y - 7);
+  ctx.quadraticCurveTo(x + w * 0.5, y - 22, x + w - 1, y - 3);
+  ctx.lineTo(x + w + 4, y + h);
+  ctx.lineTo(x - 7, y + h);
+  ctx.closePath();
+  ctx.clip();
+  for (let i = 0; i < 10; i++) {
+    const k = i / 9;
+    const px = x + 3 + k * w + Math.sin(t * 0.002 + i) * 1.2;
+    const grad = ctx.createLinearGradient(px - 4, y, px + 6, y + h);
+    grad.addColorStop(0, `rgba(255,255,255,${0.05 + time.light * 0.05})`);
+    grad.addColorStop(0.45, 'rgba(255,255,255,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.11)');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = i % 3 === 0 ? 1.5 : 0.8;
+    ctx.beginPath();
+    ctx.moveTo(px, y - 2);
+    ctx.bezierCurveTo(px - 5, y + h * 0.28, px + 7, y + h * 0.62, px + Math.sin(i) * 5, y + h + 2);
+    ctx.stroke();
+  }
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.fillStyle = mix(color, '#05070a', 0.62);
+  ctx.globalAlpha = 0.12;
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.38, y + h * 0.85, w * 0.62, h * 0.22, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawFacePlanes(x, y, a, time) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.fillStyle = 'rgba(75,39,32,0.14)';
+  ctx.beginPath();
+  ctx.ellipse(x + 5, y + 2, 8, 12, 0.18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalCompositeOperation = 'screen';
+  const cheek = ctx.createRadialGradient(x - 5, y - 5, 1, x - 5, y - 5, 11);
+  cheek.addColorStop(0, `rgba(255,234,185,${0.34 * time.light})`);
+  cheek.addColorStop(1, 'rgba(255,234,185,0)');
+  ctx.fillStyle = cheek;
+  ctx.beginPath();
+  ctx.arc(x - 5, y - 5, 12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.strokeStyle = mix(a.skin, '#2b1511', 0.45);
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(x - 7, y + 3);
+  ctx.quadraticCurveTo(x - 1, y + 7, x + 7, y + 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawHairStrandVolume(x, y, color, t, time) {
+  ctx.save();
+  ctx.strokeStyle = mix(color, '#ffffff', 0.18 * time.light);
+  ctx.lineWidth = 0.75;
+  ctx.globalAlpha = 0.5;
+  for (let i = 0; i < 18; i++) {
+    const a = -Math.PI + i * (Math.PI / 17);
+    const sx = x + Math.cos(a) * 13;
+    const sy = y + Math.sin(a) * 8;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.quadraticCurveTo(sx + Math.sin(t * 0.002 + i) * 3, sy + 10, sx + Math.cos(i) * 6, sy + 23);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawCharacterOcclusion(time) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'multiply';
+  const occ = ctx.createRadialGradient(-8, 23, 3, -8, 35, 45);
+  occ.addColorStop(0, 'rgba(8,5,4,0.02)');
+  occ.addColorStop(0.62, 'rgba(8,5,4,0.16)');
+  occ.addColorStop(1, 'rgba(8,5,4,0)');
+  ctx.fillStyle = occ;
+  ctx.beginPath();
+  ctx.ellipse(-8, 38, 52, 41, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalCompositeOperation = 'screen';
+  ctx.strokeStyle = `rgba(120,220,230,${0.08 + time.light * 0.04})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(9, -19);
+  ctx.quadraticCurveTo(20, 22, 15, 68);
   ctx.stroke();
   ctx.restore();
 }
