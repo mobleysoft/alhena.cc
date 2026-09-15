@@ -77,10 +77,56 @@ button.active { background: rgba(255, 213, 118, .24); border-color: rgba(255, 22
   text-transform: uppercase;
   backdrop-filter: blur(12px);
 }
+.status {
+  margin-top: 12px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 12px;
+  background: rgba(0,0,0,.18);
+  color: rgba(255,244,215,.82);
+  font: 11px/1.45 ui-sans-serif, system-ui, sans-serif;
+}
+.mobile-pad {
+  position: fixed;
+  inset: auto auto max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+  display: none;
+  grid-template-columns: repeat(3, 48px);
+  grid-template-rows: repeat(3, 48px);
+  gap: 7px;
+  z-index: 4;
+}
+.mobile-pad button,
+.action-pad button {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border-radius: 16px;
+  background: rgba(6, 20, 29, .56);
+  backdrop-filter: blur(12px);
+  touch-action: none;
+}
+.mobile-pad [data-held="forward"] { grid-column: 2; grid-row: 1; }
+.mobile-pad [data-held="left"] { grid-column: 1; grid-row: 2; }
+.mobile-pad [data-held="back"] { grid-column: 2; grid-row: 3; }
+.mobile-pad [data-held="right"] { grid-column: 3; grid-row: 2; }
+.action-pad {
+  position: fixed;
+  right: max(18px, env(safe-area-inset-right));
+  bottom: max(18px, env(safe-area-inset-bottom));
+  display: none;
+  gap: 10px;
+  z-index: 4;
+}
+body.clean .hud,
+body.clean .caption { opacity: 0; pointer-events: none; }
 @media (max-width: 720px) {
   .hud { width: calc(100vw - 24px); left: 12px; top: 12px; padding: 14px; }
   h1 { font-size: 24px; }
   .caption { font-size: 8px; border-radius: 18px; }
+  .mobile-pad,
+  .action-pad { display: grid; }
+  body.clean .mobile-pad,
+  body.clean .action-pad { opacity: .18; }
 }
 </style>
 </head>
@@ -95,9 +141,22 @@ button.active { background: rgba(255, 213, 118, .24); border-color: rgba(255, 22
     <button data-time="noon">Noon</button>
     <button data-time="storm">Storm</button>
     <button id="tour">Tour</button>
+    <button id="cast">Cast</button>
+    <button id="clean">Clean HUD</button>
   </div>
+  <div class="status" id="status">Ready. Space/click casts; reel when the bobber dives.</div>
 </section>
 <div class="caption">Path: /game/ · Next production target: Godot 4 web export with rigged assets and spectral ocean</div>
+<div class="mobile-pad" aria-label="movement controls">
+  <button data-held="forward">W</button>
+  <button data-held="left">A</button>
+  <button data-held="right">D</button>
+  <button data-held="back">S</button>
+</div>
+<div class="action-pad" aria-label="fishing controls">
+  <button id="mobile-cast">Cast</button>
+  <button id="mobile-clean">HUD</button>
+</div>
 
 <script type="module">
 import * as THREE from 'https://unpkg.com/three@0.168.0/build/three.module.js';
@@ -641,6 +700,67 @@ const look = new THREE.Vector3(0.4, 1.05, -11);
 let tour = false;
 let targetAngle = 0;
 camera.lookAt(look);
+const statusEl = document.getElementById('status');
+const keys = new Set();
+const play = {
+  cast: false,
+  bite: false,
+  biteAt: 0,
+  catchCount: 1,
+  message: 'Ready. Space/click casts; reel when the bobber dives.',
+  bobberBase: new THREE.Vector3(2.2, .34, -16),
+  velocity: new THREE.Vector3(),
+};
+
+function setStatus(message) {
+  play.message = message;
+  statusEl.textContent = message;
+}
+
+function castOrReel() {
+  const now = performance.now();
+  if (!play.cast) {
+    play.cast = true;
+    play.bite = false;
+    play.biteAt = now + 1800 + Math.random() * 3200;
+    play.bobberBase.set(-2 + Math.random() * 7, .34, -13 - Math.random() * 14);
+    setStatus('Line cast. Watch the bobber and reel on the bite.');
+    return;
+  }
+  if (play.bite) {
+    play.catchCount += 1;
+    play.cast = false;
+    play.bite = false;
+    const names = ['glass minnow', 'reef snapper', 'blue runner', 'moon jack', 'amber fry'];
+    setStatus(`Caught ${names[play.catchCount % names.length]}. Cast again.`);
+    return;
+  }
+  setStatus('Too early. Let the fish commit before reeling.');
+}
+
+function updatePlayerInput(dt) {
+  const speed = keys.has('shift') ? 9.5 : 5.6;
+  const forward = new THREE.Vector3();
+  camera.getWorldDirection(forward);
+  forward.y = 0;
+  forward.normalize();
+  const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+  play.velocity.set(0, 0, 0);
+  if (keys.has('w') || keys.has('arrowup')) play.velocity.add(forward);
+  if (keys.has('s') || keys.has('arrowdown')) play.velocity.sub(forward);
+  if (keys.has('a') || keys.has('arrowleft')) play.velocity.sub(right);
+  if (keys.has('d') || keys.has('arrowright')) play.velocity.add(right);
+  if (play.velocity.lengthSq() > 0) {
+    play.velocity.normalize().multiplyScalar(speed * dt);
+    camera.position.add(play.velocity);
+    look.add(play.velocity);
+    camera.position.x = THREE.MathUtils.clamp(camera.position.x, -15, 15);
+    camera.position.z = THREE.MathUtils.clamp(camera.position.z, 6, 24);
+    look.x = THREE.MathUtils.clamp(look.x, -12, 12);
+    look.z = THREE.MathUtils.clamp(look.z, -24, 0);
+    camera.lookAt(look);
+  }
+}
 
 function setPreset(name) {
   activePreset = presets[name];
@@ -659,13 +779,37 @@ function setPreset(name) {
 
 document.querySelectorAll('[data-time]').forEach(btn => btn.addEventListener('click', () => setPreset(btn.dataset.time)));
 document.getElementById('tour').addEventListener('click', () => { tour = !tour; });
+document.getElementById('cast').addEventListener('click', castOrReel);
+document.getElementById('mobile-cast').addEventListener('pointerdown', ev => { ev.preventDefault(); castOrReel(); });
+document.getElementById('clean').addEventListener('click', () => document.body.classList.toggle('clean'));
+document.getElementById('mobile-clean').addEventListener('pointerdown', ev => {
+  ev.preventDefault();
+  document.body.classList.toggle('clean');
+});
+
+window.addEventListener('keydown', ev => {
+  const k = ev.key.toLowerCase();
+  if ([' ', 'w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift'].includes(k)) ev.preventDefault();
+  if (k === ' ') castOrReel();
+  if (k === 'c') document.body.classList.toggle('clean');
+  keys.add(k === ' ' ? 'space' : k);
+});
+window.addEventListener('keyup', ev => keys.delete(ev.key.toLowerCase()));
+
+document.querySelectorAll('[data-held]').forEach(btn => {
+  const key = { forward: 'w', left: 'a', back: 's', right: 'd' }[btn.dataset.held];
+  btn.addEventListener('pointerdown', ev => { ev.preventDefault(); keys.add(key); btn.classList.add('active'); });
+  btn.addEventListener('pointerup', ev => { ev.preventDefault(); keys.delete(key); btn.classList.remove('active'); });
+  btn.addEventListener('pointercancel', () => { keys.delete(key); btn.classList.remove('active'); });
+  btn.addEventListener('pointerleave', () => { keys.delete(key); btn.classList.remove('active'); });
+});
 
 window.addEventListener('pointermove', ev => {
   if (tour) return;
   const nx = ev.clientX / innerWidth - .5;
   const ny = ev.clientY / innerHeight - .5;
-  camera.position.x = 7.5 + nx * 8;
-  camera.position.y = 4.0 - ny * 2.8;
+  look.x = 0.4 + nx * 7.5;
+  camera.position.y = 3.0 - ny * 2.2;
   camera.lookAt(look);
 });
 
@@ -680,8 +824,11 @@ window.addEventListener('resize', resize);
 resize();
 setPreset('dawn');
 
+let lastNow = performance.now();
 function animate(now) {
   const t = now * .001;
+  const dt = Math.min(0.05, (now - lastNow) * 0.001);
+  lastNow = now;
   waterUniforms.uTime.value = t;
   if (tour) {
     targetAngle += .0018;
@@ -689,6 +836,8 @@ function animate(now) {
     camera.position.z = 11.4 + Math.cos(targetAngle * .7) * 2.2;
     camera.position.y = 2.65 + Math.sin(targetAngle * 1.4) * .25;
     camera.lookAt(look);
+  } else {
+    updatePlayerInput(dt);
   }
   alhena.group.rotation.y = Math.sin(t * .38) * .08;
   alhena.leftArm.rotation.z = -.58 + Math.sin(t * 1.2) * .07;
@@ -701,11 +850,18 @@ function animate(now) {
   lab.legs.forEach((leg, i) => {
     leg.rotation.x = Math.sin(t * 5.2 + i * Math.PI) * .38;
   });
-  bobber.position.y = .26 + Math.sin(t * 2.5) * .13;
-  bobber.position.z = -16 + Math.sin(t * .72) * .75;
-  bobber.position.x = 2.2 + Math.cos(t * .61) * .5;
+  if (play.cast && !play.bite && now > play.biteAt) {
+    play.bite = true;
+    setStatus('Bite. Reel now before the tension breaks.');
+  }
+  const biteDive = play.bite ? -0.48 - Math.abs(Math.sin(t * 9.0)) * .15 : 0;
+  const drift = play.cast ? 1 : .32;
+  bobber.position.y = play.bobberBase.y + Math.sin(t * 2.5) * .13 + biteDive;
+  bobber.position.z = play.bobberBase.z + Math.sin(t * .72) * .75 * drift;
+  bobber.position.x = play.bobberBase.x + Math.cos(t * .61) * .5 * drift;
+  bobber.scale.setScalar(play.bite ? 1.18 : 1);
   const points = [];
-  const start = new THREE.Vector3(13.6, 2.3, 4.3);
+  const start = new THREE.Vector3(11.8, 2.3, 4.3);
   for (let i = 0; i < 28; i++) {
     const k = i / 27;
     points.push(new THREE.Vector3(
