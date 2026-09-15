@@ -154,6 +154,9 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
     <button data-time="noon">Noon</button>
     <button data-time="sunset">Sunset</button>
     <button data-time="night">Night</button>
+    <button data-weather="calm">Calm</button>
+    <button class="active" data-weather="breeze">Breeze</button>
+    <button data-weather="storm">Storm</button>
     <a class="button" href="/">Root Game</a>
     <a class="button" href="/game-v3/">V3 Gate</a>
   </div>
@@ -173,6 +176,8 @@ const palette = {
 };
 let timeKey = new URLSearchParams(location.search).get('time') || 'dawn';
 if (!palette[timeKey]) timeKey = 'dawn';
+let weatherKey = new URLSearchParams(location.search).get('weather') || 'breeze';
+if (!['calm', 'breeze', 'storm'].includes(weatherKey)) weatherKey = 'breeze';
 const cleanPresentation = new URLSearchParams(location.search).get('clean') === '1';
 document.body.classList.toggle('clean', cleanPresentation);
 
@@ -522,6 +527,7 @@ const nearWaterMat = new THREE.ShaderMaterial({
     uDeep: { value: new THREE.Color(0x07526f) },
     uGlint: { value: new THREE.Color(0xdffcff) },
     uGold: { value: new THREE.Color(0xffdc84) },
+    uEnergy: { value: 0.72 },
   },
   vertexShader: `
     uniform float uTime;
@@ -555,6 +561,7 @@ const nearWaterMat = new THREE.ShaderMaterial({
     uniform vec3 uDeep;
     uniform vec3 uGlint;
     uniform vec3 uGold;
+    uniform float uEnergy;
     varying vec2 vUv;
     varying vec3 vWorld;
     varying float vFoam;
@@ -572,11 +579,11 @@ const nearWaterMat = new THREE.ShaderMaterial({
       float stipple = smoothstep(0.45, 0.88, noise(vWorld.xz * vec2(1.8, 5.6) + vec2(uTime * 0.12, -uTime * 0.28)));
       float fresnel = pow(1.0 - clamp(dot(normalize(cameraPosition - vWorld), normalize(vec3(0.0, 1.0, 0.18))), 0.0, 1.0), 3.0);
       vec3 color = uDeep * 0.15;
-      color += uGlint * lines * shoreFade * 0.10;
-      color += uGlint * cross * stipple * shoreFade * 0.07;
+      color += uGlint * lines * shoreFade * (0.07 + uEnergy * 0.05);
+      color += uGlint * cross * stipple * shoreFade * (0.04 + uEnergy * 0.04);
       color += uGold * fresnel * shoreFade * 0.06;
       color = mix(color, vec3(0.92, 0.99, 1.0), vFoam * stipple * 0.42);
-      float alpha = shoreFade * (0.07 + lines * 0.075 + cross * 0.04 + vFoam * 0.07);
+      float alpha = shoreFade * (0.055 + uEnergy * 0.025 + lines * 0.075 + cross * 0.04 + vFoam * 0.07);
       gl_FragColor = vec4(color, alpha);
     }
   `
@@ -1200,10 +1207,7 @@ new GLTFLoader().load('/assets/models/paradise-shoreline.glb', gltf => {
 function setTime(key) {
   timeKey = key;
   const p = palette[key];
-  if (oceanFrame) {
-    const weather = key === 'sunset' ? 'breeze' : key === 'night' ? 'calm' : 'breeze';
-    oceanFrame.src = `/game-v3/ocean-pass/?time=${encodeURIComponent(key)}&weather=${weather}`;
-  }
+  updateOceanFrame();
   scene.fog.color.setHex(p.fog);
   skyMat.uniforms.topColor.value.setHex(p.sky);
   skyMat.uniforms.horizonColor.value.setHex(p.horizon);
@@ -1224,8 +1228,20 @@ function setTime(key) {
   for (const ray of atmosphereRays) ray.material.opacity = rayOpacity;
   for (const button of document.querySelectorAll('[data-time]')) button.classList.toggle('active', button.dataset.time === key);
 }
+function setWeather(key) {
+  weatherKey = key;
+  nearWaterMat.uniforms.uEnergy.value = key === 'storm' ? 1.0 : key === 'breeze' ? 0.72 : 0.42;
+  updateOceanFrame();
+  for (const button of document.querySelectorAll('[data-weather]')) button.classList.toggle('active', button.dataset.weather === key);
+}
+function updateOceanFrame() {
+  if (!oceanFrame) return;
+  oceanFrame.src = `/game-v3/ocean-pass/?time=${encodeURIComponent(timeKey)}&weather=${encodeURIComponent(weatherKey)}`;
+}
 document.querySelectorAll('[data-time]').forEach(button => button.addEventListener('click', () => setTime(button.dataset.time)));
+document.querySelectorAll('[data-weather]').forEach(button => button.addEventListener('click', () => setWeather(button.dataset.weather)));
 setTime(timeKey);
+setWeather(weatherKey);
 
 let pointerX = 0;
 let pointerY = 0;
