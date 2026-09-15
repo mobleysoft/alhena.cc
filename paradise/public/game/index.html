@@ -21,6 +21,21 @@ html, body {
   font-family: Georgia, "Times New Roman", serif;
 }
 #stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+#grade {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 39% 36%, rgba(255, 224, 150, .13), transparent 25%),
+    radial-gradient(circle at 52% 72%, transparent 35%, rgba(2, 8, 13, .23) 100%),
+    linear-gradient(180deg, rgba(255,255,255,.03), rgba(25, 52, 64, .10) 44%, rgba(67, 38, 12, .13));
+  mix-blend-mode: soft-light;
+  z-index: 1;
+}
+.hud,
+.caption,
+.mobile-pad,
+.action-pad { z-index: 3; }
 .hud {
   position: fixed;
   left: max(18px, env(safe-area-inset-left));
@@ -146,6 +161,7 @@ body.clean .caption { opacity: 0; pointer-events: none; }
 </head>
 <body>
 <canvas id="stage"></canvas>
+<div id="grade"></div>
 <section class="hud">
   <div class="kicker">Paradise · mesh reboot</div>
   <h1>Shoreline vertical slice</h1>
@@ -515,6 +531,26 @@ wetSand.position.set(0, -0.105, -1.5);
 wetSand.receiveShadow = true;
 scene.add(wetSand);
 
+const shallowsMat = new THREE.MeshBasicMaterial({ color: 0xb7e7e1, transparent: true, opacity: .18, depthWrite: false });
+for (let i = 0; i < 4; i++) {
+  const shallows = new THREE.Mesh(new THREE.PlaneGeometry(95 - i * 7, 1.2, 40, 1), shallowsMat);
+  shallows.name = 'transparent-shallow-water-band';
+  shallows.rotation.x = -Math.PI / 2;
+  shallows.position.set(0, -0.055 + i * .002, -3.2 - i * 1.05);
+  scene.add(shallows);
+}
+
+function contactShadow(name, x, z, sx, sz, opacity = .24) {
+  const mat = new THREE.MeshBasicMaterial({ color: 0x1d1208, transparent: true, opacity, depthWrite: false });
+  const mesh = new THREE.Mesh(new THREE.CircleGeometry(1, 48), mat);
+  mesh.name = name;
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.set(x, -0.04, z);
+  mesh.scale.set(sx, sz, 1);
+  scene.add(mesh);
+  return mesh;
+}
+
 function box(name, size, pos, material) {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
   mesh.name = name;
@@ -553,6 +589,8 @@ roof('beach-house-roof', -9.2, 3.8);
 box('warm-window', [1.0, 1.25, .08], [-9.2, 1.15, 5.74], glassMat);
 box('bar-base', [7.2, 1.4, 1.35], [8.6, .64, 3.9], darkWoodMat);
 box('bar-counter', [7.8, .28, 1.75], [8.6, 1.48, 3.9], woodMat);
+contactShadow('house-contact-shadow', -9.2, 4.8, 3.8, 2.6, .22);
+contactShadow('bar-contact-shadow', 8.6, 4.2, 4.8, 1.7, .2);
 for (let i = 0; i < 12; i++) cyl('bar-bamboo-' + i, .09, 1.55, [5.2 + i * .62, .72, 3.13], [0,0,0], woodMat, 16);
 for (let i = 0; i < 11; i++) {
   const plank = box('dock-plank-' + i, [1.9, .16, .42], [-6.9 + i * 1.25, .1, -.55 - i * .38], woodMat);
@@ -575,6 +613,30 @@ for (let row = 0; row < 7; row++) {
   lineMesh.name = 'animated-shore-foam-line';
   scene.add(lineMesh);
   shoreFoamLines.push({ line: lineMesh, row, baseZ: z });
+}
+
+const distantMat = new THREE.MeshBasicMaterial({ color: 0x5f8391, transparent: true, opacity: .52, depthWrite: false });
+for (const [x, z, sx, sy] of [[-38, -104, 18, 2.2], [-13, -111, 24, 3.1], [18, -106, 19, 2.4], [43, -116, 28, 3.5]]) {
+  const island = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 7), distantMat);
+  island.name = 'mist-distant-island';
+  island.position.set(x, 1.5, z);
+  island.scale.set(sx, sy, sx * .28);
+  island.rotation.y = Math.PI / 7;
+  scene.add(island);
+}
+
+const cloudMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .18, depthWrite: false });
+for (const [x, y, z, sx] of [[-34, 20, -95, 10], [-5, 24, -115, 14], [35, 21, -102, 11]]) {
+  const cloud = new THREE.Group();
+  cloud.name = 'soft-layered-cloud-bank';
+  cloud.position.set(x, y, z);
+  for (let i = 0; i < 5; i++) {
+    const puff = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 9), cloudMat);
+    puff.position.set((i - 2) * 1.25, Math.sin(i) * .22, Math.cos(i * 1.3) * .15);
+    puff.scale.set(sx * (.46 + i * .04), sx * .09, sx * .08);
+    cloud.add(puff);
+  }
+  scene.add(cloud);
 }
 
 const bobberRingMat = new THREE.LineBasicMaterial({ color: 0xf6ffff, transparent: true, opacity: .42 });
@@ -615,6 +677,15 @@ function addLantern(x, y, z) {
 addLantern(5.2, 1.88, 3.15);
 addLantern(12.1, 1.88, 3.15);
 addLantern(-10.7, 2.2, 5.8);
+
+const bottleMat = new THREE.MeshPhysicalMaterial({ color: 0x98e0d6, roughness: .08, transmission: .22, transparent: true, opacity: .72 });
+for (const [x, z, h] of [[7.25,3.05,.55],[7.72,3.02,.42],[10.95,3.02,.62],[11.45,3.04,.5]]) {
+  cyl('bar-glass-bottle', .08, h, [x, 1.92 + h * .5, z], [0,0,0], bottleMat, 18);
+}
+
+const rodMat = new THREE.MeshStandardMaterial({ color: 0x3a2414, roughness: .55 });
+const rod = cyl('fishing-rod-on-bar', .035, 4.2, [12.2, 2.35, 4.0], [Math.PI / 2.25, 0, -0.72], rodMat, 10);
+rod.scale.x = .55;
 
 function addRock(x, z, s, color = 0x766b58) {
   const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), new THREE.MeshStandardMaterial({ color, roughness: .94 }));
