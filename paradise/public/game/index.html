@@ -89,7 +89,7 @@ button.active { background: rgba(255, 213, 118, .24); border-color: rgba(255, 22
 <section class="hud">
   <div class="kicker">Paradise · mesh reboot</div>
   <h1>Shoreline vertical slice</h1>
-  <p>This route intentionally removes the weak 2D character placeholders and shows the direction instead: 3D mesh terrain, modeled shoreline objects, shader ocean, cinematic lighting, and a deploy target for the Godot/WebGL rebuild.</p>
+  <p>Mesh-first vertical slice: spectral ocean shader, modeled shore/dock/bar/house forms, cinematic lighting, and code-native character slots while the Godot/WebGL rebuild is prepared.</p>
   <div class="bar">
     <button class="active" data-time="dawn">Dawn</button>
     <button data-time="noon">Noon</button>
@@ -104,7 +104,7 @@ import * as THREE from 'https://unpkg.com/three@0.168.0/build/three.module.js';
 
 const canvas = document.getElementById('stage');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.35));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -115,7 +115,7 @@ scene.background = new THREE.Color(0x88bdd1);
 scene.fog = new THREE.FogExp2(0x8cbfd0, 0.0105);
 
 const camera = new THREE.PerspectiveCamera(52, 1, 0.1, 280);
-camera.position.set(7.5, 4.0, 14.5);
+camera.position.set(0.8, 3.0, 18.5);
 
 const hemi = new THREE.HemisphereLight(0xc8f1ff, 0x6e5433, 1.15);
 scene.add(hemi);
@@ -211,6 +211,12 @@ const woodMat = new THREE.MeshStandardMaterial({ map: woodTex, color: 0xae6e39, 
 const darkWoodMat = new THREE.MeshStandardMaterial({ map: woodTex, color: 0x563019, roughness: .78 });
 const roofMat = new THREE.MeshStandardMaterial({ color: 0x6d2419, roughness: .72 });
 const leafMat = new THREE.MeshStandardMaterial({ color: 0x245f3f, roughness: .82 });
+const clothMat = new THREE.MeshStandardMaterial({ color: 0x42aac1, roughness: .64 });
+const skinMat = new THREE.MeshStandardMaterial({ color: 0x7b4c35, roughness: .72 });
+const hairMat = new THREE.MeshStandardMaterial({ color: 0x17110d, roughness: .88 });
+const labMat = new THREE.MeshStandardMaterial({ color: 0x12100f, roughness: .48, metalness: .02 });
+const labHighlightMat = new THREE.MeshStandardMaterial({ color: 0x26201d, roughness: .42, metalness: .04 });
+const collarMat = new THREE.MeshStandardMaterial({ color: 0x2ca6c7, roughness: .38 });
 const glassMat = new THREE.MeshPhysicalMaterial({
   color: 0xbfeefa,
   roughness: .08,
@@ -219,6 +225,46 @@ const glassMat = new THREE.MeshPhysicalMaterial({
   transparent: true,
   opacity: .66
 });
+
+function makeSkyTexture() {
+  return canvasTexture(1024, (ctx, s) => {
+    const g = ctx.createLinearGradient(0, 0, 0, s);
+    g.addColorStop(0, '#326f98');
+    g.addColorStop(.42, '#9ed4df');
+    g.addColorStop(.64, '#ffe0a2');
+    g.addColorStop(1, '#c09355');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, s, s);
+    const sun = ctx.createRadialGradient(s * .38, s * .48, 10, s * .38, s * .48, s * .24);
+    sun.addColorStop(0, 'rgba(255,247,196,.82)');
+    sun.addColorStop(.22, 'rgba(255,221,140,.34)');
+    sun.addColorStop(1, 'rgba(255,221,140,0)');
+    ctx.fillStyle = sun;
+    ctx.fillRect(0, 0, s, s);
+    ctx.fillStyle = 'rgba(255,255,255,.18)';
+    for (let i = 0; i < 18; i++) {
+      const x = (i * 173) % s;
+      const y = s * (.18 + ((i * 47) % 28) / 100);
+      ctx.beginPath();
+      ctx.ellipse(x, y, 70 + (i % 4) * 22, 8 + (i % 3) * 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  });
+}
+
+const skyBackdrop = new THREE.Mesh(
+  new THREE.PlaneGeometry(260, 120),
+  new THREE.MeshBasicMaterial({ map: makeSkyTexture(), depthWrite: false })
+);
+skyBackdrop.position.set(0, 25, -126);
+scene.add(skyBackdrop);
+
+const sunDisk = new THREE.Mesh(
+  new THREE.CircleGeometry(5.2, 64),
+  new THREE.MeshBasicMaterial({ color: 0xffedaa, transparent: true, opacity: .78, depthWrite: false })
+);
+sunDisk.position.set(-28, 22, -122);
+scene.add(sunDisk);
 
 const waterUniforms = {
   uTime: { value: 0 },
@@ -243,13 +289,13 @@ const waterMat = new THREE.ShaderMaterial({
     const float gravity = 9.81;
     float hash1(float n) { return fract(sin(n) * 43758.5453123); }
     vec2 waveDir(float i) {
-      float t = i / 23.0;
+      float t = i / 15.0;
       float theta = (t - 0.5) * PI * 0.86 + 0.18;
       return vec2(cos(theta), sin(theta));
     }
     void component(float i, out float freq, out float amp, out float phase) {
       float omegaP = 0.13 * gravity / max(uWind, 1.0) * TAU;
-      float t = i / 23.0;
+      float t = i / 15.0;
       float omegaMin = omegaP * 0.48;
       float omegaMax = omegaP * 3.45;
       freq = omegaMin * pow(omegaMax / omegaMin, t);
@@ -258,14 +304,14 @@ const waterMat = new THREE.ShaderMaterial({
       float spectrum = 0.0081 * gravity * gravity / pow(freq, 5.0)
         * exp(-1.25 * pow(omegaP / freq, 4.0))
         * pow(3.3, r);
-      float dOmega = (omegaMax - omegaMin) / 24.0;
+      float dOmega = (omegaMax - omegaMin) / 16.0;
       amp = sqrt(2.0 * spectrum * dOmega) * 0.28 * uWind / 12.0;
       amp = clamp(amp, 0.0, 1.35);
       phase = hash1(i * 17.31 + 0.73) * TAU;
     }
     float oceanHeight(vec2 pos) {
       float h = 0.0;
-      for (int j = 0; j < 24; j++) {
+      for (int j = 0; j < 16; j++) {
         float i = float(j);
         float freq;
         float amp;
@@ -291,7 +337,6 @@ const waterMat = new THREE.ShaderMaterial({
   fragmentShader: `
     precision highp float;
     uniform float uTime;
-    uniform float uWind;
     uniform float uChop;
     uniform float uFoamT;
     uniform vec3 uSkyTint;
@@ -299,64 +344,10 @@ const waterMat = new THREE.ShaderMaterial({
     varying vec2 vUv;
     varying vec3 vWorld;
     varying float vH;
-    const float PI = 3.14159265359;
-    const float TAU = 6.28318530718;
-    const float gravity = 9.81;
-    float hash1(float n) { return fract(sin(n) * 43758.5453123); }
     float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123); }
     float noise(vec2 p){
       vec2 i=floor(p), f=fract(p), u=f*f*(3.0-2.0*f);
       return mix(mix(hash(i),hash(i+vec2(1,0)),u.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y);
-    }
-    vec2 waveDir(float i) {
-      float t = i / 31.0;
-      float theta = (t - 0.5) * PI * 0.92 + 0.18;
-      return vec2(cos(theta), sin(theta));
-    }
-    void component(float i, out float freq, out float amp, out float phase) {
-      float omegaP = 0.13 * gravity / max(uWind, 1.0) * TAU;
-      float t = i / 31.0;
-      float omegaMin = omegaP * 0.5;
-      float omegaMax = omegaP * 3.5;
-      freq = omegaMin * pow(omegaMax / omegaMin, t);
-      float sigma = freq <= omegaP ? 0.07 : 0.09;
-      float r = exp(-pow(freq - omegaP, 2.0) / (2.0 * sigma * sigma * omegaP * omegaP));
-      float spectrum = 0.0081 * gravity * gravity / pow(freq, 5.0)
-        * exp(-1.25 * pow(omegaP / freq, 4.0))
-        * pow(3.3, r);
-      float dOmega = (omegaMax - omegaMin) / 32.0;
-      amp = sqrt(2.0 * spectrum * dOmega) * 0.32 * uWind / 12.0;
-      amp = clamp(amp, 0.0, 1.55);
-      phase = hash1(i * 17.31 + 0.73) * TAU;
-    }
-    float oceanHeight(vec2 pos) {
-      float h = 0.0;
-      for (int j = 0; j < 32; j++) {
-        float i = float(j);
-        float freq;
-        float amp;
-        float phase;
-        component(i, freq, amp, phase);
-        float k = freq * freq / gravity;
-        h += amp * sin(dot(waveDir(i), pos) * k - freq * uTime + phase);
-      }
-      return h * uChop;
-    }
-    vec3 oceanNormal(vec2 pos) {
-      float eps = 0.035;
-      float hc = oceanHeight(pos);
-      float hx = oceanHeight(pos + vec2(eps, 0.0));
-      float hy = oceanHeight(pos + vec2(0.0, eps));
-      return normalize(vec3(-(hx - hc) / eps, 1.0, -(hy - hc) / eps));
-    }
-    float laplacian(vec2 pos) {
-      float eps = 0.08;
-      float hc = oceanHeight(pos);
-      float hx1 = oceanHeight(pos + vec2( eps, 0.0));
-      float hx2 = oceanHeight(pos + vec2(-eps, 0.0));
-      float hy1 = oceanHeight(pos + vec2(0.0,  eps));
-      float hy2 = oceanHeight(pos + vec2(0.0, -eps));
-      return (hx1 + hx2 + hy1 + hy2 - 4.0 * hc) / (eps * eps);
     }
     float fresnelSchlick(float cosTheta) {
       float f0 = 0.02;
@@ -374,35 +365,35 @@ const waterMat = new THREE.ShaderMaterial({
       return sky;
     }
     void main() {
-      vec2 worldPos = vWorld.xz * 0.18 + vec2(uTime * 0.018, uTime * 0.011);
-      float h = oceanHeight(worldPos);
-      vec3 normal = oceanNormal(worldPos);
-      float curve = laplacian(worldPos);
-      vec3 viewDir = normalize(cameraPosition - vWorld + vec3(0.0, h * 0.4, 0.0));
+      vec3 dx = dFdx(vWorld);
+      vec3 dy = dFdy(vWorld);
+      vec3 normal = normalize(cross(dy, dx));
+      normal = normalize(mix(vec3(0.0, 1.0, 0.0), normal, 0.82));
+      vec3 viewDir = normalize(cameraPosition - vWorld + vec3(0.0, vH * 0.4, 0.0));
       vec3 reflected = reflect(-viewDir, normal);
       float fresnel = fresnelSchlick(max(dot(normal, viewDir), 0.0));
       float depth = pow(vUv.y, 1.35);
-      float hNorm = clamp(h * 0.34 + 0.5, 0.0, 1.0);
+      float hNorm = clamp(vH * 0.34 + 0.5, 0.0, 1.0);
       vec3 waterDeep = vec3(0.01, 0.04, 0.12);
       vec3 waterShallow = vec3(0.06, 0.32, 0.46);
       vec3 waterCrest = vec3(0.28, 0.70, 0.88);
       vec3 waterBody = mix(waterDeep, waterShallow, depth);
       waterBody = mix(waterBody, waterCrest, pow(hNorm, 3.0) * 0.68);
-      float sss = clamp(curve * 0.11, 0.0, 1.0);
+      float sss = smoothstep(0.48, 0.86, hNorm);
       waterBody += vec3(0.0, 0.55, 0.60) * sss * 0.34;
       vec3 water = mix(waterBody, skyColor(reflected), fresnel * 0.82);
       vec3 sunDir = normalize(vec3(0.5, 0.35, 0.6));
       vec3 halfV = normalize(viewDir + sunDir);
       float spec = pow(max(dot(normal, halfV), 0.0), 118.0) * 2.4;
       water += vec3(1.0, 0.95, 0.78) * spec * uGold * 1.7;
-      float foamH = abs(h);
+      vec2 foamUv = vWorld.xz * 1.6 + vec2(uTime * 0.18, -uTime * 0.12);
+      float foamH = abs(vH);
       float foam = smoothstep(uFoamT * 0.72, uFoamT * 1.2, foamH);
-      float foamNoise = noise(worldPos * 16.0 + vec2(uTime * 0.18, -uTime * 0.12));
+      float foamNoise = noise(foamUv);
       float foamDensity = foam * smoothstep(0.36, 0.72, foamNoise);
       float shore = smoothstep(0.82, 1.0, vUv.y) * (0.5 + 0.5 * sin(vWorld.x * 1.7 + uTime * 2.1));
       water = mix(water, vec3(0.88, 0.95, 0.98), clamp(foamDensity * 0.86 + shore * 0.62, 0.0, 1.0));
-      water += vec3(0.04, 0.0, 0.0) * abs(h - oceanHeight(worldPos + vec2(0.003, 0.0))) * foamDensity * 8.0;
-      water += vec3(0.0, 0.0, 0.06) * abs(h - oceanHeight(worldPos - vec2(0.003, 0.0))) * foamDensity * 8.0;
+      water += vec3(0.025, 0.0, 0.035) * foamDensity * noise(foamUv * 3.0);
       float fogT = clamp((1.0 - vUv.y) * 1.2, 0.0, 1.0);
       vec3 fogColor = uSkyTint + vec3(0.06, 0.10, 0.20);
       water = mix(water, fogColor, pow(fogT, 1.5) * 0.34);
@@ -413,7 +404,7 @@ const waterMat = new THREE.ShaderMaterial({
   `,
 });
 
-const water = new THREE.Mesh(new THREE.PlaneGeometry(180, 170, 260, 260), waterMat);
+const water = new THREE.Mesh(new THREE.PlaneGeometry(180, 170, 150, 150), waterMat);
 water.rotation.x = -Math.PI / 2;
 water.position.set(0, -0.06, -58);
 water.receiveShadow = true;
@@ -468,17 +459,130 @@ function roof(name, x, z) {
   return m;
 }
 
-box('beach-house', [5.6, 2.4, 3.8], [-13.6, 1.08, 3.8], woodMat);
-roof('beach-house-roof', -13.6, 3.8);
-box('warm-window', [1.0, 1.25, .08], [-13.6, 1.15, 5.74], glassMat);
-box('bar-base', [7.2, 1.4, 1.35], [10.4, .64, 3.9], darkWoodMat);
-box('bar-counter', [7.8, .28, 1.75], [10.4, 1.48, 3.9], woodMat);
-for (let i = 0; i < 12; i++) cyl('bar-bamboo-' + i, .09, 1.55, [7.0 + i * .62, .72, 3.13], [0,0,0], woodMat, 16);
+box('beach-house', [5.6, 2.4, 3.8], [-9.2, 1.08, 3.8], woodMat);
+roof('beach-house-roof', -9.2, 3.8);
+box('warm-window', [1.0, 1.25, .08], [-9.2, 1.15, 5.74], glassMat);
+box('bar-base', [7.2, 1.4, 1.35], [8.6, .64, 3.9], darkWoodMat);
+box('bar-counter', [7.8, .28, 1.75], [8.6, 1.48, 3.9], woodMat);
+for (let i = 0; i < 12; i++) cyl('bar-bamboo-' + i, .09, 1.55, [5.2 + i * .62, .72, 3.13], [0,0,0], woodMat, 16);
 for (let i = 0; i < 11; i++) {
-  const plank = box('dock-plank-' + i, [1.9, .16, .42], [-5.2 + i * 1.25, .1, -.55 - i * .38], woodMat);
+  const plank = box('dock-plank-' + i, [1.9, .16, .42], [-6.9 + i * 1.25, .1, -.55 - i * .38], woodMat);
   plank.rotation.y = -.16;
 }
-for (let i = 0; i < 8; i++) cyl('dock-post-' + i, .1, 1.4, [-5.7 + i * 1.72, -.42, -.46 - i * .5], [0,0,0], darkWoodMat, 14);
+for (let i = 0; i < 8; i++) cyl('dock-post-' + i, .1, 1.4, [-7.4 + i * 1.72, -.42, -.46 - i * .5], [0,0,0], darkWoodMat, 14);
+
+function sphere(name, radius, pos, material, scale = [1, 1, 1], segments = 24) {
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, segments, Math.max(8, Math.floor(segments / 2))), material);
+  mesh.name = name;
+  mesh.position.set(...pos);
+  mesh.scale.set(...scale);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  return mesh;
+}
+
+function addLantern(x, y, z) {
+  const group = new THREE.Group();
+  group.position.set(x, y, z);
+  const shade = new THREE.Mesh(new THREE.CylinderGeometry(.22, .3, .32, 18), new THREE.MeshStandardMaterial({ color: 0xf1b85a, emissive: 0xb45c20, emissiveIntensity: .9, roughness: .45 }));
+  const glow = new THREE.PointLight(0xffb66a, .8, 8);
+  glow.position.set(0, .05, 0);
+  group.add(shade, glow);
+  scene.add(group);
+}
+addLantern(5.2, 1.88, 3.15);
+addLantern(12.1, 1.88, 3.15);
+addLantern(-10.7, 2.2, 5.8);
+
+function addRock(x, z, s, color = 0x766b58) {
+  const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), new THREE.MeshStandardMaterial({ color, roughness: .94 }));
+  rock.position.set(x, s * .34 - .05, z);
+  rock.scale.set(1.35, .42, .86);
+  rock.rotation.set(Math.random() * .35, Math.random() * Math.PI, Math.random() * .22);
+  rock.castShadow = true;
+  rock.receiveShadow = true;
+  scene.add(rock);
+  return rock;
+}
+for (const r of [[-19,6,.42],[-17,8,.3],[-4,7.6,.24],[3,6.2,.18],[18,8.7,.36],[22,5.3,.28],[-7,1.2,.2]]) addRock(...r);
+
+function makeAlhena() {
+  const group = new THREE.Group();
+  group.name = 'alhena-modest-bartender-mesh-slot';
+  group.position.set(8.6, 1.68, 3.28);
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(.42, .62, 1.25, 24), clothMat);
+  torso.position.y = .15;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.34, 24, 12), skinMat);
+  head.position.y = 1.02;
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(.38, 24, 12), hairMat);
+  hair.position.set(0, 1.08, -.05);
+  hair.scale.set(1.05, .9, .82);
+  const apron = new THREE.Mesh(new THREE.BoxGeometry(.86, .92, .045), new THREE.MeshStandardMaterial({ color: 0xd6b16b, roughness: .7 }));
+  apron.position.set(0, .03, .43);
+  const leftArm = new THREE.Mesh(new THREE.CapsuleGeometry(.07, .72, 6, 12), skinMat);
+  leftArm.position.set(-.52, .42, .1);
+  leftArm.rotation.z = -.62;
+  const rightArm = new THREE.Mesh(new THREE.CapsuleGeometry(.07, .72, 6, 12), skinMat);
+  rightArm.position.set(.52, .42, .1);
+  rightArm.rotation.z = .62;
+  const eyes = new THREE.Group();
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x070504 });
+  for (const x of [-.11,.11]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(.028, 10, 6), eyeMat);
+    eye.position.set(x, 1.05, .31);
+    eyes.add(eye);
+  }
+  group.add(torso, head, hair, apron, leftArm, rightArm, eyes);
+  group.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  scene.add(group);
+  return { group, leftArm, rightArm };
+}
+
+function makeBlackLab() {
+  const group = new THREE.Group();
+  group.name = 'black-lab-articulated-mesh-slot';
+  group.position.set(-2.6, .42, 5.65);
+  group.rotation.y = -.25;
+  const body = new THREE.Mesh(new THREE.SphereGeometry(.48, 28, 14), labMat);
+  body.scale.set(1.75, .68, .82);
+  const chest = new THREE.Mesh(new THREE.SphereGeometry(.38, 24, 12), labHighlightMat);
+  chest.position.set(.55, .06, .02);
+  chest.scale.set(.85, .78, .9);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.34, 24, 12), labMat);
+  head.position.set(1.05, .38, .02);
+  head.scale.set(1.05, .82, .88);
+  const muzzle = new THREE.Mesh(new THREE.SphereGeometry(.18, 18, 9), labHighlightMat);
+  muzzle.position.set(1.31, .31, .02);
+  muzzle.scale.set(1.25, .62, .72);
+  const collar = new THREE.Mesh(new THREE.TorusGeometry(.32, .035, 8, 28), collarMat);
+  collar.position.set(.79, .27, .02);
+  collar.rotation.y = Math.PI / 2;
+  const tail = new THREE.Mesh(new THREE.CapsuleGeometry(.055, .7, 6, 12), labMat);
+  tail.position.set(-.92, .24, .02);
+  tail.rotation.z = 1.1;
+  const legs = [];
+  for (const [x, z] of [[-.42,-.26],[-.42,.26],[.52,-.26],[.52,.26]]) {
+    const leg = new THREE.Mesh(new THREE.CapsuleGeometry(.07, .48, 6, 12), labMat);
+    leg.position.set(x, -.42, z);
+    leg.rotation.z = .05;
+    legs.push(leg);
+    group.add(leg);
+  }
+  const earL = new THREE.Mesh(new THREE.CapsuleGeometry(.055, .32, 6, 10), labMat);
+  earL.position.set(1.0, .27, -.25);
+  earL.rotation.x = .78;
+  const earR = earL.clone();
+  earR.position.z = .25;
+  earR.rotation.x = -.78;
+  group.add(body, chest, head, muzzle, collar, tail, earL, earR);
+  group.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  scene.add(group);
+  return { group, legs, tail, head };
+}
+
+const alhena = makeAlhena();
+const lab = makeBlackLab();
 
 function palm(x, z, s = 1) {
   const trunk = cyl('palm-trunk', .16 * s, 4.8 * s, [x, 2.1 * s, z], [0,0,.16], woodMat, 18);
@@ -494,8 +598,8 @@ function palm(x, z, s = 1) {
   }
   return trunk;
 }
-palm(-18, 4.8, 1.05);
-palm(17, 6.7, .82);
+palm(-13.2, 4.8, 1.05);
+palm(14.2, 6.7, .82);
 palm(-2, 8.6, .65);
 
 const shellMat = new THREE.MeshStandardMaterial({ color: 0xf4d8a3, roughness: .62 });
@@ -533,9 +637,10 @@ const lineGeo = new THREE.BufferGeometry();
 const line = new THREE.Line(lineGeo, lineMat);
 scene.add(line);
 
-const look = new THREE.Vector3(0, 1.0, -22);
-let tour = true;
+const look = new THREE.Vector3(0.4, 1.05, -11);
+let tour = false;
 let targetAngle = 0;
+camera.lookAt(look);
 
 function setPreset(name) {
   activePreset = presets[name];
@@ -580,11 +685,22 @@ function animate(now) {
   waterUniforms.uTime.value = t;
   if (tour) {
     targetAngle += .0018;
-    camera.position.x = Math.sin(targetAngle) * 7.0;
-    camera.position.z = 14.5 + Math.cos(targetAngle * .7) * 2.8;
-    camera.position.y = 3.9 + Math.sin(targetAngle * 1.4) * .35;
+    camera.position.x = 3.4 + Math.sin(targetAngle) * 4.2;
+    camera.position.z = 11.4 + Math.cos(targetAngle * .7) * 2.2;
+    camera.position.y = 2.65 + Math.sin(targetAngle * 1.4) * .25;
     camera.lookAt(look);
   }
+  alhena.group.rotation.y = Math.sin(t * .38) * .08;
+  alhena.leftArm.rotation.z = -.58 + Math.sin(t * 1.2) * .07;
+  alhena.rightArm.rotation.z = .58 + Math.cos(t * 1.1) * .07;
+  lab.group.position.x = -2.6 + Math.sin(t * .42) * 1.25;
+  lab.group.position.z = 5.65 + Math.cos(t * .36) * .35;
+  lab.group.rotation.y = -.25 + Math.sin(t * .42) * .24;
+  lab.head.rotation.y = Math.sin(t * 1.1) * .16;
+  lab.tail.rotation.z = 1.1 + Math.sin(t * 5.0) * .35;
+  lab.legs.forEach((leg, i) => {
+    leg.rotation.x = Math.sin(t * 5.2 + i * Math.PI) * .38;
+  });
   bobber.position.y = .26 + Math.sin(t * 2.5) * .13;
   bobber.position.z = -16 + Math.sin(t * .72) * .75;
   bobber.position.x = 2.2 + Math.cos(t * .61) * .5;
