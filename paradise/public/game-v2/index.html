@@ -10,6 +10,33 @@
 html, body { width: 100%; height: 100%; overflow: hidden; background: #06101a; color: #f8ebc7; font-family: ui-sans-serif, system-ui, sans-serif; }
 canvas { display: block; width: 100vw; height: 100vh; }
 body { touch-action: none; }
+.lens {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 53% 42%, transparent 0 42%, rgba(4, 12, 20, .10) 72%, rgba(2, 7, 12, .34) 100%),
+    linear-gradient(180deg, rgba(255,245,210,.040), transparent 24%, rgba(12,30,40,.075) 100%);
+  mix-blend-mode: multiply;
+}
+.lens::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: .070;
+  background-image:
+    repeating-radial-gradient(circle at 17% 23%, rgba(255,255,255,.38) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(91deg, rgba(255,255,255,.06) 0 1px, transparent 1px 5px);
+  background-size: 180px 160px, 7px 7px;
+  mix-blend-mode: overlay;
+}
+body.clean .lens::after { opacity: .035; }
+body.presentation .lens {
+  background:
+    radial-gradient(circle at 53% 42%, transparent 0 39%, rgba(5, 15, 22, .13) 71%, rgba(2, 7, 12, .38) 100%),
+    linear-gradient(180deg, rgba(255,238,198,.052), transparent 22%, rgba(8,25,36,.10) 100%);
+}
 .hud {
   position: fixed;
   left: 18px;
@@ -137,6 +164,7 @@ body.clean .caption {
 </style>
 </head>
 <body>
+<div class="lens" aria-hidden="true"></div>
 <div class="hud">
   <div class="kicker">Paradise V2 · real 3D architecture</div>
   <h1>Shoreline rebuild</h1>

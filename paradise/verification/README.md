@@ -194,6 +194,11 @@ taken with Playwright Chromium at `1440x900`.
   mist cards. This improves sky/ocean depth and golden-hour readability without
   relying on more flat prop art; it is still a bridge until real HDRI, authored
   skyboxes, and PBR scene assets replace the procedural stand-ins.
+- `paradise-game-v2-cinematic-lens.png`: live presentation-mode shore capture
+  after adding a lightweight cinematic lens layer with vignette, warm veil, and
+  restrained grain. This improves screenshot focus and perceived contrast while
+  keeping gameplay untouched; it is a post/composition bridge, not a substitute
+  for authored high-fidelity scene assets.
 - `scripts/verify-game.sh`: production verifier now covers the legacy canvas
   game, the root launcher, and the primary `/game-v2/` route. It syntax-checks
   both module scripts, validates asset budgets, checks root CTA markers, and

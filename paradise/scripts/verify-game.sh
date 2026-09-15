@@ -99,6 +99,7 @@ v2_markers=(
   "v2-black-lab-procedural-rig-standin"
   "v2-alhena-bartender-procedural-standin"
   "v2-near-surface-fish-glint"
+  "class=\"lens\""
   "mobile-controls"
   "presentation"
   "hud-hidden"
