@@ -84,6 +84,11 @@ taken with Playwright Chromium at `1440x900`.
   reflection, sky/horizon reflection, subsurface scatter, foam streaks, fog,
   and tone mapping. It verifies the approach is active in `/game-v2/`, but also
   shows the visual ceiling of the current procedural scene.
+- `paradise-game-v2-water-optics-tuned.png`: live V2 clean/cinematic capture
+  after correcting the failed beige transparent-water pass, making the ocean
+  opaque, lowering cinematic fog, deepening the water body, raising the water
+  camera, and adding a shader-only optical highlight layer. This is the current
+  best verified V2 water view.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.
