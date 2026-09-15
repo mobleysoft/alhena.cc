@@ -23,6 +23,10 @@ taken with Playwright Chromium at `1440x900`.
 - `paradise-candidate-default-cinematic.png`: production capture after changing
   runtime model slots to candidate-only loading unless `assets=1`; verifies the
   default visual is restored while the GLB remains deployed for testing.
+- `paradise-coherent-surface-cinematic.png`: production capture after adding a
+  JavaScript-side spectral surface sampler shared by bobber buoyancy, ridge
+  geometry, glints, ripple rings, and fish depth. This is primarily a motion
+  coherence improvement, not a still-frame leap.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.
