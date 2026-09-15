@@ -1655,6 +1655,36 @@ function drawContactShadow(x, y, rx, ry, alpha=0.22) {
   ctx.restore();
 }
 
+function drawWoodGrain(x, y, w, h, time, density = 9) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  ctx.globalAlpha = 0.14 + time.light * 0.08;
+  ctx.strokeStyle = 'rgba(255,218,142,0.42)';
+  ctx.lineWidth = 0.8;
+  for (let i = 0; i < density; i++) {
+    const yy = y + 5 + (i / Math.max(1, density - 1)) * (h - 10);
+    ctx.beginPath();
+    for (let px = x - 6; px <= x + w + 6; px += 8) {
+      const py = yy + Math.sin(px * 0.08 + i * 1.7) * 1.8 + Math.sin(px * 0.023 + i) * 1.2;
+      if (px === x - 6) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 0.11;
+  ctx.fillStyle = '#0a0705';
+  for (let i = 0; i < 5; i++) {
+    const kx = x + 13 + ((i * 29) % Math.max(20, w - 20));
+    const ky = y + 11 + ((i * 17) % Math.max(16, h - 18));
+    ctx.beginPath();
+    ctx.ellipse(kx, ky, 8, 2.2, Math.sin(i) * 0.5, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawForegroundPlants(x, y, s, time) {
   ctx.save();
   ctx.translate(x, y);
@@ -1690,6 +1720,7 @@ function drawBeachHouse(x, y, s, time) {
   ctx.fillStyle = siding;
   roundRect(0, 0, 130, 62, 2);
   ctx.fill();
+  drawWoodGrain(0, 0, 130, 62, time, 11);
   const side = ctx.createLinearGradient(130, 2, 162, 58);
   side.addColorStop(0, mix('#65371f', '#120a07', 1 - time.light));
   side.addColorStop(1, mix('#3d2416', '#050302', 1 - time.light));
@@ -1701,6 +1732,7 @@ function drawBeachHouse(x, y, s, time) {
   ctx.lineTo(130, 62);
   ctx.closePath();
   ctx.fill();
+  drawWoodGrain(130, 8, 30, 48, time, 6);
   ctx.fillStyle = mix('#7b2b1c', '#1c0c08', 1 - time.light);
   ctx.beginPath();
   ctx.moveTo(-12, 2);
@@ -1721,6 +1753,12 @@ function drawBeachHouse(x, y, s, time) {
   for (let i = 0; i < 5; i++) ctx.fillRect(10 + i * 23, 4, 2, 58);
   ctx.fillStyle = 'rgba(255,240,184,0.16)';
   ctx.fillRect(3, 5, 124, 2);
+  ctx.strokeStyle = `rgba(255,237,172,${0.16 + time.light * 0.16})`;
+  ctx.lineWidth = 1.1;
+  ctx.beginPath();
+  ctx.moveTo(4, 1);
+  ctx.lineTo(126, 1);
+  ctx.stroke();
   ctx.fillStyle = state.time === 'night' ? 'rgba(255,211,105,0.92)' : 'rgba(255,218,121,0.5)';
   roundRect(49, 20, 27, 34, 2);
   ctx.fill();
@@ -1889,11 +1927,18 @@ function drawBarAndAlhena(x, y, t, time) {
   ctx.fillStyle = barGrad;
   roundRect(-94, 34, 170, 64, 5);
   ctx.fill();
+  drawWoodGrain(-94, 36, 170, 60, time, 12);
   ctx.fillStyle = 'rgba(0,0,0,0.22)';
   for (let i = 0; i < 7; i++) ctx.fillRect(-83 + i * 24, 39, 2, 53);
   ctx.fillStyle = '#122f32';
   roundRect(-106, 20, 194, 15, 8);
   ctx.fill();
+  ctx.strokeStyle = `rgba(161,238,226,${0.22 + time.light * 0.12})`;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-97, 22);
+  ctx.lineTo(78, 22);
+  ctx.stroke();
   ctx.fillStyle = 'rgba(255,255,255,0.08)';
   roundRect(-98, 22, 72, 5, 3);
   ctx.fill();
