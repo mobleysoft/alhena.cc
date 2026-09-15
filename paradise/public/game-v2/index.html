@@ -25,6 +25,21 @@ canvas { display: block; width: 100vw; height: 100vh; }
 .kicker { color: rgba(255, 215, 126, .76); font-size: 10px; letter-spacing: .24em; text-transform: uppercase; }
 h1 { margin-top: 8px; font-family: Georgia, serif; font-size: 30px; line-height: .95; font-weight: 500; }
 p { margin-top: 10px; color: rgba(248, 235, 199, .72); font-size: 13px; line-height: 1.55; }
+.status { min-height: 36px; }
+.meter {
+  height: 7px;
+  margin-top: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255,255,255,.10);
+}
+.meter span {
+  display: block;
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #53d8ef, #f0cb66, #e85e4c);
+}
 .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 button {
   border: 1px solid rgba(255, 233, 180, .26);
@@ -67,15 +82,18 @@ button.active { border-color: rgba(255, 220, 116, .75); background: rgba(255, 21
 <div class="hud">
   <div class="kicker">Paradise V2 · real 3D architecture</div>
   <h1>Shoreline rebuild</h1>
-  <p>This route is the clean replacement path: a real 3D ocean mesh, spectral waves, PBR-style materials, cast shadows, and camera views designed for asset-pipeline iteration.</p>
+  <p class="status" id="status">Cast past the foam line. When the bobber dives, reel before the tension breaks.</p>
+  <div class="meter"><span id="meter"></span></div>
   <div class="row">
+    <button id="cast">Cast</button>
+    <button id="reel">Reel</button>
     <button data-view="shore" class="active">Shore</button>
     <button data-view="water">Water</button>
     <button data-view="bar">Bar</button>
     <button data-view="dog">Dog</button>
   </div>
 </div>
-<div class="caption">Drag to orbit · wheel to dolly · V2 is isolated from the current playable route</div>
+<div class="caption">Space/tap casts and reels · drag to orbit · wheel to dolly</div>
 
 <script type="importmap">
 {
@@ -584,6 +602,90 @@ const red = new THREE.Mesh(new THREE.SphereGeometry(.162, 24, 12, 0, Math.PI * 2
 red.position.copy(bobber.position);
 scene.add(red);
 
+const lineMat = new THREE.LineBasicMaterial({ color: 0xeef9f3, transparent: true, opacity: .66 });
+const lineGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]);
+const fishingLine = new THREE.Line(lineGeom, lineMat);
+fishingLine.name = 'v2-live-fishing-line';
+scene.add(fishingLine);
+const rodTip = new THREE.Vector3(11.4, 1.78, 3.2);
+const castTargets = [
+  new THREE.Vector3(-4.8, .08, -20.0),
+  new THREE.Vector3(-1.2, .08, -17.5),
+  new THREE.Vector3(2.8, .08, -21.5),
+  new THREE.Vector3(6.4, .08, -18.2)
+];
+const statusEl = document.getElementById('status');
+const meterEl = document.getElementById('meter');
+const play = {
+  cast: false,
+  castAt: 0,
+  biteAt: 0,
+  bite: false,
+  tension: 0,
+  catches: 0,
+  target: castTargets[1].clone()
+};
+
+function setStatus(text) {
+  statusEl.textContent = text;
+}
+
+function castLine() {
+  const now = performance.now();
+  play.cast = true;
+  play.bite = false;
+  play.tension = 0;
+  play.castAt = now;
+  play.biteAt = now + 1600 + Math.random() * 2200;
+  play.target.copy(castTargets[Math.floor(Math.random() * castTargets.length)]);
+  setStatus('Line out. Watch for the bobber to dive.');
+}
+
+function clearLine() {
+  play.cast = false;
+  play.bite = false;
+  play.tension = 0;
+  setStatus('Cast past the foam line. When the bobber dives, reel before the tension breaks.');
+}
+
+function reelLine() {
+  if (!play.cast) return castLine();
+  if (!play.bite) {
+    play.tension = Math.min(1, play.tension + .16);
+    setStatus('Too early. Let the bite develop before reeling.');
+    return;
+  }
+  play.tension += .28;
+  if (play.tension > .62 && play.tension < 1.05) {
+    play.catches += 1;
+    setStatus(`Caught glass minnow x${play.catches}. Cast again.`);
+    clearLine();
+  } else if (play.tension >= 1.05) {
+    setStatus('Line snapped. Reset and cast again.');
+    clearLine();
+  } else {
+    setStatus('Reel again. Keep tension in the strike window.');
+  }
+}
+
+document.getElementById('cast').addEventListener('click', castLine);
+document.getElementById('reel').addEventListener('click', reelLine);
+window.addEventListener('keydown', event => {
+  if (event.code === 'Space') {
+    event.preventDefault();
+    reelLine();
+  }
+});
+let lastTap = 0;
+renderer.domElement.addEventListener('pointerdown', event => {
+  if (event.pointerType === 'mouse' && event.button !== 0) return;
+  const now = performance.now();
+  if (now - lastTap < 360) clearLine();
+  else if (!play.cast) castLine();
+  else reelLine();
+  lastTap = now;
+});
+
 const fishMat = new THREE.MeshStandardMaterial({ color: 0x73d5c7, roughness: .48, metalness: .08 });
 const fish = [];
 for (let i = 0; i < 12; i++) {
@@ -621,7 +723,9 @@ addEventListener('resize', resize);
 
 const clock = new THREE.Clock();
 function animate() {
+  const dt = Math.min(clock.getDelta(), .05);
   const t = clock.getElapsedTime();
+  const now = performance.now();
   oceanUniforms.uTime.value = t;
   sunDisk.lookAt(camera.position);
   sunGlow.lookAt(camera.position);
@@ -634,8 +738,31 @@ function animate() {
   dog.userData.legs.forEach((leg, i) => {
     leg.rotation.x = Math.sin(t * 4.3 + i * Math.PI * .5) * .26;
   });
-  bobber.position.y = .08 + Math.sin(t * 1.7) * .06;
+  if (play.cast && !play.bite && now > play.biteAt) {
+    play.bite = true;
+    play.tension = .18;
+    setStatus('Bite. Reel now.');
+  }
+  if (play.cast) {
+    const fly = Math.min(1, (now - play.castAt) / 720);
+    const ease = 1 - Math.pow(1 - fly, 3);
+    bobber.position.lerpVectors(new THREE.Vector3(10.8, 1.55, 3.4), play.target, ease);
+    bobber.position.y = (play.bite ? -.05 : .08) + Math.sin(t * 1.7) * .055 - play.tension * .035;
+    if (play.bite) play.tension = Math.min(1.18, play.tension + .14 * dt);
+  } else {
+    bobber.position.set(10.8, 1.55 + Math.sin(t * 1.6) * .025, 3.4);
+  }
   red.position.copy(bobber.position);
+  const linePos = fishingLine.geometry.attributes.position;
+  linePos.setXYZ(0, rodTip.x, rodTip.y, rodTip.z);
+  linePos.setXYZ(1, (rodTip.x + bobber.position.x) * .5, Math.max(.35, (rodTip.y + bobber.position.y) * .5 - .6), (rodTip.z + bobber.position.z) * .5);
+  linePos.setXYZ(2, bobber.position.x, bobber.position.y, bobber.position.z);
+  linePos.needsUpdate = true;
+  meterEl.style.width = `${Math.round(Math.min(1, play.tension) * 100)}%`;
+  if (play.cast && play.bite && play.tension >= 1.1) {
+    setStatus('The fish shook loose. Cast again.');
+    clearLine();
+  }
   fish.forEach((f, i) => {
     f.position.x += Math.sin(t * f.userData.speed + f.userData.phase) * .008;
     f.position.y = -.52 + Math.sin(t * .8 + i) * .12;

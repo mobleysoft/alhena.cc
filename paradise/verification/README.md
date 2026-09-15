@@ -54,6 +54,11 @@ taken with Playwright Chromium at `1440x900`.
 - `paradise-game-v2-final-atmosphere.png`: final live capture for this pass;
   verifies the `/game-v2/` route remains renderable after linking it from the
   Paradise landing page.
+- `paradise-game-v2-play-idle.png`: live V2 capture from the automated
+  production playtest before input.
+- `paradise-game-v2-play-cast.png`: live V2 capture after pressing Space and
+  clicking Reel in production; verifies the bobber, line, bite status, and
+  tension meter path.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.
