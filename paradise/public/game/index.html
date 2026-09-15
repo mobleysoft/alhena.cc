@@ -20,7 +20,10 @@ html, body {
   color: var(--ink);
   font-family: Georgia, "Times New Roman", serif;
 }
+#ocean-pass,
 #stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+#ocean-pass { z-index: 0; background: #07131b; }
+#stage { z-index: 1; }
 #grade {
   position: fixed;
   inset: 0;
@@ -249,6 +252,7 @@ body.clean .caption { opacity: 0; pointer-events: none; }
 </style>
 </head>
 <body>
+<canvas id="ocean-pass"></canvas>
 <canvas id="stage"></canvas>
 <div id="grade"></div>
 <section class="hud">
@@ -289,20 +293,22 @@ body.clean .caption { opacity: 0; pointer-events: none; }
 import * as THREE from 'https://unpkg.com/three@0.168.0/build/three.module.js';
 
 const canvas = document.getElementById('stage');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+const oceanCanvas = document.getElementById('ocean-pass');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, premultipliedAlpha: false, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.35));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.setClearColor(0x000000, 0);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.06;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x88bdd1);
+scene.background = null;
 scene.fog = new THREE.FogExp2(0x8cbfd0, 0.0105);
 
-const camera = new THREE.PerspectiveCamera(52, 1, 0.1, 280);
-camera.position.set(0.8, 3.0, 18.5);
+const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 280);
+camera.position.set(0.2, 1.85, 7.2);
 
 const hemi = new THREE.HemisphereLight(0xc8f1ff, 0x6e5433, 1.15);
 scene.add(hemi);
@@ -337,6 +343,118 @@ const presets = {
   }
 };
 let activePreset = presets.dawn;
+
+function makeOceanPass(canvas) {
+  const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+  if (!gl) return null;
+  const vertex = `attribute vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }`;
+  const fragment = `
+    precision highp float;
+    uniform vec2 uRes;
+    uniform float uTime;
+    uniform float uGold;
+    uniform float uWind;
+    uniform vec3 uSkyTint;
+    const float PI = 3.14159265359;
+    float hash(float n){ return fract(sin(n) * 43758.5453123); }
+    float wave(vec2 p, float i) {
+      float t = i / 10.0;
+      float theta = (t - .5) * PI * .92 + .18 + (hash(i * 9.17) - .5) * .42;
+      vec2 d = vec2(cos(theta), sin(theta));
+      float f = mix(.65, 7.8, t * t);
+      float amp = exp(-pow(t - .34, 2.0) * 16.0) * .055 + .012 / (1.0 + i);
+      float w = dot(d, p) * f - uTime * (0.55 + f * .11) + hash(i * 17.3) * 6.283;
+      return sin(w) * amp + sin(w * 2.0 + i) * amp * .22;
+    }
+    float height(vec2 p) {
+      float h = 0.0;
+      for (int i = 0; i < 11; i++) h += wave(p, float(i));
+      return h * mix(.75, 1.85, clamp(uWind / 16.0, 0.0, 1.0));
+    }
+    vec3 normal(vec2 p) {
+      float e = .018;
+      float h = height(p);
+      return normalize(vec3(height(p + vec2(e, 0.0)) - h, e * 3.0, height(p + vec2(0.0, e)) - h));
+    }
+    void main() {
+      vec2 uv = gl_FragCoord.xy / uRes;
+      vec2 q = (gl_FragCoord.xy * 2.0 - uRes) / min(uRes.x, uRes.y);
+      float horizon = .47 + .018 * sin(q.x * 2.1 + uTime * .06);
+      vec3 zenith = uSkyTint * 2.2 + vec3(.03, .08, .16);
+      vec3 horizonCol = mix(vec3(.32, .58, .70), vec3(.96, .68, .36), uGold * .36);
+      vec3 col = mix(horizonCol, zenith, smoothstep(.42, 1.0, uv.y));
+      vec2 sun = vec2(.37, .60);
+      float sunCore = exp(-distance(uv, sun) * 18.0) * uGold;
+      float sunGlow = exp(-distance(uv, sun) * 4.2) * uGold;
+      col += vec3(1.0, .78, .42) * (sunCore * .75 + sunGlow * .12);
+      if (uv.y < horizon) {
+        float depth = smoothstep(horizon, .02, uv.y);
+        vec2 p = vec2(q.x * (1.0 + depth * 3.0), depth * 5.8 + uTime * .055);
+        vec3 n = normal(p);
+        float fres = pow(1.0 - clamp(n.y, 0.0, 1.0), 3.0);
+        vec3 deep = vec3(.012, .055, .11);
+        vec3 shallow = vec3(.05, .34, .43);
+        vec3 skyRefl = mix(horizonCol, zenith, .42 + n.z * .25);
+        col = mix(mix(shallow, deep, depth), skyRefl, .28 + fres * .65);
+        float crest = smoothstep(.038, .105, abs(height(p)));
+        float shore = smoothstep(.14, .0, abs(uv.y - .22)) * (.5 + .5 * sin(q.x * 38.0 + uTime * 2.4));
+        float glint = pow(max(0.0, dot(normalize(vec3(.25,.9,.28)), n)), 72.0) * uGold;
+        col += vec3(.02, .42, .36) * crest * .28;
+        col = mix(col, vec3(.9, .98, 1.0), clamp(crest * .22 + shore * .26, 0.0, .58));
+        col += vec3(1.0, .86, .48) * glint * 1.2;
+        col = mix(col, horizonCol, smoothstep(.0, .22, uv.y) * .18);
+      }
+      col = col / (col + vec3(1.0));
+      col = pow(col, vec3(1.0 / 2.2));
+      gl_FragColor = vec4(col, 1.0);
+    }`;
+  function compile(type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader));
+    return shader;
+  }
+  const program = gl.createProgram();
+  gl.attachShader(program, compile(gl.VERTEX_SHADER, vertex));
+  gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fragment));
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
+  const buffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+  const pos = gl.getAttribLocation(program, 'p');
+  const uniforms = {
+    res: gl.getUniformLocation(program, 'uRes'),
+    time: gl.getUniformLocation(program, 'uTime'),
+    gold: gl.getUniformLocation(program, 'uGold'),
+    wind: gl.getUniformLocation(program, 'uWind'),
+    skyTint: gl.getUniformLocation(program, 'uSkyTint')
+  };
+  return {
+    render(time, preset) {
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
+      const w = Math.max(1, Math.floor(canvas.clientWidth * dpr));
+      const h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.useProgram(program);
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      gl.enableVertexAttribArray(pos);
+      gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
+      gl.uniform2f(uniforms.res, canvas.width, canvas.height);
+      gl.uniform1f(uniforms.time, time);
+      gl.uniform1f(uniforms.gold, preset.gold);
+      gl.uniform1f(uniforms.wind, preset.wind);
+      gl.uniform3f(uniforms.skyTint, preset.skyTint[0], preset.skyTint[1], preset.skyTint[2]);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
+  };
+}
+const oceanPass = makeOceanPass(oceanCanvas);
 
 function canvasTexture(size, painter) {
   const c = document.createElement('canvas');
@@ -539,12 +657,12 @@ const skyBackdrop = new THREE.Mesh(
       void main() {
         vec2 uv = vUv;
         vec3 zenith = uSkyTint * 2.45 + vec3(0.04, 0.08, 0.15);
-        vec3 horizon = mix(vec3(0.30, 0.54, 0.64), vec3(1.0, 0.64, 0.24), uGold);
+        vec3 horizon = mix(vec3(0.30, 0.54, 0.64), vec3(0.94, 0.68, 0.36), uGold * 0.45);
         vec3 sky = mix(horizon, zenith, smoothstep(0.20, 0.95, uv.y));
         vec2 sunUv = vec2(0.36, 0.55);
         float sun = exp(-distance(uv, sunUv) * 18.0) * uGold;
         float rays = pow(max(0.0, 1.0 - distance(uv, sunUv) * 2.2), 3.0) * .20 * uGold;
-        sky += vec3(1.0, 0.84, 0.48) * (sun * 1.2 + rays);
+        sky += vec3(1.0, 0.84, 0.48) * (sun * 0.82 + rays);
         float clouds = fbm(vec2(uv.x * 4.8 + uTime * .012, uv.y * 10.0));
         float cloudMask = smoothstep(.58, .78, clouds) * smoothstep(.18, .52, uv.y) * (1.0 - smoothstep(.86, 1.0, uv.y));
         sky = mix(sky, vec3(.92, .98, 1.0), cloudMask * (.20 + .20 * uGold));
@@ -558,6 +676,7 @@ const skyBackdrop = new THREE.Mesh(
   })
 );
 skyBackdrop.position.set(0, 58, -190);
+skyBackdrop.visible = false;
 scene.add(skyBackdrop);
 const skyUniforms = skyBackdrop.material.uniforms;
 
@@ -745,7 +864,7 @@ const waterMat = new THREE.ShaderMaterial({
     vec3 skyColor(vec3 r) {
       float t = clamp(r.y * 0.5 + 0.5, 0.0, 1.0);
       vec3 zenith = uSkyTint * 2.5 + vec3(0.04, 0.08, 0.18);
-      vec3 horizon = mix(vec3(0.12, 0.16, 0.28), vec3(0.84, 0.58, 0.22) * uGold, uGold);
+      vec3 horizon = mix(vec3(0.12, 0.22, 0.34), vec3(0.76, 0.56, 0.28), uGold * 0.5);
       vec3 sky = mix(horizon, zenith, smoothstep(0.0, 0.55, t));
       vec3 sunDir = normalize(vec3(0.5, 0.20, 0.6));
       float sunDot = dot(normalize(r), sunDir);
@@ -941,17 +1060,18 @@ for (let row = 0; row < 7; row++) {
   shoreFoamLines.push({ line: lineMesh, row, baseZ: z });
 }
 
-const distantMat = new THREE.MeshBasicMaterial({ color: 0x5f8391, transparent: true, opacity: .52, depthWrite: false });
+const distantMat = new THREE.MeshBasicMaterial({ color: 0x486f7c, transparent: true, opacity: .30, depthWrite: false });
 for (const [x, z, sx, sy] of [[-38, -104, 18, 2.2], [-13, -111, 24, 3.1], [18, -106, 19, 2.4], [43, -116, 28, 3.5]]) {
   const island = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 7), distantMat);
   island.name = 'mist-distant-island';
   island.position.set(x, 1.5, z);
   island.scale.set(sx, sy, sx * .28);
   island.rotation.y = Math.PI / 7;
+  island.visible = false;
   scene.add(island);
 }
 
-const cloudMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .18, depthWrite: false });
+const cloudMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .045, depthWrite: false });
 for (const [x, y, z, sx] of [[-34, 20, -95, 10], [-5, 24, -115, 14], [35, 21, -102, 11]]) {
   const cloud = new THREE.Group();
   cloud.name = 'soft-layered-cloud-bank';
@@ -962,6 +1082,7 @@ for (const [x, y, z, sx] of [[-34, 20, -95, 10], [-5, 24, -115, 14], [35, 21, -1
     puff.scale.set(sx * (.46 + i * .04), sx * .09, sx * .08);
     cloud.add(puff);
   }
+  cloud.visible = false;
   scene.add(cloud);
 }
 
@@ -1281,9 +1402,9 @@ const lineGeo = new THREE.BufferGeometry();
 const line = new THREE.Line(lineGeo, lineMat);
 scene.add(line);
 
-const look = new THREE.Vector3(0.4, 1.05, -11);
-const desiredCamera = new THREE.Vector3(0.8, 3.0, 18.5);
-const desiredLook = new THREE.Vector3(0.4, 1.05, -11);
+const look = new THREE.Vector3(0.15, .42, -42);
+const desiredCamera = new THREE.Vector3(0.2, 1.85, 7.2);
+const desiredLook = new THREE.Vector3(0.15, .42, -42);
 let tour = false;
 let targetAngle = 0;
 camera.lookAt(look);
@@ -1306,8 +1427,8 @@ const play = {
 };
 
 const views = {
-  wide: { pos: [0.8, 3.0, 18.5], look: [0.4, 1.05, -11], note: 'Wide establishing view.' },
-  water: { pos: [3.2, 2.35, 7.8], look: [1.0, .72, -17.5], note: 'Low shore-water view.' },
+  wide: { pos: [0.2, 1.85, 7.2], look: [0.15, .42, -42], note: 'Ocean-forward establishing view.' },
+  water: { pos: [2.6, 1.28, 4.9], look: [1.0, .28, -54], note: 'Low shore-water view.' },
   dock: { pos: [-7.8, 2.35, 7.8], look: [-1.0, .78, -8.5], note: 'Dock and cast lane.' },
   dog: { pos: [-5.6, 1.72, 9.4], look: [-2.7, .62, 5.3], note: 'Black lab movement slot.' },
   bar: { pos: [4.8, 2.75, 9.8], look: [8.8, 1.38, 3.3], note: 'Alhena bartender slot.' },
@@ -1372,16 +1493,16 @@ function updatePlayerInput(dt) {
     desiredCamera.add(play.velocity);
     desiredLook.add(play.velocity);
     desiredCamera.x = THREE.MathUtils.clamp(desiredCamera.x, -15, 15);
-    desiredCamera.z = THREE.MathUtils.clamp(desiredCamera.z, 5, 24);
+    desiredCamera.z = THREE.MathUtils.clamp(desiredCamera.z, 2.5, 24);
     desiredLook.x = THREE.MathUtils.clamp(desiredLook.x, -12, 12);
-    desiredLook.z = THREE.MathUtils.clamp(desiredLook.z, -24, 0);
+    desiredLook.z = THREE.MathUtils.clamp(desiredLook.z, -58, 0);
   }
 }
 
 function setPreset(name) {
   activePreset = presets[name];
   document.querySelectorAll('[data-time]').forEach(b => b.classList.toggle('active', b.dataset.time === name));
-  scene.background.setHex(activePreset.bg);
+  renderer.setClearColor(activePreset.bg, 0);
   scene.fog.color.setHex(activePreset.fog);
   renderer.toneMappingExposure = activePreset.exposure;
   sun.position.set(...activePreset.sun);
@@ -1466,8 +1587,9 @@ window.addEventListener('pointermove', ev => {
   if (ev.target.closest?.('.hud, .mobile-pad, .action-pad')) return;
   const nx = ev.clientX / innerWidth - .5;
   const ny = ev.clientY / innerHeight - .5;
-  desiredLook.x = 0.4 + nx * 7.5;
-  desiredCamera.y = THREE.MathUtils.clamp(3.0 - ny * 2.2, .85, 5.2);
+  desiredLook.x = 0.15 + nx * 9.5;
+  desiredLook.y = THREE.MathUtils.clamp(.42 - ny * 1.0, .05, 1.35);
+  desiredCamera.y = THREE.MathUtils.clamp(1.85 - ny * 1.65, .75, 4.6);
 });
 
 function resize() {
@@ -1486,14 +1608,15 @@ function animate(now) {
   const t = now * .001;
   const dt = Math.min(0.05, (now - lastNow) * 0.001);
   lastNow = now;
+  oceanPass?.render(t, activePreset);
   waterUniforms.uTime.value = t;
   skyUniforms.uTime.value = t;
   if (tour) {
     targetAngle += .0018;
-    desiredCamera.x = 3.4 + Math.sin(targetAngle) * 4.2;
-    desiredCamera.z = 11.4 + Math.cos(targetAngle * .7) * 2.2;
-    desiredCamera.y = 2.65 + Math.sin(targetAngle * 1.4) * .25;
-    desiredLook.set(0.4, 1.05, -11);
+    desiredCamera.x = 2.2 + Math.sin(targetAngle) * 5.2;
+    desiredCamera.z = 7.8 + Math.cos(targetAngle * .7) * 2.8;
+    desiredCamera.y = 1.9 + Math.sin(targetAngle * 1.4) * .38;
+    desiredLook.set(0.15, .42, -42);
   } else {
     updatePlayerInput(dt);
   }
