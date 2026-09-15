@@ -38,7 +38,8 @@ html, body {
 .hud,
 .caption,
 .mobile-pad,
-.action-pad { z-index: 3; }
+.action-pad,
+.debug-panel { z-index: 3; }
 .hud {
   position: fixed;
   left: max(18px, env(safe-area-inset-left));
@@ -192,6 +193,23 @@ button.active { background: rgba(255, 213, 118, .24); border-color: rgba(255, 22
 }
 body.clean .hud,
 body.clean .caption { opacity: 0; pointer-events: none; }
+.debug-panel {
+  position: fixed;
+  right: max(14px, env(safe-area-inset-right));
+  top: max(14px, env(safe-area-inset-top));
+  display: none;
+  min-width: 190px;
+  padding: 12px 14px;
+  border: 1px solid rgba(143, 222, 255, .24);
+  border-radius: 14px;
+  background: rgba(4, 12, 18, .62);
+  color: rgba(232, 248, 255, .82);
+  font: 10px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .06em;
+  backdrop-filter: blur(14px);
+  white-space: pre;
+}
+body.debug .debug-panel { display: block; }
 @media (max-width: 720px), (max-height: 520px), (pointer: coarse) {
   .hud { width: calc(100vw - 24px); left: 12px; top: 12px; padding: 14px; }
   h1 { font-size: 24px; }
@@ -280,6 +298,7 @@ body.clean .caption { opacity: 0; pointer-events: none; }
   <div class="catch-line"><span id="catch-count">0 landed</span><span id="bite-state">waiting water</span></div>
 </section>
 <div class="caption">Space or tap casts and reels · WASD moves · C hides interface · cinematic views above</div>
+<div class="debug-panel" id="debug-panel" aria-live="polite"></div>
 <div class="mobile-pad" aria-label="movement controls">
   <div class="stick-zone" id="move-stick" role="application" aria-label="analog movement joystick">
     <div class="stick-thumb" id="move-thumb"></div>
@@ -1616,11 +1635,17 @@ let tour = false;
 let targetAngle = 0;
 camera.lookAt(look);
 const statusEl = document.getElementById('status');
+const debugEl = document.getElementById('debug-panel');
 const tensionFillEl = document.getElementById('tension-fill');
 const catchCountEl = document.getElementById('catch-count');
 const biteStateEl = document.getElementById('bite-state');
 const keys = new Set();
 const moveAxis = new THREE.Vector2();
+const runtime = {
+  fps: 0,
+  frameCount: 0,
+  lastFpsAt: performance.now(),
+};
 const play = {
   cast: false,
   bite: false,
@@ -1795,6 +1820,7 @@ window.addEventListener('keydown', ev => {
   if ([' ', 'w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift'].includes(k)) ev.preventDefault();
   if (k === ' ') castOrReel();
   if (k === 'c') document.body.classList.toggle('clean');
+  if (k === 'q') document.body.classList.toggle('debug');
   keys.add(k === ' ' ? 'space' : k);
 });
 window.addEventListener('keyup', ev => keys.delete(ev.key.toLowerCase()));
@@ -1869,6 +1895,20 @@ function animate(now) {
   const t = now * .001;
   const dt = Math.min(0.05, (now - lastNow) * 0.001);
   lastNow = now;
+  runtime.frameCount += 1;
+  if (now - runtime.lastFpsAt > 500) {
+    runtime.fps = Math.round(runtime.frameCount * 1000 / (now - runtime.lastFpsAt));
+    runtime.frameCount = 0;
+    runtime.lastFpsAt = now;
+    debugEl.textContent = [
+      `fps ${runtime.fps}`,
+      `dpr ${renderer.getPixelRatio().toFixed(2)}`,
+      `view ${innerWidth}x${innerHeight}`,
+      `objects ${scene.children.length}`,
+      `water spectral-mesh`,
+      `motion ${play.motionEnabled ? 'armed' : 'off'}`,
+    ].join('\\n');
+  }
   oceanPass?.render(t, activePreset);
   waterUniforms.uTime.value = t;
   skyUniforms.uTime.value = t;
