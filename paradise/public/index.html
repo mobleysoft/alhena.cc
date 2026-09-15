@@ -523,6 +523,7 @@ const state = {
   lastMotionAt: 0,
   splashes: [],
   camera: { x: 0, y: 0, tx: 0, ty: 0 },
+  lab: { seed: Math.random() * 1000 },
   cinematic: false,
   lastTapAt: 0,
   tapTimer: null,
@@ -1174,6 +1175,7 @@ function drawWater(t, time, weather) {
   }
 
   drawMolecularSurface(t, top, bottom, time, weather);
+  drawWaterVolumeBlobs(t, top, bottom, time, weather);
 
   const foamY = h * 0.85 + Math.sin(t * 0.0016) * 4;
   const foam = ctx.createLinearGradient(0, foamY - 12, 0, foamY + 18);
@@ -1206,6 +1208,87 @@ function drawWater(t, time, weather) {
   drawBobber(t);
   drawSplashes(t);
   ctx.restore();
+}
+
+function drawWaterVolumeBlobs(t, top, bottom, time, weather) {
+  const w = state.w;
+  const height = bottom - top;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, top, w, height);
+  ctx.clip();
+
+  ctx.globalCompositeOperation = 'multiply';
+  for (let i = 0; i < 16; i++) {
+    const depth = (i % 8) / 7;
+    const lane = Math.floor(i / 8);
+    const speed = 0.012 + depth * 0.018 + weather.wave * 0.01;
+    const x = ((i * 173 + t * speed * 28) % (w + 360)) - 180;
+    const y = top + height * (0.12 + depth * 0.74) + Math.sin(t * 0.0013 + i * 2.1) * (8 + weather.wave * 10);
+    const rx = (170 + depth * 310) * (0.72 + lane * 0.34);
+    const ry = 11 + depth * 38;
+    const alpha = (0.025 + depth * 0.055) * (0.7 + weather.chop * 0.42);
+    drawGaussianBlob(x, y, rx, ry, `rgba(13,31,38,${alpha})`, 0.04);
+  }
+
+  ctx.globalCompositeOperation = 'screen';
+  const sunTrack = state.w * time.sunX;
+  for (let i = 0; i < 20; i++) {
+    const depth = i / 19;
+    const spread = 40 + depth * 360;
+    const x = sunTrack + Math.sin(i * 7.37 + t * 0.002) * spread + Math.sin(t * 0.0008 + i) * 24;
+    const y = top + height * (0.13 + depth * 0.72);
+    const rx = 18 + depth * 86 + weather.chop * 28;
+    const ry = 3 + depth * 14;
+    const alpha = (0.03 + time.light * 0.075) * (1 - depth * 0.42) * (1 - weather.cloud * 0.48);
+    drawGaussianBlob(x, y, rx, ry, `rgba(255,229,150,${alpha})`, 0.16);
+  }
+
+  for (let i = 0; i < 26; i++) {
+    const depth = i / 25;
+    const x = ((i * 251 + Math.sin(t * 0.001 + i) * 90) % (w + 260)) - 130;
+    const y = top + height * (0.18 + depth * 0.75);
+    const rx = 40 + depth * 155;
+    const ry = 4 + depth * 18;
+    const foamGate = 0.35 + weather.foam * 0.55;
+    const phase = Math.max(0, Math.sin(t * 0.003 + i * 1.71));
+    drawGaussianBlob(x, y, rx, ry, `rgba(222,252,255,${(0.018 + phase * 0.045) * foamGate})`, 0.2);
+  }
+
+  const fog = ctx.createLinearGradient(0, top, 0, bottom);
+  fog.addColorStop(0, `rgba(225,245,247,${0.14 + weather.haze * 0.22})`);
+  fog.addColorStop(0.18, `rgba(225,245,247,${0.06 + weather.haze * 0.16})`);
+  fog.addColorStop(0.55, 'rgba(225,245,247,0)');
+  fog.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = fog;
+  ctx.fillRect(0, top, w, height);
+  ctx.restore();
+}
+
+function drawGaussianBlob(x, y, rx, ry, color, hardStop = 0.0) {
+  const r = Math.max(rx, ry);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(rx / r, ry / r);
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+  g.addColorStop(0, color);
+  g.addColorStop(0.42 + hardStop, fadeRgba(color, 0.32));
+  g.addColorStop(1, fadeRgba(color, 0));
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function fadeRgba(color, alphaScale) {
+  const match = color.match(/rgba\(([^,]+),([^,]+),([^,]+),([^)]+)\)/);
+  if (!match) return color;
+  const r = Number(match[1]);
+  const g = Number(match[2]);
+  const b = Number(match[3]);
+  const a = Number(match[4]) * alphaScale;
+  return `rgba(${r},${g},${b},${a})`;
 }
 
 function drawSplashes(t) {
@@ -1404,7 +1487,8 @@ function drawShore(t, time) {
   drawFootprintsAndTideWrack(t, y, time);
   drawBeachGear(w * 0.48, h * 0.89, 1.0, t, time);
   drawBeachHouse(w * 0.11, h * 0.735, 1.14, time);
-  drawBlackLab(w * 0.31, h * 0.82, 1.18, t, time);
+  const lab = labLocomotion(w, h, t);
+  drawBlackLab(lab.x, lab.y, lab.s, t, time, lab);
   drawForegroundPlants(w * 0.965, h * 0.87, 1.0, time);
   drawForegroundPlants(w * 0.035, h * 0.93, 0.68, time);
   drawRod(t);
@@ -1802,9 +1886,28 @@ function drawPalm(x, y, s) {
   ctx.restore();
 }
 
-function drawBlackLab(x, y, s, t, time) {
+function labLocomotion(w, h, t) {
+  const walk = (Math.sin(t * 0.0011 + state.lab.seed) + 1) * 0.5;
+  const sniff = (Math.sin(t * 0.0027 + 1.4) + 1) * 0.5;
+  const pace = Math.sin(t * 0.0022 + state.lab.seed * 0.37);
+  const lope = Math.sin(t * 0.0044 + state.lab.seed);
+  const baseX = w * 0.305 + (walk - 0.5) * Math.min(170, w * 0.1);
+  const baseY = h * 0.822 + Math.sin(t * 0.0017) * 5;
+  return {
+    x: baseX,
+    y: baseY,
+    s: 1.14 + sniff * 0.05,
+    gait: lope,
+    pace,
+    head: -0.08 - sniff * 0.18 + Math.sin(t * 0.0031) * 0.05,
+    tail: Math.sin(t * 0.006) * (0.8 + sniff * 0.4),
+    facing: pace < -0.82 ? -1 : 1,
+  };
+}
+
+function drawBlackLab(x, y, s, t, time, pose = null) {
   if (labSprite.complete && labSprite.naturalWidth) {
-    drawBlackLabAsset(x, y, s, t, time);
+    drawBlackLabAsset(x, y, s, t, time, pose);
     return;
   }
   ctx.save();
@@ -1922,16 +2025,29 @@ function drawBlackLab(x, y, s, t, time) {
   ctx.restore();
 }
 
-function drawBlackLabAsset(x, y, s, t, time) {
+function drawBlackLabAsset(x, y, s, t, time, pose = {}) {
   ctx.save();
   ctx.translate(x, y);
+  if (pose.facing < 0) ctx.scale(-1, 1);
   ctx.scale(s, s);
   const breathe = 1 + Math.sin(t * 0.003) * 0.012;
-  const w = 154 * breathe;
-  const h = 104 / breathe;
-  drawContactShadow(6, 28, 78, 16, 0.3);
+  const gait = pose.gait || 0;
+  const head = pose.head || 0;
+  const tail = pose.tail || 0;
+  const w = 154;
+  const h = 104;
+  drawContactShadow(8, 29, 82, 17, 0.3);
+  drawLabPawContacts(gait, time);
   ctx.globalAlpha = 0.98;
-  ctx.drawImage(labSprite, -76, -72, w, h);
+  ctx.save();
+  ctx.translate(0, Math.sin(t * 0.004) * 1.4);
+  ctx.scale(1 + (breathe - 1) * 0.7, 1 - (breathe - 1) * 0.45);
+  if (Math.abs(gait) < 0.18) {
+    ctx.drawImage(labSprite, -76, -72, w, h);
+  } else {
+    drawSegmentedLabSprite(w, h, gait, head, tail);
+  }
+  ctx.restore();
   ctx.globalCompositeOperation = 'screen';
   const rim = ctx.createLinearGradient(-70, -64, 78, 22);
   rim.addColorStop(0, `rgba(255,210,121,${0.08 + time.light * 0.08})`);
@@ -1941,6 +2057,44 @@ function drawBlackLabAsset(x, y, s, t, time) {
   ctx.beginPath();
   ctx.ellipse(2, -20, 76, 42, -0.03, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
+}
+
+function drawSegmentedLabSprite(w, h, gait, head, tail) {
+  const iw = labSprite.naturalWidth;
+  const ih = labSprite.naturalHeight;
+  const drawPart = (sx, sy, sw, sh, dx, dy, dw, dh, rot = 0) => {
+    ctx.save();
+    ctx.translate(dx + dw * 0.5, dy + dh * 0.5);
+    ctx.rotate(rot);
+    ctx.drawImage(labSprite, sx * iw, sy * ih, sw * iw, sh * ih, -dw * 0.5, -dh * 0.5, dw, dh);
+    ctx.restore();
+  };
+  drawPart(0.04, 0.12, 0.36, 0.78, -76, -69 + gait * 0.9, w * 0.38, h * 0.96, -tail * 0.01);
+  drawPart(0.28, 0.10, 0.43, 0.78, -32, -71, w * 0.48, h, gait * 0.006);
+  drawPart(0.62, 0.08, 0.33, 0.76, 20, -71 + head * 8, w * 0.36, h * 0.95, head);
+  ctx.save();
+  ctx.globalAlpha = 0.72;
+  drawPart(0.18, 0.57, 0.62, 0.34, -47 + gait * 4, -20 + Math.abs(gait) * 2.4, w * 0.66, h * 0.43, gait * 0.02);
+  drawPart(0.23, 0.57, 0.57, 0.34, -41 - gait * 4, -20, w * 0.6, h * 0.43, -gait * 0.018);
+  ctx.restore();
+}
+
+function drawLabPawContacts(gait, time) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'multiply';
+  const contacts = [
+    [-37 + gait * 5, 29, 15, Math.max(0.12, 0.24 - gait * 0.07)],
+    [-13 - gait * 4, 31, 12, Math.max(0.1, 0.2 + gait * 0.04)],
+    [17 + gait * 3, 30, 14, Math.max(0.1, 0.2 - gait * 0.05)],
+    [35 - gait * 5, 29, 11, Math.max(0.1, 0.19 + gait * 0.06)],
+  ];
+  for (const [x, y, rx, alpha] of contacts) {
+    ctx.fillStyle = `rgba(16,12,9,${alpha * (0.72 + time.light * 0.15)})`;
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, 3.2, -0.06, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -1977,6 +2131,9 @@ function drawBarAndAlhena(x, y, t, time) {
   ctx.fillText('ALHENA', -64, 66);
   drawBarDetails(-92, 24);
 
+  ctx.save();
+  ctx.translate(1, -10);
+  ctx.scale(1.18, 1.18);
   const breath = Math.sin(t * 0.003) * 1.6;
   ctx.strokeStyle = a.skin;
   ctx.lineWidth = 6;
@@ -2031,6 +2188,7 @@ function drawBarAndAlhena(x, y, t, time) {
   ctx.beginPath();
   ctx.ellipse(-10, -1 + breath * 0.2, 10, 4, 0, 0, Math.PI * 2);
   ctx.fill();
+  drawAlhenaShoulders(a, breath, time);
   const faceLight = ctx.createRadialGradient(-15, -18, 1, -9, -12, 16);
   faceLight.addColorStop(0, 'rgba(255,236,193,0.38)');
   faceLight.addColorStop(0.55, 'rgba(255,236,193,0.08)');
@@ -2089,6 +2247,7 @@ function drawBarAndAlhena(x, y, t, time) {
   ctx.arc(-9, 2, 20, Math.PI * 1.12, Math.PI * 1.88);
   ctx.stroke();
   drawCharacterOcclusion(time);
+  drawAlhenaRimSilhouette(time);
   ctx.fillStyle = 'rgba(255,230,164,0.68)';
   ctx.beginPath();
   ctx.arc(-23, -8, 2, 0, Math.PI * 2);
@@ -2099,6 +2258,46 @@ function drawBarAndAlhena(x, y, t, time) {
   ctx.beginPath();
   ctx.moveTo(-32, 68);
   ctx.quadraticCurveTo(-12, 78 + Math.sin(t * 0.002) * 2, 14, 68);
+  ctx.stroke();
+  ctx.restore();
+  ctx.restore();
+}
+
+function drawAlhenaShoulders(a, breath, time) {
+  ctx.save();
+  const skinShade = mix(a.skin, '#2d1812', 0.22);
+  ctx.fillStyle = skinShade;
+  ctx.beginPath();
+  ctx.moveTo(-28, 15 + breath);
+  ctx.quadraticCurveTo(-10, 28 + breath, 15, 15 + breath);
+  ctx.lineTo(19, 25 + breath);
+  ctx.quadraticCurveTo(-8, 39 + breath, -32, 25 + breath);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalCompositeOperation = 'screen';
+  ctx.strokeStyle = `rgba(255,225,180,${0.18 * time.light})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-25, 18 + breath);
+  ctx.quadraticCurveTo(-8, 26 + breath, 13, 18 + breath);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawAlhenaRimSilhouette(time) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  const rim = ctx.createLinearGradient(-33, -30, 24, 72);
+  rim.addColorStop(0, `rgba(255,230,175,${0.06 + time.light * 0.08})`);
+  rim.addColorStop(0.55, 'rgba(255,255,255,0)');
+  rim.addColorStop(1, `rgba(89,225,238,${0.08 + time.light * 0.06})`);
+  ctx.strokeStyle = rim;
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.moveTo(-27, -6);
+  ctx.quadraticCurveTo(-37, 24, -31, 68);
+  ctx.moveTo(7, -6);
+  ctx.quadraticCurveTo(23, 25, 15, 68);
   ctx.stroke();
   ctx.restore();
 }
