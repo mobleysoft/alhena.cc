@@ -265,7 +265,7 @@ document.body.classList.toggle('clean', query.get('clean') === '1');
 document.body.dataset.waterArchitecture = canonicalPandoraWaterOnly
   ? 'v2-canonical-pandorachat-webgl2-ocean-shader'
   : 'v2-debug-pandorachat-plus-three-water-mesh';
-document.body.dataset.waterRefinement = 'v2-pandorachat-jonswap-analytical-ocean-optics-v2';
+document.body.dataset.waterRefinement = 'v2-pandorachat-jonswap-analytical-ocean-optics-v3';
 document.body.dataset.shoreStaging = 'v2-ocean-first-shore-composition-scaled-billboard-depth';
 const oceanCanvas = document.getElementById('ocean-pass');
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, premultipliedAlpha: false, powerPreference: 'high-performance' });
@@ -785,6 +785,20 @@ function makePandoraOceanPass(canvas) {
         + smoothstep(0.58, 0.91, cross) * 0.36
         + smoothstep(0.78, 0.985, cap) * smoothstep(0.02, 0.55, d) * 0.20;
     }
+    float waveShadow(vec2 p, float d, float curvature, float slope) {
+      float longBands = fbm(vec2(p.x * .020 - uTime * .010, p.y * .095 + uTime * .030));
+      float windRows = fbm(vec2(p.x * .120 + p.y * .018 - uTime * .035, p.y * .820 + uTime * .110));
+      float occlusion = smoothstep(.34, .82, longBands) * .26 + smoothstep(.50, .86, windRows) * .18;
+      occlusion += smoothstep(.10, .62, curvature + slope * .42) * .16;
+      return occlusion * smoothstep(.025, .88, d);
+    }
+    float horizonFoam(vec2 q, float uvY, float horizon) {
+      float line = horizon - .008
+        + sin(q.x * 15.0 + uTime * .28) * .0018
+        + sin(q.x * 37.0 - uTime * .42) * .0012;
+      float breakup = fbm(vec2(q.x * 24.0 + uTime * .20, uTime * .10));
+      return smoothstep(.0048, .0, abs(uvY - line)) * smoothstep(.46, .84, breakup);
+    }
     vec3 scatterVolume(vec3 base, vec3 n, vec3 viewDir, float h, float d, float curvature) {
       float nearShore = smoothstep(0.48, 1.0, d);
       float facingSun = max(dot(n, normalize(vec3(-0.32, 0.86, 0.38))), 0.0);
@@ -831,31 +845,31 @@ function makePandoraOceanPass(canvas) {
     }
     vec3 oceanColor(vec2 uv, vec2 q, float horizon) {
       float d = clamp((horizon - uv.y) / horizon, 0.0, 1.0);
-      float farField = smoothstep(0.045, 0.34, d);
-      float nearShore = smoothstep(0.52, 1.0, d);
-      float invDepth = 1.0 / max(0.050, pow(d + 0.038, 1.74));
-      float range = min(132.0, invDepth);
-      vec2 p = vec2(q.x * range * 2.72, range * 4.58 - uTime * (0.31 + uWind * 0.016));
+      float farField = smoothstep(0.030, 0.26, d);
+      float nearShore = smoothstep(0.56, 1.0, d);
+      float invDepth = 1.0 / max(0.036, pow(d + 0.030, 1.88));
+      float range = min(172.0, invDepth);
+      vec2 p = vec2(q.x * range * 3.06, range * 5.18 - uTime * (0.34 + uWind * 0.018));
       WaveSample low = sampleJonswapSurface(p * 0.145 + vec2(8.0, -2.0));
       WaveSample midSample = sampleJonswapSurface(p * 0.31 + vec2(-4.0, 6.0));
       p += vec2(low.h, midSample.h) * 0.036 * uChop;
       WaveSample sample = sampleJonswapSurface(p);
       vec3 n = waterNormal(p, range * 0.010);
       float h = sample.h;
-      float curvature = clamp(abs(sample.curvature) * 0.120 + sample.energy * 0.40, 0.0, 1.0);
-      float slope = clamp(length(sample.grad) * 0.92 + (1.0 - n.y) * 2.55, 0.0, 1.0);
-      vec3 viewDir = normalize(vec3(q.x * .52, d * .48 + .12, 1.0));
+      float curvature = clamp(abs(sample.curvature) * 0.145 + sample.energy * 0.46, 0.0, 1.0);
+      float slope = clamp(length(sample.grad) * 1.12 + (1.0 - n.y) * 2.92, 0.0, 1.0);
+      vec3 viewDir = normalize(vec3(q.x * .50, d * .54 + .10, 1.0));
       float fresnel = 0.0204 + 0.9796 * pow(1.0 - clamp(dot(n, viewDir), 0.0, 1.0), 5.0);
       vec3 reflectedDir = reflect(-viewDir, n);
-      vec2 reflectUv = vec2(uv.x + n.x * .135 + h * .0025, horizon + d * .62 + n.z * .095);
+      vec2 reflectUv = vec2(uv.x + n.x * .175 + h * .0035, horizon + d * .66 + n.z * .120);
       vec3 refl = skyColor(reflectUv, reflectedDir);
       refl += vec3(0.10, 0.18, 0.22) * pow(clamp(reflectedDir.y * 0.5 + 0.5, 0.0, 1.0), 2.4) * (1.0 - uStorm * .45);
-      vec3 deep = mix(vec3(0.000, 0.013, 0.055), vec3(0.001, 0.010, 0.024), uStorm);
-      vec3 mid = mix(vec3(0.002, 0.086, 0.150), vec3(0.014, 0.065, 0.092), uStorm);
-      vec3 shallow = mix(vec3(0.025, 0.245, 0.300), vec3(0.065, 0.145, 0.160), uStorm);
-      float farDepth = smoothstep(0.055, 0.48, d) * (1.0 - nearShore * 0.48);
+      vec3 deep = mix(vec3(0.000, 0.010, 0.043), vec3(0.001, 0.008, 0.020), uStorm);
+      vec3 mid = mix(vec3(0.000, 0.074, 0.134), vec3(0.012, 0.055, 0.082), uStorm);
+      vec3 shallow = mix(vec3(0.030, 0.280, 0.330), vec3(0.066, 0.138, 0.152), uStorm);
+      float farDepth = smoothstep(0.042, 0.54, d) * (1.0 - nearShore * 0.55);
       vec3 body = mix(mid, shallow, nearShore);
-      body = mix(body, deep, farDepth * 0.70);
+      body = mix(body, deep, farDepth * 0.82);
       body = scatterVolume(body, n, viewDir, h, d, curvature);
       float signedCurvature = sample.curvature;
       float crestEnergy = smoothstep(0.08, 0.44, abs(h)) * max(slope, curvature);
@@ -864,27 +878,28 @@ function makePandoraOceanPass(canvas) {
       float foamNoise = fbm(p * 5.9 + vec2(uTime * .08, -uTime * .05));
       float microFoam = smoothstep(uFoamT * .36, uFoamT * 1.02, abs(h) + slope * .08) * smoothstep(.38 - uStorm * .10, .84, foamNoise) * farField;
       float shoreLine = 0.218 + 0.012 * sin(q.x * 3.4 + uTime * .18) + 0.007 * fbm(vec2(q.x * 8.0, uTime * .18));
-      float shoreFoam = smoothstep(0.034, 0.0, abs(uv.y - shoreLine)) * smoothstep(.32, .82, fbm(vec2(q.x * 27.0, uTime * .44))) * farField;
-      float foam = clamp(crestEnergy * microFoam * (.58 + streakField * .64) + folding * .38 + shoreFoam * .56, 0.0, .90);
-      float reflectWeight = fresnel * mix(.30, .76, smoothstep(0.0, 0.22, d)) + slope * .045;
+      float shoreFoam = smoothstep(0.036, 0.0, abs(uv.y - shoreLine)) * smoothstep(.32, .82, fbm(vec2(q.x * 27.0, uTime * .44))) * farField;
+      float farBreak = horizonFoam(q, uv.y, horizon) * smoothstep(.015, .20, d);
+      float foam = clamp(crestEnergy * microFoam * (.66 + streakField * .86) + folding * .48 + shoreFoam * .66 + farBreak * .32, 0.0, .94);
+      float reflectWeight = fresnel * mix(.38, .84, smoothstep(0.0, 0.25, d)) + slope * .060;
       vec3 water = mix(body, refl, clamp(reflectWeight, 0.0, .78));
-      water += vec3(.020, .180, .205) * pow(clamp(slope * .64 + curvature * .34, 0.0, 1.0), 1.28) * streakField * smoothstep(.02, .82, d) * farField * 1.72;
-      float swellShadow = smoothstep(.36, .78, fbm(vec2(p.x * .028 - uTime * .011, p.y * .112 + uTime * .033)));
+      water += vec3(.018, .205, .230) * pow(clamp(slope * .70 + curvature * .42, 0.0, 1.0), 1.18) * streakField * smoothstep(.015, .86, d) * farField * 1.96;
+      float swellShadow = waveShadow(p, d, curvature, slope);
       float reflectedClouds = smoothstep(.46, .86, fbm(vec2(p.x * .017 + n.x * 2.6 - uTime * .006, p.y * .050 + n.z * 1.7 + 2.7)));
-      water = mix(water, water * vec3(.62, .78, .83), swellShadow * smoothstep(.035, .82, d) * farField * (.20 + uStorm * .13));
-      water = mix(water, vec3(.60, .72, .73), reflectedClouds * fresnel * smoothstep(.025, .58, d) * farField * (.12 + uStorm * .18));
+      water = mix(water, water * vec3(.54, .72, .78), swellShadow * farField * (.42 + uStorm * .18));
+      water = mix(water, vec3(.64, .76, .78), reflectedClouds * fresnel * smoothstep(.020, .62, d) * farField * (.15 + uStorm * .22));
       float caustics = causticField(p * mix(.22, .72, nearShore));
       water += vec3(.18, .76, .66) * caustics * nearShore * (1.0 - uStorm * .42) * .22;
       vec3 sunDir = normalize(vec3(-0.34, .86, .38));
       float spec = pow(max(dot(n, normalize(viewDir + sunDir)), 0.0), mix(44.0, 260.0, smoothstep(0.08, 0.92, d)));
       float glints = smoothstep(.60, .975, fbm(p * 34.0 + vec2(uTime * .55, -uTime * .21)));
       float sparkle = pow(max(dot(reflect(-sunDir, n), viewDir), 0.0), 18.0) * smoothstep(.74, .99, fbm(p * vec2(16.0, 44.0) + uTime * .28));
-      water += vec3(1.0, .84, .46) * (spec * glints + sparkle * .45) * (0.9 + uGold * 1.7) * farField;
-      water = mix(water, vec3(.88, .97, .99), foam * .50);
+      water += vec3(1.0, .84, .46) * (spec * glints + sparkle * .58) * (0.9 + uGold * 1.9) * farField;
+      water = mix(water, vec3(.88, .97, .99), foam * .56);
       water += vec3(.12, .03, .18) * foam * curvature * 0.08;
       float farHaze = smoothstep(0.24, 0.0, d);
-      water = mix(water, mix(vec3(.18, .31, .38), vec3(.58, .67, .67), uGold * .14), farHaze * (.30 + uStorm * .20));
-      water = mix(water, vec3(.50, .63, .66), smoothstep(0.30, 0.0, d) * (.70 + uStorm * .10));
+      water = mix(water, mix(vec3(.15, .29, .37), vec3(.58, .67, .67), uGold * .14), farHaze * (.38 + uStorm * .22));
+      water = mix(water, vec3(.54, .67, .70), smoothstep(0.28, 0.0, d) * (.72 + uStorm * .12));
       water = mix(water, vec3(.03,.09,.105), uStorm * smoothstep(.08, .78, d) * .22);
       return water;
     }
@@ -900,8 +915,8 @@ function makePandoraOceanPass(canvas) {
       if (uv.y < horizon) {
         col = mix(col, oceanColor(uv, q, horizon), smoothstep(0.0, 0.006, clamp((horizon - uv.y) / horizon, 0.0, 1.0)));
       }
-      col *= 1.0 - dot(q, q) * 0.035;
-      col = acesTone(col * 1.18);
+      col *= 1.0 - dot(q, q) * 0.042;
+      col = acesTone(col * 1.24);
       col = pow(col, vec3(1.0 / 2.2));
       gl_FragColor = vec4(col, 1.0);
     }`;
