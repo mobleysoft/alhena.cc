@@ -460,7 +460,7 @@ body.started .touch-controls {
 }
 </style>
 </head>
-<body data-water-system="pandorachat-jonswap-webgl-ocean-v4">
+<body data-water-system="pandorachat-jonswap-webgl-ocean-v5">
 <canvas id="water" aria-hidden="true"></canvas>
 <canvas id="world" aria-label="Paradise ocean fishing game"></canvas>
 <div class="veil"></div>
@@ -1321,6 +1321,9 @@ function drawWater(t, time, weather) {
   ctx.clip();
 
   if (waterProgram) {
+    drawOceanPerspectiveRibbons(t, top, bottom, time, weather);
+    drawMolecularSurface(t, top, bottom, time, weather);
+    drawWaterVolumeBlobs(t, top, bottom, time, weather);
     drawShaderWaterForeground(t, top, bottom, time, weather);
     drawObjectWaterReflections(t, top, bottom, time);
     drawFishShadows(t, top, bottom);
