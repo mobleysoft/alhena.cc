@@ -22,7 +22,7 @@
 html, body { width: 100%; height: 100%; overflow: hidden; background: #050a12; color: var(--paper); font-family: "DM Sans", sans-serif; }
 button { font: inherit; color: inherit; }
 
-#water, #world {
+#ocean-pass-frame, #water, #world {
   position: fixed;
   inset: 0;
   width: 100vw;
@@ -30,9 +30,17 @@ button { font: inherit; color: inherit; }
   display: block;
 }
 
+#ocean-pass-frame {
+  z-index: 0;
+  border: 0;
+  pointer-events: none;
+  background: #050a12;
+}
+
 #water {
   z-index: 1;
   background: #050a12;
+  display: none;
 }
 
 #world {
@@ -460,7 +468,8 @@ body.started .touch-controls {
 }
 </style>
 </head>
-<body data-water-system="pandorachat-jonswap-webgl-ocean-v5">
+<body data-water-system="pandorachat-jonswap-webgl-ocean-v5-root-composite">
+<iframe id="ocean-pass-frame" title="PandoraChat spectral ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=calm"></iframe>
 <canvas id="water" aria-hidden="true"></canvas>
 <canvas id="world" aria-label="Paradise ocean fishing game"></canvas>
 <div class="veil"></div>
@@ -533,6 +542,7 @@ body.started .touch-controls {
 
 <script>
 const waterCanvas = document.getElementById('water');
+const oceanPassFrame = document.getElementById('ocean-pass-frame');
 const canvas = document.getElementById('world');
 const ctx = canvas.getContext('2d', { alpha: true });
 const intro = document.getElementById('intro');
@@ -565,6 +575,7 @@ houseSprite.src = './assets/beach-house-billboard.png';
 const palmSprite = new Image();
 palmSprite.src = './assets/palm-cluster-billboard.png';
 let waterProgram = null;
+let oceanPassSrc = '';
 
 const TIMES = {
   dawn: {
@@ -1016,6 +1027,14 @@ function updateControlState() {
   document.querySelectorAll('[data-time]').forEach(b => b.classList.toggle('active', b.dataset.time === state.time));
   document.querySelectorAll('[data-weather]').forEach(b => b.classList.toggle('active', b.dataset.weather === state.weather));
   weatherReadout.textContent = `${state.time} / ${WEATHER[state.weather].label}`;
+  syncOceanPass();
+}
+
+function syncOceanPass() {
+  const src = `/game-v3/ocean-pass/?time=${encodeURIComponent(state.time)}&weather=${encodeURIComponent(state.weather)}`;
+  if (oceanPassSrc === src) return;
+  oceanPassSrc = src;
+  oceanPassFrame.src = src;
 }
 
 function setCinematic(enabled) {
@@ -1146,6 +1165,25 @@ function onMotion(event) {
 }
 
 function drawSky(t, time, weather) {
+  if (oceanPassFrame) {
+    const skyH = state.h * 0.54;
+    if (time.stars > 0) {
+      ctx.save();
+      ctx.fillStyle = '#eef7ff';
+      for (let i = 0; i < 80; i++) {
+        const x = ((i * 193.7) % state.w) - state.camera.x * 10;
+        const y = ((i * 71.3) % (skyH * 0.72)) - state.camera.y * 5;
+        const r = ((i * 17) % 3) * 0.35 + 0.45;
+        ctx.globalAlpha = time.stars * (0.28 + 0.55 * Math.sin(t * 0.001 + i));
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    drawBirds(t, time, weather, skyH);
+    return;
+  }
   const w = state.w, h = state.h;
   const cam = state.camera;
   const skyH = h * 0.54;
@@ -1304,7 +1342,7 @@ function drawWater(t, time, weather) {
   const w = state.w, h = state.h;
   const top = h * 0.54;
   const bottom = h * 0.88;
-  if (!waterProgram) {
+  if (!waterProgram && !oceanPassFrame) {
     const g = ctx.createLinearGradient(0, top, 0, bottom);
     const far = mix(time.seaFar, '#66737b', weather.haze);
     const near = mix(time.seaNear, '#243441', weather.haze + weather.cloud * 0.12);
@@ -1320,7 +1358,7 @@ function drawWater(t, time, weather) {
   ctx.rect(0, top, w, bottom - top);
   ctx.clip();
 
-  if (waterProgram) {
+  if (waterProgram || oceanPassFrame) {
     drawOceanPerspectiveRibbons(t, top, bottom, time, weather);
     drawMolecularSurface(t, top, bottom, time, weather);
     drawWaterVolumeBlobs(t, top, bottom, time, weather);
