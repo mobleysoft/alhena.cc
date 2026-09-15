@@ -385,7 +385,7 @@ for (let i = 0; i < 8; i++) {
     new THREE.MeshBasicMaterial({
       color: 0xffd27c,
       transparent: true,
-      opacity: .020 - i * .0012,
+      opacity: .008 - i * .00045,
       depthWrite: false,
       fog: false,
       blending: THREE.AdditiveBlending
@@ -412,7 +412,7 @@ for (let i = 0; i < 18; i++) {
 }
 const horizonHaze = new THREE.Mesh(
   new THREE.PlaneGeometry(240, 18, 1, 1),
-  new THREE.MeshBasicMaterial({ color: 0xe7f2ef, transparent: true, opacity: .18, depthWrite: false, fog: false })
+  new THREE.MeshBasicMaterial({ color: 0xd6e7e5, transparent: true, opacity: .075, depthWrite: false, fog: false })
 );
 horizonHaze.name = 'v2-ocean-horizon-haze-gradient-card';
 horizonHaze.position.set(0, 5.5, -120);
@@ -615,7 +615,7 @@ const furTex = makeTexture(512, (ctx, s) => {
 });
 furTex.repeat.set(1.8, 1.0);
 
-const sandMat = new THREE.MeshStandardMaterial({ map: sandTex, bumpMap: sandTex, bumpScale: .09, roughness: .95, color: 0xd8b46e, envMapIntensity: .18 });
+const sandMat = new THREE.MeshStandardMaterial({ map: sandTex, bumpMap: sandTex, bumpScale: .09, roughness: .95, color: 0xc99b58, envMapIntensity: .18 });
 const wetSandMat = new THREE.MeshPhysicalMaterial({
   map: washTex,
   bumpMap: washTex,
@@ -861,7 +861,16 @@ function makePandoraOceanPass(canvas) {
 
 const pandoraOceanPass = makePandoraOceanPass(oceanCanvas);
 let pandoraOceanPreset = { gold: 1.0, wind: 10.8, chop: 1.0, foamT: .32, storm: 0.0, skyTint: [.08, .18, .32] };
-if (pandoraOceanPass) skyDome.visible = false;
+if (pandoraOceanPass) {
+  document.body.dataset.atmosphereOwner = 'v2-pandorachat-background-owns-atmosphere';
+  skyDome.visible = false;
+  sunDisk.visible = false;
+  sunGlow.visible = false;
+  sunShafts.visible = false;
+  cloudBank.visible = false;
+  horizonHaze.visible = false;
+  mistBands.forEach(band => { band.visible = false; });
+}
 
 const oceanUniforms = {
   uTime: { value: 0 },
@@ -1189,7 +1198,7 @@ for (let row = 0; row < 4; row++) {
     map: washTex,
     color: row % 2 ? 0xc8fbff : 0xfff5d5,
     transparent: true,
-    opacity: .16 - row * .022,
+    opacity: .075 - row * .010,
     depthWrite: false,
     depthTest: false,
     blending: THREE.AdditiveBlending
@@ -1210,12 +1219,12 @@ for (let row = 0; row < 4; row++) {
   surfSheets.push(sheet);
 }
 
-const islandMat = new THREE.MeshBasicMaterial({ color: 0x5f8790, transparent: true, opacity: .36, depthWrite: false });
-for (const [x, z, sx, sy, rz] of [[-42, -126, 20, 2.7, .18], [-12, -138, 30, 3.5, -.08], [23, -128, 24, 2.9, .14], [55, -145, 36, 4.0, -.16]]) {
+const islandMat = new THREE.MeshBasicMaterial({ color: 0x486d75, transparent: true, opacity: .115, depthWrite: false });
+for (const [x, z, sx, sy, rz] of [[-42, -126, 14, .82, .18], [-12, -138, 22, 1.05, -.08], [23, -128, 17, .88, .14], [55, -145, 26, 1.15, -.16]]) {
   const island = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 7), islandMat);
-  island.name = 'v2-atmospheric-distant-island';
-  island.position.set(x, 1.6, z);
-  island.scale.set(sx, sy, sx * .28);
+  island.name = 'v2-softened-distant-island-silhouette';
+  island.position.set(x, .76, z);
+  island.scale.set(sx, sy, sx * .22);
   island.rotation.y = Math.PI / 7 + rz;
   scene.add(island);
 }
@@ -1982,10 +1991,10 @@ function applyEnvironment(timeName = activeTime, weatherName = activeWeather) {
   skyUniforms.uCloud.value = weather.cloud;
   skyUniforms.uSunBloom.value = time.bloom;
   horizonHaze.material.color.setHex(time.fog);
-  horizonHaze.material.opacity = (activeTime === 'night' ? .08 : .16) + weather.cloud * .16;
+  horizonHaze.material.opacity = ((activeTime === 'night' ? .035 : .075) + weather.cloud * .045) * (presentation ? .82 : 1.0);
   sunShafts.children.forEach((ray, i) => {
     ray.material.color.setHex(time.sun);
-    ray.material.opacity = (activeTime === 'night' ? .003 : activeTime === 'noon' ? .009 : .020) * time.bloom * (1 - i * .06);
+    ray.material.opacity = (activeTime === 'night' ? .0015 : activeTime === 'noon' ? .0035 : .008) * time.bloom * (1 - i * .06);
   });
   mistBands.forEach((band, i) => {
     band.material.color.setHex(activeTime === 'sunset' ? 0xffd0aa : activeTime === 'night' ? 0x284862 : 0xd6eef0);
@@ -1996,7 +2005,7 @@ function applyEnvironment(timeName = activeTime, weatherName = activeWeather) {
     cloud.material.opacity = ((activeTime === 'night' ? .08 : .13) + weather.cloud * .22) * (i % 3 === 0 ? .72 : 1);
   });
   surfSheets.forEach((sheet, i) => {
-    sheet.material.opacity = (.12 + weather.foam * .045) * (1.0 - i * .13) * (activeTime === 'night' ? .55 : 1.0);
+    sheet.material.opacity = (.050 + weather.foam * .026) * (1.0 - i * .13) * (activeTime === 'night' ? .55 : 1.0);
   });
   oceanUniforms.uSky.value.setHex(time.sky);
   oceanUniforms.uHorizon.value.setHex(time.waterHorizon);
@@ -2042,6 +2051,7 @@ function setView(name) {
     /^v2-dock-/,
     /^v2-coiled-rope/,
     /^v2-atmospheric-distant-island/,
+    /^v2-softened-distant-island/,
     /^v2-beach-house/,
     /^v2-beach-shell/,
     /^v2-beach-pebble/,

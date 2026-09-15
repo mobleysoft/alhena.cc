@@ -91,6 +91,7 @@ fi
 v2_markers=(
   "v2-jonswap-displaced-ocean-mesh"
   "v2-pandorachat-fullscreen-ocean-pass"
+  "v2-pandorachat-background-owns-atmosphere"
   "v2-pandorachat-jonswap-fresnel-water-optics-overlay"
   "uStorm"
   "v2-pbr-sky-ocean-environment-map"
@@ -98,6 +99,7 @@ v2_markers=(
   "v2-layered-atmospheric-cloud-bank"
   "v2-cinematic-atmospheric-sun-shafts"
   "v2-layered-depth-mist-over-ocean"
+  "v2-softened-distant-island-silhouette"
   "v2-black-lab-procedural-rig-standin"
   "v2-black-lab-procedural-four-beat-gait-standin"
   "v2-alhena-bartender-procedural-standin"

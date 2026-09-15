@@ -217,6 +217,11 @@ taken with Playwright Chromium at `1440x900`.
   the shader’s weather coupling pass: storm now cools/darkens the sky and water,
   lowers the foam threshold, reduces golden sun contribution, and removes the
   placeholder island/atmosphere-card horizon slab from the clean water view.
+- `paradise-game-v2-pandora-owned-atmosphere-shore.png`: live shore capture
+  after letting the PandoraChat-style full-screen pass own sky/water/atmosphere
+  globally, while the Three.js layer focuses on physical shore objects. This
+  removes the worst duplicate atmosphere-card artifacts from the normal playable
+  scene and keeps the water system visually consistent across views.
 - `paradise-game-v2-dog-four-beat-gait.png`: live dog-focused capture after
   replacing simple sine bobbing with a procedural quadruped stand-in that stores
   base transforms, offsets paw/hock/shoulder phases, plants paws, sniffs, wags,
