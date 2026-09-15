@@ -1,0 +1,9 @@
+/game-v3/*.wasm
+  Content-Type: application/wasm
+
+/game-v3/*.pck
+  Content-Type: application/octet-stream
+
+/game-v3/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cache-Control: public, max-age=60

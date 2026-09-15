@@ -9,9 +9,11 @@ TMP_V2_MODULE="/tmp/paradise-game-v2-module.mjs"
 TMP_LIVE="/tmp/paradise-live-verify.html"
 TMP_V2_LIVE="/tmp/paradise-v2-live-verify.html"
 TMP_ROOT_LIVE="/tmp/paradise-root-live-verify.html"
+TMP_V3_LIVE="/tmp/paradise-v3-live-verify.html"
 URL="${1:-https://paradise.alhena.cc/game/?v=verify}"
 V2_URL="${2:-https://paradise.alhena.cc/game-v2/?view=shore&time=sunset&weather=breeze&quality=cinematic&v=verify}"
 ROOT_URL="${3:-https://paradise.alhena.cc/?v=verify}"
+V3_URL="${4:-https://paradise.alhena.cc/game-v3/?v=verify}"
 
 python3 - "$GAME_HTML" > "$TMP_MODULE" <<'PY'
 from pathlib import Path
@@ -37,7 +39,7 @@ PY
 
 node --check "$TMP_V2_MODULE"
 node "$ROOT/scripts/verify-assets.mjs" >/tmp/paradise-assets-verify.json
-git -C "$ROOT/.." diff --check -- paradise/public/game/index.html paradise/public/game-v2/index.html paradise/public/index.html paradise/verification/README.md
+git -C "$ROOT/.." diff --check -- paradise/public/game/index.html paradise/public/game-v2/index.html paradise/public/game-v3/index.html paradise/public/index.html paradise/public/_headers paradise/verification/README.md
 
 http_code="$(curl -L -s -o "$TMP_LIVE" -w '%{http_code}' "$URL")"
 if [[ "$http_code" != "200" ]]; then
@@ -71,6 +73,7 @@ fi
 
 root_markers=(
   "Launch 3D shore"
+  "V3 authored 3D rebuild gate"
   "/game-v2/?view=shore&time=dawn&weather=breeze&quality=cinematic&presentation=1"
   "Legacy canvas prototype"
 )
@@ -144,7 +147,29 @@ for marker in "${v2_markers[@]}"; do
   fi
 done
 
+v3_code="$(curl -L -s -o "$TMP_V3_LIVE" -w '%{http_code}' "$V3_URL")"
+if [[ "$v3_code" != "200" ]]; then
+  echo "Paradise V3 live check failed: HTTP $v3_code for $V3_URL" >&2
+  exit 1
+fi
+
+v3_markers=(
+  "v3-godot-glb-production-gate"
+  "authored-assets-before-promotion"
+  "Runtime Asset Gate"
+  "JONSWAP-inspired waves"
+  "/assets/paradise-asset-manifest.json"
+)
+
+for marker in "${v3_markers[@]}"; do
+  if ! grep -Fq "$marker" "$TMP_V3_LIVE"; then
+    echo "Paradise V3 live check failed: missing marker: $marker" >&2
+    exit 1
+  fi
+done
+
 echo "Paradise game verified: $URL"
 echo "Paradise root verified: $ROOT_URL"
 echo "Paradise V2 verified: $V2_URL"
+echo "Paradise V3 verified: $V3_URL"
 echo "Paradise assets verified: /tmp/paradise-assets-verify.json"
