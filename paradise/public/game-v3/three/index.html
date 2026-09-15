@@ -31,6 +31,40 @@ body > canvas {
   inset: 0;
   z-index: 1;
 }
+.shoreline-atmosphere {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 2;
+  height: 34vh;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 22% 58%, rgba(255, 238, 171, 0.30), transparent 24%),
+    radial-gradient(ellipse at 74% 52%, rgba(255, 224, 159, 0.22), transparent 20%),
+    linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(232, 250, 255, 0.18) 16%, rgba(245, 233, 188, 0.54) 40%, rgba(167, 112, 56, 0.52) 100%);
+  mix-blend-mode: soft-light;
+}
+.shoreline-atmosphere::before,
+.shoreline-atmosphere::after {
+  content: "";
+  position: absolute;
+  left: -10vw;
+  right: -10vw;
+  height: 28px;
+  border-radius: 50%;
+  filter: blur(8px);
+  transform: rotate(-1.2deg);
+}
+.shoreline-atmosphere::before {
+  top: 16%;
+  background: linear-gradient(90deg, transparent, rgba(238, 254, 255, 0.52), rgba(255, 241, 207, 0.22), transparent);
+  opacity: 0.72;
+}
+.shoreline-atmosphere::after {
+  top: 28%;
+  background: linear-gradient(90deg, transparent, rgba(255, 248, 226, 0.26), rgba(215, 246, 255, 0.38), transparent);
+  opacity: 0.54;
+  transform: rotate(0.8deg);
+}
 body.clean .hud,
 body.clean .readout {
   opacity: 0;
@@ -110,6 +144,7 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
 </head>
 <body data-paradise-v3="three-mesh-ocean-candidate" data-water-system="pandorachat-jonswap-mesh-ocean-v4">
 <iframe class="ocean-pass-frame" id="ocean-pass-frame" title="PandoraChat WebGL2 ocean pass" src="/game-v2/?view=water&amp;time=dawn&amp;weather=breeze&amp;quality=cinematic&amp;clean=1&amp;embed=ocean"></iframe>
+<div class="shoreline-atmosphere" aria-hidden="true"></div>
 <aside class="hud">
   <div class="kicker">Paradise V3 / Mesh Candidate</div>
   <h1>Mesh ocean, not flat art.</h1>
