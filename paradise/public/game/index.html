@@ -42,6 +42,26 @@ html, body {
   mix-blend-mode: soft-light;
   z-index: 1;
 }
+#grade::before,
+#grade::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+#grade::before {
+  background:
+    radial-gradient(circle at 50% 44%, transparent 0 42%, rgba(0, 0, 0, .18) 100%),
+    linear-gradient(180deg, rgba(8, 24, 34, .20), transparent 38%, rgba(12, 7, 2, .18));
+  mix-blend-mode: multiply;
+}
+#grade::after {
+  opacity: .075;
+  background-image:
+    repeating-radial-gradient(circle at 18% 27%, rgba(255,255,255,.32) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(92deg, transparent 0 5px, rgba(0,0,0,.18) 5px 6px);
+  mix-blend-mode: overlay;
+}
 .hud,
 .caption,
 .mobile-pad,
