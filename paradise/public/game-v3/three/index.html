@@ -112,6 +112,24 @@ button, a.button {
   cursor: pointer;
 }
 button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5a844); border-color: transparent; }
+.play-row button {
+  min-width: 104px;
+  border-color: rgba(120,216,237,.32);
+  background: rgba(7, 33, 48, .28);
+}
+.play-row #cast-reel {
+  min-width: 144px;
+  color: #06101a;
+  background: linear-gradient(135deg, #dffcff, #f0cf7a);
+  border-color: transparent;
+}
+.play-row button.alert {
+  animation: bitePulse 720ms ease-in-out infinite alternate;
+}
+@keyframes bitePulse {
+  from { filter: drop-shadow(0 0 0 rgba(240,207,122,0)); transform: translateY(0); }
+  to { filter: drop-shadow(0 0 16px rgba(240,207,122,.75)); transform: translateY(-1px); }
+}
 .readout {
   position: fixed;
   right: max(16px, env(safe-area-inset-right));
@@ -160,6 +178,11 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
     <a class="button" href="/">Root Game</a>
     <a class="button" href="/game-v3/">V3 Gate</a>
   </div>
+  <div class="row play-row">
+    <button id="cast-reel">Cast Line</button>
+    <button id="view-cycle">View: Wide</button>
+    <button id="reset-cast">Reset</button>
+  </div>
 </aside>
 <div class="readout" id="readout">loading mesh ocean</div>
 
@@ -168,6 +191,9 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const readout = document.getElementById('readout');
+const castButton = document.getElementById('cast-reel');
+const viewButton = document.getElementById('view-cycle');
+const resetButton = document.getElementById('reset-cast');
 const palette = {
   dawn: { sky: 0x8fcde0, horizon: 0xffd89a, sun: 0xffefb4, deep: [0.00, 0.04, 0.10], mid: [0.00, 0.19, 0.28], shallow: [0.05, 0.42, 0.44], fog: 0xaad0d4, light: 1.15, gold: 1.0, wind: 8.4, chop: 0.92, foam: 0.72 },
   noon: { sky: 0x55aeea, horizon: 0xd7eff7, sun: 0xfff5cf, deep: [0.00, 0.05, 0.16], mid: [0.00, 0.23, 0.38], shallow: [0.06, 0.54, 0.56], fog: 0xbfe4ea, light: 1.35, gold: 0.62, wind: 7.6, chop: 0.86, foam: 0.58 },
@@ -1191,6 +1217,101 @@ scene.add(rodLine);
 const bobber = new THREE.Mesh(new THREE.SphereGeometry(0.18, 18, 12), new THREE.MeshStandardMaterial({ color: 0xff5546, roughness: 0.32 }));
 bobber.position.set(0.4, -0.05, -11.0);
 scene.add(bobber);
+const rodTip = new THREE.Vector3(9.3, 0.9, 6.0);
+const dockBobber = new THREE.Vector3(8.55, 0.02, 5.0);
+const waterBobber = new THREE.Vector3(0.4, -0.05, -11.0);
+const lineMidA = new THREE.Vector3();
+const lineMidB = new THREE.Vector3();
+const bobberTarget = new THREE.Vector3();
+const playState = {
+  cast: true,
+  castProgress: 1,
+  bite: false,
+  biteUntil: 0,
+  tension: 0,
+  view: 0,
+};
+const viewTargets = [
+  { label: 'Wide', pos: new THREE.Vector3(0, 5.1, 19.5), look: new THREE.Vector3(0, 0.85, -24) },
+  { label: 'Water', pos: new THREE.Vector3(-1.4, 3.25, 12.8), look: new THREE.Vector3(0.2, 0.1, -11.5) },
+  { label: 'Bar', pos: new THREE.Vector3(5.4, 3.6, 12.5), look: new THREE.Vector3(5.7, 0.9, 3.6) },
+  { label: 'Dog', pos: new THREE.Vector3(-4.6, 2.9, 11.8), look: new THREE.Vector3(-3.0, 0.8, 6.5) },
+];
+function easeInOut(t) {
+  return t * t * (3 - 2 * t);
+}
+function vibrate(pattern) {
+  if (!navigator.vibrate || navigator.userActivation?.isActive === false) return;
+  navigator.vibrate(pattern);
+}
+function refreshPlayHud() {
+  castButton.textContent = playState.bite ? 'Reel Bite' : playState.cast ? 'Reel' : 'Cast Line';
+  castButton.classList.toggle('alert', playState.bite);
+  viewButton.textContent = `View: ${viewTargets[playState.view].label}`;
+}
+function resetCast() {
+  playState.cast = false;
+  playState.castProgress = 0;
+  playState.bite = false;
+  playState.biteUntil = 0;
+  playState.tension = 0;
+  readout.textContent = 'line reset / space casts';
+  refreshPlayHud();
+}
+function castLine() {
+  playState.cast = true;
+  playState.bite = false;
+  playState.tension = 0;
+  readout.textContent = 'line out / wait for bite';
+  vibrate(18);
+  refreshPlayHud();
+}
+function reelLine() {
+  if (playState.bite) {
+    readout.textContent = 'bite registered / tension cleared';
+    vibrate([28, 35, 28]);
+  } else {
+    readout.textContent = 'reeling line back';
+    vibrate(12);
+  }
+  playState.cast = false;
+  playState.bite = false;
+  playState.biteUntil = 0;
+  playState.tension = 0;
+  refreshPlayHud();
+}
+function toggleCast() {
+  if (playState.cast) reelLine();
+  else castLine();
+}
+function cycleView() {
+  playState.view = (playState.view + 1) % viewTargets.length;
+  readout.textContent = `camera / ${viewTargets[playState.view].label.toLowerCase()}`;
+  refreshPlayHud();
+}
+castButton.addEventListener('click', toggleCast);
+resetButton.addEventListener('click', resetCast);
+viewButton.addEventListener('click', cycleView);
+addEventListener('keydown', event => {
+  if (event.repeat) return;
+  const tag = event.target?.tagName?.toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || event.target?.isContentEditable) return;
+  if (event.code === 'Space') {
+    event.preventDefault();
+    toggleCast();
+  } else if (event.key.toLowerCase() === 'c') {
+    resetCast();
+  } else if (event.key.toLowerCase() === 'v') {
+    cycleView();
+  }
+});
+refreshPlayHud();
+window.__paradiseDebug = {
+  playState,
+  getBobber: () => bobber.position.toArray(),
+  getCamera: () => camera.position.toArray(),
+  getOceanSrc: () => oceanFrame?.src,
+};
 
 new GLTFLoader().load('/assets/models/paradise-shoreline.glb', gltf => {
   gltf.scene.position.set(-5.8, -0.42, 7.6);
@@ -1331,10 +1452,47 @@ function animate() {
   houseShadow.material.opacity = 0.18 + Math.sin(elapsed * 0.18) * 0.015;
   barShadow.material.opacity = 0.20 + Math.sin(elapsed * 0.21) * 0.014;
   person.rotation.y = Math.sin(elapsed * 0.38) * 0.08;
-  bobber.position.y = -0.05 + Math.sin(elapsed * 2.2) * 0.10;
-  camera.position.x += (pointerX * 2.2 - camera.position.x) * 0.018;
-  camera.position.y += (5.1 - pointerY * 0.8 - camera.position.y) * 0.018;
-  camera.lookAt(0, 0.85, -24);
+  const progressTarget = playState.cast ? 1 : 0;
+  playState.castProgress += (progressTarget - playState.castProgress) * 0.055;
+  const easedCast = easeInOut(playState.castProgress);
+  bobberTarget.lerpVectors(dockBobber, waterBobber, easedCast);
+  bobberTarget.y += Math.sin(elapsed * 2.2) * (0.025 + easedCast * 0.095);
+  bobber.position.copy(bobberTarget);
+  lineMidA.lerpVectors(rodTip, bobber.position, 0.34);
+  lineMidB.lerpVectors(rodTip, bobber.position, 0.68);
+  const sag = playState.cast ? 0.55 : 0.18;
+  lineMidA.y += 1.05 - sag * easedCast;
+  lineMidB.y += 0.62 - sag * 1.15 * easedCast;
+  rodLine.geometry.dispose();
+  rodLine.geometry = new THREE.BufferGeometry().setFromPoints(new THREE.CatmullRomCurve3([
+    rodTip,
+    lineMidA.clone(),
+    lineMidB.clone(),
+    bobber.position.clone(),
+  ]).getPoints(56));
+  if (playState.cast && playState.castProgress > 0.96) {
+    playState.tension = Math.max(0, playState.tension + (playState.bite ? 0.010 : -0.003));
+    const biteSignal = Math.sin(elapsed * 1.7 + 0.8) > 0.985 || Math.sin(elapsed * 0.63) > 0.994;
+    if (!playState.bite && biteSignal) {
+      playState.bite = true;
+      playState.biteUntil = elapsed + 3.2;
+      readout.textContent = 'bite / space reels';
+      vibrate([24, 40, 24]);
+      refreshPlayHud();
+    }
+    if (playState.bite && elapsed > playState.biteUntil) {
+      playState.bite = false;
+      playState.tension = 0;
+      readout.textContent = 'bite missed / line still out';
+      refreshPlayHud();
+    }
+  }
+  bobber.scale.setScalar(playState.bite ? 1.0 + Math.sin(elapsed * 18.0) * 0.16 : 1.0);
+  const target = viewTargets[playState.view];
+  camera.position.x += (target.pos.x + pointerX * 1.5 - camera.position.x) * 0.026;
+  camera.position.y += (target.pos.y - pointerY * 0.62 - camera.position.y) * 0.026;
+  camera.position.z += (target.pos.z - camera.position.z) * 0.026;
+  camera.lookAt(target.look);
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
 }
