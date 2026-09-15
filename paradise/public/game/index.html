@@ -425,6 +425,8 @@ const woodMat = new THREE.MeshStandardMaterial({ map: woodTex, bumpMap: woodTex,
 const darkWoodMat = new THREE.MeshStandardMaterial({ map: woodTex, bumpMap: woodTex, bumpScale: .035, color: 0x563019, roughness: .82 });
 const roofMat = new THREE.MeshStandardMaterial({ color: 0x6d2419, roughness: .72 });
 const leafMat = new THREE.MeshStandardMaterial({ color: 0x245f3f, roughness: .82 });
+const grassMat = new THREE.MeshStandardMaterial({ color: 0x4e6f36, roughness: .88, side: THREE.DoubleSide });
+const dryGrassMat = new THREE.MeshStandardMaterial({ color: 0xc29a55, roughness: .9, side: THREE.DoubleSide });
 const clothMat = new THREE.MeshStandardMaterial({ map: clothTex, color: 0x42aac1, roughness: .72 });
 const skinMat = new THREE.MeshStandardMaterial({ color: 0x7b4c35, roughness: .72 });
 const hairMat = new THREE.MeshStandardMaterial({ color: 0x17110d, roughness: .88 });
@@ -993,6 +995,46 @@ function addRock(x, z, s, color = 0x766b58) {
 }
 for (const r of [[-19,6,.42],[-17,8,.3],[-4,7.6,.24],[3,6.2,.18],[18,8.7,.36],[22,5.3,.28],[-7,1.2,.2]]) addRock(...r);
 
+const seaOats = [];
+function makeSeaOats(x, z, scale = 1, count = 9) {
+  const group = new THREE.Group();
+  group.name = 'wind-animated-sea-oats';
+  group.position.set(x, 0, z);
+  for (let i = 0; i < count; i++) {
+    const blade = new THREE.Group();
+    const ox = (Math.random() - .5) * .9 * scale;
+    const oz = (Math.random() - .5) * .55 * scale;
+    const h = (.85 + Math.random() * .75) * scale;
+    blade.position.set(ox, .02, oz);
+    blade.rotation.z = (Math.random() - .5) * .18;
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(.012 * scale, .022 * scale, h, 6), dryGrassMat);
+    stem.position.y = h * .5;
+    stem.castShadow = true;
+    const leaf = new THREE.Mesh(new THREE.ConeGeometry(.045 * scale, h * .9, 5), grassMat);
+    leaf.position.set((Math.random() - .5) * .1 * scale, h * .46, (Math.random() - .5) * .08 * scale);
+    leaf.scale.set(.35, 1, .11);
+    leaf.rotation.set(.35 + Math.random() * .3, Math.random() * Math.PI, (Math.random() - .5) * .4);
+    leaf.castShadow = true;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(.052 * scale, 8, 5), dryGrassMat);
+    head.position.set(.08 * scale, h + .03 * scale, 0);
+    head.scale.set(.55, 1.45, .55);
+    head.castShadow = true;
+    blade.add(stem, leaf, head);
+    group.add(blade);
+  }
+  scene.add(group);
+  seaOats.push({ group, phase: Math.random() * Math.PI * 2, sway: .035 + Math.random() * .035 });
+  return group;
+}
+[
+  [-18.6, 10.7, 1.32, 12],
+  [-16.8, 12.8, 1.0, 9],
+  [-4.2, 11.7, .82, 8],
+  [15.8, 10.4, 1.25, 12],
+  [22.4, 8.4, .92, 8],
+  [27.5, 12.5, 1.55, 14]
+].forEach(args => makeSeaOats(...args));
+
 function makeAlhena() {
   const group = new THREE.Group();
   group.name = 'alhena-modest-bartender-mesh-slot';
@@ -1397,6 +1439,11 @@ function animate(now) {
     leg.rotation.x = gait * .38;
     lab.paws[i].position.y = -.69 + Math.max(0, gait) * .075;
     lab.paws[i].position.x = (i < 2 ? -.42 : .52) + Math.cos(t * 5.2 + i * Math.PI) * .055;
+  });
+  seaOats.forEach((oat, i) => {
+    const wind = activePreset.wind / 18;
+    oat.group.rotation.z = Math.sin(t * (1.1 + wind) + oat.phase) * oat.sway * (1 + wind);
+    oat.group.rotation.x = Math.cos(t * .7 + oat.phase + i) * oat.sway * .38;
   });
   if (play.cast && !play.bite && now > play.biteAt) {
     play.bite = true;
