@@ -152,6 +152,11 @@ taken with Playwright Chromium at `1440x900`.
   cloud-bank cards, preset-driven cloud color/opacity, and subtle drift. This
   improves horizon scale and scene depth without increasing the GLB asset budget,
   but remains a bridge until a real skybox/HDRI/environment pipeline exists.
+- `paradise-game-v2-fish-surface-cues.png`: live water capture after replacing
+  single-sphere fish with lightweight multi-part species groups and adding
+  near-surface silhouettes/glints so fish activity remains visible through the
+  opaque spectral ocean. This improves gameplay readability, but realistic fish
+  still require authored meshes, animations, and water-material integration.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.

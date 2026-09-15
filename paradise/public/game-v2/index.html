@@ -1266,13 +1266,76 @@ renderer.domElement.addEventListener('pointerdown', event => {
 });
 
 const fishMats = fishSpecies.map(species => new THREE.MeshStandardMaterial({ color: species.color, roughness: .48, metalness: .08 }));
+function makeFish(i) {
+  const species = fishSpecies[i % fishSpecies.length];
+  const mat = fishMats[i % fishMats.length];
+  const finMat = new THREE.MeshStandardMaterial({ color: species.color, roughness: .62, metalness: .03, transparent: true, opacity: .72 });
+  const g = new THREE.Group();
+  g.name = `v2-underwater-fish-${species.name.replaceAll(' ', '-')}`;
+  const body = new THREE.Mesh(new THREE.SphereGeometry(.12, 18, 10), mat);
+  body.name = 'v2-fish-body';
+  body.scale.set(2.0, .56, .78);
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(.055, 10, 6), mat);
+  nose.name = 'v2-fish-nose';
+  nose.position.set(.22, .006, 0);
+  nose.scale.set(1.15, .72, .72);
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(.11, .28, 3), finMat);
+  tail.name = 'v2-fish-tail-fin';
+  tail.position.set(-.27, .006, 0);
+  tail.rotation.z = Math.PI / 2;
+  tail.scale.set(1.0, .72, .18);
+  const dorsal = new THREE.Mesh(new THREE.ConeGeometry(.055, .20, 3), finMat);
+  dorsal.name = 'v2-fish-dorsal-fin';
+  dorsal.position.set(-.02, .075, 0);
+  dorsal.rotation.z = Math.PI;
+  dorsal.scale.set(.75, 1.0, .18);
+  const pectoralL = new THREE.Mesh(new THREE.ConeGeometry(.045, .16, 3), finMat);
+  pectoralL.name = 'v2-fish-left-pectoral-fin';
+  pectoralL.position.set(.07, -.025, -.085);
+  pectoralL.rotation.set(.65, 0, -.65);
+  const pectoralR = pectoralL.clone();
+  pectoralR.name = 'v2-fish-right-pectoral-fin';
+  pectoralR.position.z = .085;
+  pectoralR.rotation.x = -.65;
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(.012, 6, 4), eyeMat);
+  eye.name = 'v2-fish-eye-glint';
+  eye.position.set(.20, .045, -.045);
+  const surfaceShadow = new THREE.Mesh(
+    new THREE.CircleGeometry(.32, 24),
+    new THREE.MeshBasicMaterial({ color: 0x123b45, transparent: true, opacity: .44, depthWrite: false, depthTest: false })
+  );
+  surfaceShadow.name = 'v2-near-surface-fish-silhouette';
+  surfaceShadow.rotation.x = -Math.PI / 2;
+  surfaceShadow.scale.set(4.8, 1.05, 1);
+  surfaceShadow.renderOrder = 5;
+  const surfaceGlint = new THREE.Mesh(
+    new THREE.RingGeometry(.10, .16, 20),
+    new THREE.MeshBasicMaterial({ color: 0xf7e18a, transparent: true, opacity: .34, depthWrite: false, depthTest: false })
+  );
+  surfaceGlint.name = 'v2-near-surface-fish-glint';
+  surfaceGlint.rotation.x = -Math.PI / 2;
+  surfaceGlint.scale.set(1.8, .52, 1);
+  surfaceGlint.renderOrder = 6;
+  g.add(body, nose, tail, dorsal, pectoralL, pectoralR, eye, surfaceShadow, surfaceGlint);
+  const depth = .55 + Math.random() * .95;
+  g.position.set(-18 + Math.random() * 36, -.38 - Math.random() * .7, -28 - Math.random() * 62);
+  g.userData = {
+    phase: Math.random() * Math.PI * 2,
+    speed: .3 + Math.random() * .35,
+    depth,
+    tail,
+    pectoralL,
+    pectoralR,
+    surfaceShadow,
+    surfaceGlint
+  };
+  surfaceShadow.position.y = depth + .32;
+  surfaceGlint.position.set(.10, depth + .36, .02);
+  return g;
+}
 const fish = [];
 for (let i = 0; i < 12; i++) {
-  const f = new THREE.Mesh(new THREE.SphereGeometry(.12, 16, 8), fishMats[i % fishMats.length]);
-  f.name = 'v2-underwater-fish';
-  f.scale.set(1.9, .52, .75);
-  f.position.set(-20 + Math.random() * 40, -.38 - Math.random() * .7, -8 - Math.random() * 34);
-  f.userData = { phase: Math.random() * Math.PI * 2, speed: .3 + Math.random() * .35, depth: .55 + Math.random() * .95 };
+  const f = makeFish(i);
   scene.add(f);
   fish.push(f);
 }
@@ -1500,9 +1563,17 @@ function animate() {
     clearLine();
   }
   fish.forEach((f, i) => {
-    f.position.x += Math.sin(t * f.userData.speed + f.userData.phase) * .008;
+    f.position.x += Math.sin(t * f.userData.speed + f.userData.phase) * .010;
+    f.position.z += Math.cos(t * f.userData.speed * .82 + f.userData.phase) * .004;
     f.position.y = sampleOceanHeight(f.position.x, f.position.z, t) - f.userData.depth + Math.sin(t * .8 + i) * .08;
-    f.rotation.y = Math.sin(t * .6 + i) * .18;
+    f.rotation.y = Math.sin(t * .6 + i) * .22;
+    f.userData.surfaceShadow.position.y = f.userData.depth + .34 + Math.sin(t * .8 + i) * -.035;
+    f.userData.surfaceShadow.material.opacity = .30 + Math.sin(t * .9 + i) * .055;
+    f.userData.surfaceGlint.position.y = f.userData.depth + .40 + Math.sin(t * 1.7 + i) * .025;
+    f.userData.surfaceGlint.material.opacity = .18 + Math.max(0, Math.sin(t * 2.2 + i)) * .26;
+    f.userData.tail.rotation.y = Math.sin(t * 8.0 + f.userData.phase) * .48;
+    f.userData.pectoralL.rotation.z = -.65 + Math.sin(t * 5.4 + i) * .12;
+    f.userData.pectoralR.rotation.z = -.65 - Math.sin(t * 5.4 + i) * .12;
   });
   shoreFoam.forEach(line => {
     const pos = line.geometry.attributes.position;
