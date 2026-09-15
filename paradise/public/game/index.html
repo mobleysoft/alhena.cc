@@ -1168,6 +1168,55 @@ for (const [x, y, z, sx] of [[-34, 20, -95, 10], [-5, 24, -115, 14], [35, 21, -1
   scene.add(cloud);
 }
 
+const gulls = [];
+function makeGull(x, y, z, scale, phase) {
+  const group = new THREE.Group();
+  group.name = 'distant-animated-gull';
+  group.position.set(x, y, z);
+  group.userData.baseX = x;
+  group.userData.baseY = y;
+  group.userData.baseZ = z;
+  group.userData.phase = phase;
+  group.userData.speed = .08 + phase * .008;
+  const mat = new THREE.LineBasicMaterial({ color: 0x18242a, transparent: true, opacity: .38 });
+  const wingA = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(-.42 * scale, .16 * scale, 0)
+  ]), mat);
+  const wingB = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(.42 * scale, .16 * scale, 0)
+  ]), mat);
+  group.add(wingA, wingB);
+  scene.add(group);
+  gulls.push(group);
+}
+for (let i = 0; i < 9; i++) makeGull(-38 + i * 9.5, 8 + (i % 4) * 1.4, -50 - (i % 3) * 18, .55 + (i % 3) * .22, i + .5);
+
+const sailboats = [];
+function makeSailboat(x, z, scale, phase) {
+  const group = new THREE.Group();
+  group.name = 'distant-horizon-sailboat';
+  group.position.set(x, .06, z);
+  group.userData.baseX = x;
+  group.userData.phase = phase;
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(1.2 * scale, .10 * scale, .18 * scale), darkWoodMat);
+  hull.position.y = .04;
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(.012 * scale, .012 * scale, .9 * scale, 6), darkWoodMat);
+  mast.position.y = .48 * scale;
+  const sail = new THREE.Mesh(new THREE.ConeGeometry(.28 * scale, .78 * scale, 3), new THREE.MeshBasicMaterial({ color: 0xf3ead4, transparent: true, opacity: .78, side: THREE.DoubleSide }));
+  sail.name = 'small-backlit-sail';
+  sail.position.set(.16 * scale, .45 * scale, 0);
+  sail.rotation.z = -.28;
+  sail.rotation.y = Math.PI / 2;
+  group.add(hull, mast, sail);
+  scene.add(group);
+  sailboats.push(group);
+}
+makeSailboat(-21, -43, .72, .4);
+makeSailboat(24, -61, .54, 1.7);
+makeSailboat(41, -48, .43, 2.5);
+
 const bobberRingMat = new THREE.LineBasicMaterial({ color: 0xf6ffff, transparent: true, opacity: .42 });
 const bobberRings = [];
 for (let r = 0; r < 3; r++) {
@@ -1860,6 +1909,19 @@ function animate(now) {
     const wind = activePreset.wind / 18;
     oat.group.rotation.z = Math.sin(t * (1.1 + wind) + oat.phase) * oat.sway * (1 + wind);
     oat.group.rotation.x = Math.cos(t * .7 + oat.phase + i) * oat.sway * .38;
+  });
+  gulls.forEach((gull, i) => {
+    const phase = gull.userData.phase;
+    gull.position.x = gull.userData.baseX + Math.sin(t * gull.userData.speed + phase) * 3.8;
+    gull.position.y = gull.userData.baseY + Math.sin(t * .9 + phase) * .42;
+    gull.position.z = gull.userData.baseZ + Math.cos(t * .18 + phase) * 1.8;
+    gull.rotation.z = Math.sin(t * 2.4 + phase) * .20;
+    gull.scale.y = .72 + Math.sin(t * 5.4 + i) * .20;
+  });
+  sailboats.forEach((boat, i) => {
+    boat.position.x = boat.userData.baseX + Math.sin(t * .12 + boat.userData.phase) * 1.25;
+    boat.position.y = .05 + Math.sin(t * .8 + i) * .025;
+    boat.rotation.z = Math.sin(t * .62 + boat.userData.phase) * .018;
   });
   if (play.cast && !play.bite && now > play.biteAt) {
     play.bite = true;
