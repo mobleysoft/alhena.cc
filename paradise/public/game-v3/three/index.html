@@ -91,6 +91,18 @@ body > canvas {
   background-size: 5px 5px, 7px 7px;
   mask-image: radial-gradient(ellipse at center, transparent 0 28%, black 82%);
 }
+.depth-grade {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.12) 0%, transparent 20%),
+    linear-gradient(90deg, rgba(255,235,170,0.10), transparent 24%, transparent 72%, rgba(76,196,218,0.08)),
+    radial-gradient(ellipse at 50% 71%, rgba(2, 20, 32, 0.0) 0 32%, rgba(2, 20, 32, 0.15) 100%);
+  mix-blend-mode: screen;
+  opacity: 0.48;
+}
 body.clean .hud,
 body.clean .readout {
   opacity: 0;
@@ -101,13 +113,13 @@ body.clean .readout {
   left: max(16px, env(safe-area-inset-left));
   top: max(16px, env(safe-area-inset-top));
   z-index: 3;
-  width: min(420px, calc(100vw - 32px));
-  padding: 18px;
+  width: min(324px, calc(100vw - 32px));
+  padding: 12px;
   border: 1px solid var(--line);
   border-radius: 22px;
   background: var(--glass);
-  box-shadow: 0 24px 80px rgba(0,0,0,0.32), inset 0 1px rgba(255,255,255,0.08);
-  backdrop-filter: blur(18px) saturate(1.2);
+  box-shadow: 0 18px 56px rgba(0,0,0,0.26), inset 0 1px rgba(255,255,255,0.08);
+  backdrop-filter: blur(14px) saturate(1.15);
 }
 .kicker {
   color: var(--gold);
@@ -117,15 +129,16 @@ body.clean .readout {
   text-transform: uppercase;
 }
 h1 {
-  margin: 10px 0 8px;
-  font: 500 clamp(28px, 6vw, 56px)/.9 Georgia, "Times New Roman", serif;
+  margin: 7px 0 3px;
+  font: 500 clamp(22px, 3vw, 34px)/.9 Georgia, "Times New Roman", serif;
   letter-spacing: -.04em;
 }
-p { margin: 0; color: rgba(247,237,206,.72); line-height: 1.5; font-size: 13px; }
-.row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.hud p { display: none; }
+p { margin: 0; color: rgba(247,237,206,.68); line-height: 1.42; font-size: 12px; }
+.row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
 button, a.button {
-  min-height: 38px;
-  padding: 10px 12px;
+  min-height: 31px;
+  padding: 8px 10px;
   border: 1px solid rgba(247,237,206,.24);
   border-radius: 999px;
   background: rgba(255,255,255,.07);
@@ -133,7 +146,7 @@ button, a.button {
   text-decoration: none;
   text-transform: uppercase;
   letter-spacing: .13em;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
   cursor: pointer;
 }
@@ -144,7 +157,7 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
   background: rgba(7, 33, 48, .28);
 }
 .play-row #cast-reel {
-  min-width: 144px;
+  min-width: 132px;
   color: #06101a;
   background: linear-gradient(135deg, #dffcff, #f0cf7a);
   border-color: transparent;
@@ -156,16 +169,16 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 .catch-slot {
-  min-height: 28px;
-  padding: 7px 8px;
+  min-height: 22px;
+  padding: 5px 6px;
   border: 1px solid rgba(120,216,237,.20);
   border-radius: 10px;
   background: rgba(7, 33, 48, .22);
   color: rgba(247,237,206,.70);
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 800;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -278,9 +291,10 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
 <iframe class="ocean-pass-frame" id="ocean-pass-frame" title="PandoraChat WebGL ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
 <div class="shoreline-atmosphere" aria-hidden="true"></div>
 <div class="cinematic-grade" aria-hidden="true"></div>
+<div class="depth-grade" aria-hidden="true"></div>
 <aside class="hud">
   <div class="kicker">Paradise V3 / Shader Composite</div>
-  <h1>Spectral water pass.</h1>
+  <h1>Paradise Fishing.</h1>
   <p>This route composes a standalone PandoraChat-style ocean shader behind the game foreground: JONSWAP-inspired wave spectra, analytical normals, Fresnel, scatter, foam, fog, and tone mapping.</p>
   <div class="row">
     <button class="active" data-time="dawn">Dawn</button>
@@ -470,6 +484,54 @@ for (let i = 0; i < 5; i++) {
   scene.add(ray);
   atmosphereRays.push(ray);
 }
+
+function makeSparkTexture() {
+  const c = document.createElement('canvas');
+  c.width = 96;
+  c.height = 96;
+  const x = c.getContext('2d');
+  const g = x.createRadialGradient(48, 48, 0, 48, 48, 48);
+  g.addColorStop(0.0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.22, 'rgba(225,252,255,.72)');
+  g.addColorStop(0.58, 'rgba(240,207,122,.22)');
+  g.addColorStop(1.0, 'rgba(255,255,255,0)');
+  x.fillStyle = g;
+  x.fillRect(0, 0, 96, 96);
+  const texture = new THREE.CanvasTexture(c);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function makeParticleField(count, bounds, color, size, opacity) {
+  const positions = new Float32Array(count * 3);
+  const seeds = new Float32Array(count);
+  for (let i = 0; i < count; i++) {
+    const j = i * 3;
+    positions[j] = bounds.x[0] + Math.random() * (bounds.x[1] - bounds.x[0]);
+    positions[j + 1] = bounds.y[0] + Math.random() * (bounds.y[1] - bounds.y[0]);
+    positions[j + 2] = bounds.z[0] + Math.random() * (bounds.z[1] - bounds.z[0]);
+    seeds[i] = Math.random() * Math.PI * 2;
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const material = new THREE.PointsMaterial({
+    map: makeSparkTexture(),
+    color,
+    size,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    sizeAttenuation: true,
+  });
+  const points = new THREE.Points(geometry, material);
+  points.userData = { seeds, base: positions.slice(0), bounds };
+  scene.add(points);
+  return points;
+}
+
+const seaGlints = makeParticleField(120, { x: [-17, 17], y: [-0.18, 0.10], z: [-34, -5] }, 0xdffcff, 0.13, 0.22);
+const shoreMotes = makeParticleField(80, { x: [-14, 14], y: [0.05, 1.20], z: [4.4, 9.4] }, 0xfff0bd, 0.10, 0.16);
 
 const waterUniforms = {
   uTime: { value: 0 },
@@ -1757,6 +1819,21 @@ function animate() {
   nearWaterMat.uniforms.uTime.value = elapsed;
   foamMat.uniforms.uTime.value = elapsed;
   sandMat.uniforms.uTime.value = elapsed;
+  for (const field of [seaGlints, shoreMotes]) {
+    const attr = field.geometry.attributes.position;
+    const base = field.userData.base;
+    const seeds = field.userData.seeds;
+    for (let i = 0; i < attr.count; i++) {
+      const j = i * 3;
+      const seed = seeds[i];
+      attr.setX(i, base[j] + Math.sin(elapsed * 0.22 + seed) * 0.16);
+      attr.setY(i, base[j + 1] + Math.sin(elapsed * 0.90 + seed * 1.7) * 0.035);
+      attr.setZ(i, base[j + 2] + Math.cos(elapsed * 0.18 + seed) * 0.24);
+    }
+    attr.needsUpdate = true;
+  }
+  seaGlints.material.opacity = (timeKey === 'night' ? 0.10 : 0.20) * weatherProfiles[weatherKey].reflection;
+  shoreMotes.material.opacity = timeKey === 'night' ? 0.07 : 0.15;
   for (const accent of shoreAccents) {
     if (accent.material?.uniforms?.uTime) accent.material.uniforms.uTime.value = elapsed;
     if (accent.material?.uniforms?.uLight) accent.material.uniforms.uLight.value = palette[timeKey].light;
