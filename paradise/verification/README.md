@@ -36,6 +36,15 @@ taken with Playwright Chromium at `1440x900`.
   offshore Three.js water mesh into a low-opacity parallax/specular carrier on
   top of the Pandora-style full-screen shader. It improves depth slightly
   without returning to the earlier washed-out beach failure mode.
+- `paradise-game-v2-initial.png`: first live capture of the isolated `/game-v2/`
+  real-3D rebuild route; rejected because the frame rendered black before
+  import-map/runtime hardening.
+- `paradise-game-v2-fixed.png`: second live V2 capture after fixing module
+  resolution and shader portability; rejected because the ocean mesh overlapped
+  the beach/bar and flooded the foreground.
+- `paradise-game-v2-layout.png`: live V2 capture after moving the spectral ocean
+  mesh offshore and widening the default camera. This establishes the cleaner
+  replacement architecture for future PBR/GLB asset iteration.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.
