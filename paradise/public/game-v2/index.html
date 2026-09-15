@@ -157,6 +157,10 @@ body.clean .caption {
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const query = new URLSearchParams(location.search);
 const cinematic = query.get('quality') === 'cinematic';
@@ -176,6 +180,15 @@ scene.fog = new THREE.FogExp2(0x9fd0dc, cinematic ? 0.0034 : 0.0065);
 
 const camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.05, 650);
 camera.position.set(13.0, 4.2, 17.5);
+
+const composer = cinematic ? new EffectComposer(renderer) : null;
+if (composer) {
+  composer.addPass(new RenderPass(scene, camera));
+  const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.12, 0.28, 0.96);
+  bloom.name = 'v2-cinematic-sun-water-bloom';
+  composer.addPass(bloom);
+  composer.addPass(new OutputPass());
+}
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(-1.2, .75, -8.5);
@@ -1296,6 +1309,7 @@ function resize() {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  if (composer) composer.setSize(innerWidth, innerHeight);
 }
 addEventListener('resize', resize);
 
@@ -1372,7 +1386,8 @@ function animate() {
     line.material.opacity = .12 + Math.sin(t * .9 + row) * .035;
     pos.needsUpdate = true;
   });
-  renderer.render(scene, camera);
+  if (composer) composer.render();
+  else renderer.render(scene, camera);
   requestAnimationFrame(animate);
 }
 animate();

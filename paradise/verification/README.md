@@ -120,6 +120,10 @@ taken with Playwright Chromium at `1440x900`.
   after adding a JavaScript-side spectral ocean sampler. The bobber and fish now
   use the same wind/time-driven wave model family as the shader, and weather
   affects bite timing, foam, wind, and optics.
+- `paradise-game-v2-postfx-tuned.png`: live V2 sunset/storm capture after adding
+  a cinematic post-processing path with selective bloom and output pass. The
+  first post-processing attempt over-bloomed the water; this capture verifies the
+  tuned threshold/strength no longer blows out the scene.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.
