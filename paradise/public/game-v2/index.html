@@ -223,8 +223,12 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 const query = new URLSearchParams(location.search);
 const cinematic = query.get('quality') === 'cinematic';
 const presentation = query.get('presentation') === '1' || query.get('showcase') === '1';
+const canonicalPandoraWaterOnly = query.get('watermesh') !== '1';
 document.body.classList.toggle('presentation', presentation);
 document.body.classList.toggle('clean', query.get('clean') === '1');
+document.body.dataset.waterArchitecture = canonicalPandoraWaterOnly
+  ? 'v2-canonical-pandorachat-webgl2-ocean-shader'
+  : 'v2-debug-pandorachat-plus-three-water-mesh';
 const oceanCanvas = document.getElementById('ocean-pass');
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, premultipliedAlpha: false, powerPreference: 'high-performance' });
 renderer.domElement.className = 'three-pass';
@@ -674,21 +678,25 @@ function makePandoraOceanPass(canvas) {
       }
       return v;
     }
+    float jonswapSpectrum(float omega, float wp) {
+      float sigma = omega <= wp ? 0.07 : 0.09;
+      float peak = exp(-pow(omega - wp, 2.0) / (2.0 * sigma * sigma * wp * wp));
+      return 0.0081 * G * G / pow(omega, 5.0) * exp(-1.25 * pow(wp / omega, 4.0)) * pow(3.3, peak);
+    }
     void waveComponent(float i, out vec2 dir, out float k, out float omega, out float amp, out float phase) {
-      float t = i / 31.0;
-      float spread = mix(1.05, 0.12, smoothstep(0.0, 1.0, t));
+      float t = i / 39.0;
+      float spread = mix(1.18, 0.10, smoothstep(0.0, 1.0, t));
       float theta = -PI * 0.5 + (t - 0.5) * PI * spread + 0.22 + (hash(i * 8.31) - 0.5) * 0.34;
       dir = normalize(vec2(cos(theta), sin(theta)));
       float wind = max(uWind, 1.5);
       float wp = 0.13 * G / wind * TAU;
-      float wMin = wp * 0.50;
-      float wMax = wp * 3.50;
+      float wMin = wp * 0.38;
+      float wMax = wp * 7.80;
       omega = wMin * pow(wMax / wMin, t);
       k = omega * omega / G;
-      float sigma = omega <= wp ? 0.07 : 0.09;
-      float peak = exp(-pow(omega - wp, 2.0) / (2.0 * sigma * sigma * wp * wp));
-      float spectrum = 0.0081 * G * G / pow(omega, 5.0) * exp(-1.25 * pow(wp / omega, 4.0)) * pow(3.3, peak);
-      amp = clamp(sqrt(2.0 * spectrum * ((wMax - wMin) / 32.0)) * 0.52 * wind / 12.0 * uChop, 0.0, 2.20);
+      float spectrum = jonswapSpectrum(omega, wp);
+      float longSet = mix(1.24, 0.70, smoothstep(0.42, 1.0, t));
+      amp = clamp(sqrt(2.0 * spectrum * ((wMax - wMin) / 40.0)) * 0.82 * wind / 12.0 * uChop * longSet, 0.0, 2.65);
       phase = hash(i * 19.19 + 3.7) * TAU;
     }
     struct WaveSample {
@@ -703,7 +711,7 @@ function makePandoraOceanPass(canvas) {
       s.grad = vec2(0.0);
       s.curvature = 0.0;
       s.energy = 0.0;
-      for (int i = 0; i < 32; i++) {
+      for (int i = 0; i < 40; i++) {
         vec2 dir; float k; float omega; float amp; float phase;
         waveComponent(float(i), dir, k, omega, amp, phase);
         float w = dot(dir, p) * k - omega * uTime + phase;
@@ -714,13 +722,13 @@ function makePandoraOceanPass(canvas) {
         s.curvature += -amp * k * k * sw;
         s.energy += amp * amp * k;
       }
-      s.energy = clamp(s.energy * 0.08, 0.0, 1.0);
+      s.energy = clamp(s.energy * 0.095, 0.0, 1.0);
       return s;
     }
     vec3 waterNormal(vec2 p, float px) {
       WaveSample s = sampleJonswapSurface(p);
       vec3 macro = normalize(vec3(-s.grad.x, 1.0, -s.grad.y));
-      float microScale = mix(28.0, 74.0, clamp(px * 6.0, 0.0, 1.0));
+      float microScale = mix(36.0, 118.0, clamp(px * 6.0, 0.0, 1.0));
       vec2 capillary = vec2(
         fbm(p * microScale + vec2(uTime * .24, -uTime * .17)),
         fbm(p * (microScale * 1.93) + vec2(-uTime * .31, uTime * .19))
@@ -729,7 +737,7 @@ function makePandoraOceanPass(canvas) {
         sin(dot(p, vec2(1.7, 3.1)) + uTime * 1.7),
         cos(dot(p, vec2(-2.4, 1.9)) - uTime * 1.2)
       ) * 0.026;
-      return normalize(macro + vec3(capillary.x + windRipple.x, 0.0, capillary.y + windRipple.y) * (0.10 + uWind * 0.014));
+      return normalize(macro + vec3(capillary.x + windRipple.x, 0.0, capillary.y + windRipple.y) * (0.14 + uWind * 0.018));
     }
     vec3 skyColor(vec2 uv) {
       vec3 zenith = mix(uSkyTint * 2.5 + vec3(0.035, 0.08, 0.15), vec3(0.12, 0.18, 0.22), uStorm * .72);
@@ -752,7 +760,8 @@ function makePandoraOceanPass(canvas) {
     }
     vec3 oceanColor(vec2 uv, vec2 q, float horizon) {
       float d = clamp((horizon - uv.y) / horizon, 0.0, 1.0);
-      float range = 1.0 / max(0.024, pow(d + 0.016, 1.86));
+      float farField = smoothstep(0.010, 0.18, d);
+      float range = min(145.0, 1.0 / max(0.030, pow(d + 0.020, 1.74)));
       vec2 p = vec2(q.x * range * 2.42, range * 3.95 - uTime * (0.34 + uWind * 0.017));
       p += vec2(sampleJonswapSurface(p * 0.21 + 8.0).h, sampleJonswapSurface(p * 0.17 - 4.0).h) * 0.028 * uChop;
       WaveSample sample = sampleJonswapSurface(p);
@@ -777,19 +786,20 @@ function makePandoraOceanPass(canvas) {
       body += vec3(0.0, 0.20, 0.23) * curvature * 0.16;
       float crestEnergy = smoothstep(0.10, 0.48, abs(h)) * max(slope, curvature);
       float foamNoise = fbm(p * 5.6 + vec2(uTime * .08, -uTime * .05));
-      float microFoam = smoothstep(uFoamT * .42, uFoamT * 1.04, abs(h)) * smoothstep(.42 - uStorm * .10, .84, foamNoise);
+      float microFoam = smoothstep(uFoamT * .42, uFoamT * 1.04, abs(h)) * smoothstep(.42 - uStorm * .10, .84, foamNoise) * farField;
       float shoreLine = 0.218 + 0.012 * sin(q.x * 3.4 + uTime * .18);
       float shoreFoam = smoothstep(0.030, 0.0, abs(uv.y - shoreLine)) * smoothstep(.34, .82, fbm(vec2(q.x * 24.0, uTime * .42)));
       float foam = clamp(crestEnergy * microFoam + smoothstep(0.08, 0.38, -sample.curvature) * .26 + shoreFoam * .50, 0.0, .86);
       vec3 water = mix(body, refl, fresnel * mix(.36, .68, smoothstep(0.0, 0.18, d)));
       float windLines = smoothstep(.42, .88, fbm(vec2(p.x * .08 + h * 1.7, p.y * .18 - uTime * .26)));
-      water += vec3(.025, .185, .205) * pow(clamp(slope * .62 + curvature * .32, 0.0, 1.0), 1.35) * windLines * smoothstep(.02, .78, d) * 1.45;
+      water += vec3(.025, .185, .205) * pow(clamp(slope * .62 + curvature * .32, 0.0, 1.0), 1.35) * windLines * smoothstep(.02, .78, d) * farField * 1.45;
       vec3 sunDir = normalize(vec3(-0.34, .86, .38));
       float spec = pow(max(dot(n, normalize(viewDir + sunDir)), 0.0), mix(58.0, 220.0, smoothstep(0.10, 0.92, d)));
       float glints = smoothstep(.62, .96, fbm(p * 31.0 + vec2(uTime * .55, -uTime * .21)));
-      water += vec3(1.0, .84, .46) * spec * glints * (0.9 + uGold * 1.6);
+      water += vec3(1.0, .84, .46) * spec * glints * (0.9 + uGold * 1.6) * farField;
       water = mix(water, vec3(.88, .97, .99), foam * .46);
       water = mix(water, mix(vec3(.20, .33, .39), vec3(.58, .67, .67), uGold * .14), smoothstep(0.24, 0.0, d) * (.28 + uStorm * .20));
+      water = mix(water, vec3(.50, .62, .64), smoothstep(0.18, 0.0, d) * (.70 + uStorm * .20));
       water = mix(water, vec3(.03,.09,.105), uStorm * smoothstep(.08, .78, d) * .22);
       return water;
     }
@@ -863,6 +873,7 @@ const pandoraOceanPass = makePandoraOceanPass(oceanCanvas);
 let pandoraOceanPreset = { gold: 1.0, wind: 10.8, chop: 1.0, foamT: .32, storm: 0.0, skyTint: [.08, .18, .32] };
 if (pandoraOceanPass) {
   document.body.dataset.atmosphereOwner = 'v2-pandorachat-background-owns-atmosphere';
+  document.body.dataset.waterSource = 'v2-jonswap-inspired-analytical-normals-fresnel-scatter-foam-fog-tonemap';
   skyDome.visible = false;
   sunDisk.visible = false;
   sunGlow.visible = false;
@@ -2072,8 +2083,8 @@ function setView(name) {
     if (!obj.name) return;
     if (hideForWaterStudy.some(pattern => pattern.test(obj.name))) obj.visible = !waterStudy;
   });
-  ocean.visible = !waterStudy;
-  waterOptics.visible = !waterStudy;
+  ocean.visible = !waterStudy && !canonicalPandoraWaterOnly;
+  waterOptics.visible = !waterStudy && !canonicalPandoraWaterOnly;
   fish.forEach(f => { f.visible = !waterStudy; });
   bobber.visible = !waterStudy;
   red.visible = !waterStudy;

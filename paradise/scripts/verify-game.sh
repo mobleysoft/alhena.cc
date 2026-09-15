@@ -91,6 +91,9 @@ fi
 v2_markers=(
   "v2-jonswap-displaced-ocean-mesh"
   "v2-pandorachat-fullscreen-ocean-pass"
+  "v2-canonical-pandorachat-webgl2-ocean-shader"
+  "v2-jonswap-inspired-analytical-normals-fresnel-scatter-foam-fog-tonemap"
+  "jonswapSpectrum"
   "v2-pandorachat-background-owns-atmosphere"
   "v2-pandorachat-jonswap-fresnel-water-optics-overlay"
   "uStorm"
