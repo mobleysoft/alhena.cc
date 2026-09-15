@@ -116,6 +116,10 @@ taken with Playwright Chromium at `1440x900`.
 - `paradise-game-v2-night-bar.png`: live V2 night/calm bar capture from the same
   preset system. It proves the scene can shift mood coherently, while also
   showing the remaining primitive-character limitation.
+- `paradise-game-v2-wave-coupled-fishing.png`: live V2 production play probe
+  after adding a JavaScript-side spectral ocean sampler. The bobber and fish now
+  use the same wind/time-driven wave model family as the shader, and weather
+  affects bite timing, foam, wind, and optics.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.
