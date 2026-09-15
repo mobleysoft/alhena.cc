@@ -224,6 +224,7 @@ const query = new URLSearchParams(location.search);
 const cinematic = query.get('quality') === 'cinematic';
 const presentation = query.get('presentation') === '1' || query.get('showcase') === '1';
 const canonicalPandoraWaterOnly = query.get('watermesh') !== '1';
+const experimentalShallowWater = query.get('shallowwater') === '1';
 document.body.classList.toggle('presentation', presentation);
 document.body.classList.toggle('clean', query.get('clean') === '1');
 document.body.dataset.waterArchitecture = canonicalPandoraWaterOnly
@@ -619,7 +620,7 @@ const furTex = makeTexture(512, (ctx, s) => {
 });
 furTex.repeat.set(1.8, 1.0);
 
-const sandMat = new THREE.MeshStandardMaterial({ map: sandTex, bumpMap: sandTex, bumpScale: .09, roughness: .95, color: 0xc99b58, envMapIntensity: .18 });
+const sandMat = new THREE.MeshStandardMaterial({ map: sandTex, bumpMap: sandTex, bumpScale: .09, roughness: .98, color: 0x9f805b, envMapIntensity: .10 });
 const wetSandMat = new THREE.MeshPhysicalMaterial({
   map: washTex,
   bumpMap: washTex,
@@ -1179,6 +1180,30 @@ waterOptics.name = 'v2-pandorachat-jonswap-fresnel-water-optics-overlay';
 waterOptics.rotation.x = -Math.PI / 2;
 waterOptics.position.set(0, -.105, -75);
 scene.add(waterOptics);
+
+const shallowWaterMat = new THREE.MeshPhysicalMaterial({
+  color: 0x1f6f7a,
+  roughness: .08,
+  metalness: 0,
+  clearcoat: .86,
+  clearcoatRoughness: .05,
+  transparent: true,
+  opacity: .20,
+  depthWrite: false,
+  envMapIntensity: 1.28
+});
+const shallowWater = new THREE.Mesh(new THREE.PlaneGeometry(120, 12, 120, 16), shallowWaterMat);
+shallowWater.name = 'v2-perspective-shallow-water-displacement-ribbon';
+shallowWater.rotation.x = -Math.PI / 2;
+shallowWater.position.set(0, -.092, -11.2);
+shallowWater.renderOrder = 6;
+shallowWater.visible = experimentalShallowWater;
+scene.add(shallowWater);
+const shallowWaterPositions = shallowWater.geometry.attributes.position;
+const shallowWaterBase = [];
+for (let i = 0; i < shallowWaterPositions.count; i++) {
+  shallowWaterBase.push([shallowWaterPositions.getX(i), shallowWaterPositions.getY(i)]);
+}
 
 const beach = new THREE.Mesh(new THREE.PlaneGeometry(120, 48, 160, 48), sandMat);
 beach.name = 'v2-sculpted-beach-foreground';
@@ -1907,7 +1932,7 @@ for (let i = 0; i < 12; i++) {
 }
 
 const views = {
-  shore: { pos: [13.0, 4.2, 17.5], target: [-1.2, .75, -8.5] },
+  shore: { pos: [14.0, 2.35, 13.8], target: [-2.6, .62, -18.2] },
   water: { pos: [-5.8, 1.36, 7.8], target: [-4.8, .22, -46] },
   bar: { pos: [8.9, 2.95, 9.8], target: [7.55, 1.76, 3.02] },
   dog: { pos: [4.85, 1.28, 8.15], target: [1.55, .52, 5.62] }
@@ -2027,6 +2052,8 @@ function applyEnvironment(timeName = activeTime, weatherName = activeWeather) {
   oceanUniforms.uGold.value = time.gold;
   waterOpticsUniforms.uWind.value = weather.wind;
   waterOpticsUniforms.uOpticsPower.value = weather.optics;
+  shallowWater.material.color.setHex(activeWeather === 'storm' ? 0x183f48 : activeTime === 'sunset' ? 0x287f83 : 0x217b88);
+  shallowWater.material.opacity = activeWeather === 'storm' ? .18 : activeTime === 'night' ? .14 : .20;
   const sky = new THREE.Color(time.sky);
   pandoraOceanPreset = {
     gold: time.gold,
@@ -2057,6 +2084,7 @@ function setView(name) {
     /^v2-layered-depth-mist/,
     /^v2-reflective-wet-sand/,
     /^v2-layered-shorebreak/,
+    /^v2-perspective-shallow-water/,
     /^v2-animated-shoreline/,
     /^v2-weathered-dock/,
     /^v2-dock-/,
@@ -2085,6 +2113,7 @@ function setView(name) {
   });
   ocean.visible = !waterStudy && !canonicalPandoraWaterOnly;
   waterOptics.visible = !waterStudy && !canonicalPandoraWaterOnly;
+  shallowWater.visible = experimentalShallowWater && !waterStudy;
   fish.forEach(f => { f.visible = !waterStudy; });
   bobber.visible = !waterStudy;
   red.visible = !waterStudy;
@@ -2147,6 +2176,16 @@ function animate() {
     pool.material.opacity = .38 + Math.sin(t * .42 + i * 1.7) * .035;
     pool.rotation.z = Math.sin(t * .18 + i) * .025;
   });
+  for (let i = 0; i < shallowWaterPositions.count; i++) {
+    const [x, localZ] = shallowWaterBase[i];
+    const worldZ = shallowWater.position.z + localZ;
+    const height = sampleOceanHeight(x, worldZ, t);
+    const shoreFade = THREE.MathUtils.smoothstep(worldZ, -7.5, .8);
+    const ripple = Math.sin(x * .72 + worldZ * .18 - t * 1.35) * .018 + Math.sin(x * .21 - t * .62) * .012;
+    shallowWaterPositions.setZ(i, height + .028 + ripple * shoreFade - shallowWater.position.y);
+  }
+  shallowWaterPositions.needsUpdate = true;
+  shallowWater.geometry.computeVertexNormals();
   controls.update();
   alhena.rotation.y = Math.sin(t * .45) * .06;
   alhena.userData.torso.scale.y = 1.0 + Math.sin(t * 1.2) * .018;

@@ -96,6 +96,7 @@ v2_markers=(
   "jonswapSpectrum"
   "v2-pandorachat-background-owns-atmosphere"
   "v2-pandorachat-jonswap-fresnel-water-optics-overlay"
+  "v2-perspective-shallow-water-displacement-ribbon"
   "uStorm"
   "v2-pbr-sky-ocean-environment-map"
   "v2-layered-shorebreak-wash-sheet"
