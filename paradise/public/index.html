@@ -1400,9 +1400,11 @@ function drawShore(t, time) {
   drawWetSandCaustics(t, y, time);
   drawShellsAndPebbles(t, y, time);
   drawFootprintsAndTideWrack(t, y, time);
+  drawBeachGear(w * 0.48, h * 0.89, 1.0, t, time);
   drawBeachHouse(w * 0.11, h * 0.735, 1.14, time);
   drawBlackLab(w * 0.31, h * 0.82, 1.18, t, time);
   drawForegroundPlants(w * 0.965, h * 0.87, 1.0, time);
+  drawForegroundPlants(w * 0.035, h * 0.93, 0.68, time);
   drawRod(t);
   drawBarAndAlhena(w * 0.80, h * 0.725, t, time);
 }
@@ -1502,6 +1504,96 @@ function drawShellsAndPebbles(t, shoreTop, time) {
     ctx.fillStyle = i % 4 === 0 ? '#f5dfb1' : i % 4 === 1 ? '#805e45' : i % 4 === 2 ? '#ceb27c' : '#5d4b3c';
     ctx.beginPath();
     ctx.ellipse(x, y, 2.8 * s, 1.5 * s, Math.sin(i * 2.1), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 0.18 + time.light * 0.22;
+  for (let i = 0; i < 5; i++) {
+    const x = (i * 263 + w * 0.18) % w;
+    const y = shoreTop + 44 + ((i * 37) % Math.max(20, h - shoreTop - 72));
+    ctx.fillStyle = i % 2 ? '#d37f58' : '#dbb56f';
+    ctx.beginPath();
+    for (let p = 0; p < 10; p++) {
+      const a = p / 10 * Math.PI * 2;
+      const r = p % 2 ? 4.2 : 8.5;
+      const px = x + Math.cos(a) * r;
+      const py = y + Math.sin(a) * r * 0.68;
+      if (p === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawBeachGear(x, y, s, t, time) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  drawContactShadow(0, 22, 108, 18, 0.19);
+
+  ctx.save();
+  ctx.rotate(-0.08);
+  const cooler = ctx.createLinearGradient(-72, -12, -18, 26);
+  cooler.addColorStop(0, '#cfe9ef');
+  cooler.addColorStop(0.55, '#6ba5b3');
+  cooler.addColorStop(1, '#254352');
+  ctx.fillStyle = cooler;
+  roundRect(-78, -16, 58, 36, 5);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fillRect(-73, -11, 48, 5);
+  ctx.strokeStyle = 'rgba(10,24,31,0.38)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-67, -17);
+  ctx.quadraticCurveTo(-49, -30, -30, -17);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.save();
+  ctx.rotate(0.13);
+  ctx.strokeStyle = '#6c4930';
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, 24); ctx.lineTo(22, -34); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(54, 24); ctx.lineTo(29, -34); ctx.stroke();
+  const fabric = ctx.createLinearGradient(3, -33, 50, 9);
+  fabric.addColorStop(0, '#f3d779');
+  fabric.addColorStop(0.5, '#d97858');
+  fabric.addColorStop(1, '#6b2f38');
+  ctx.fillStyle = fabric;
+  ctx.beginPath();
+  ctx.moveTo(3, -33);
+  ctx.quadraticCurveTo(29, -20 + Math.sin(t * 0.002) * 2, 52, -31);
+  ctx.lineTo(42, 7);
+  ctx.quadraticCurveTo(24, 16, 8, 5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(82, -4);
+  ctx.fillStyle = '#2e2418';
+  roundRect(-10, -20, 20, 34, 4);
+  ctx.fill();
+  ctx.fillStyle = state.time === 'night' ? 'rgba(255,205,98,0.9)' : 'rgba(255,225,140,0.42)';
+  roundRect(-6, -13, 12, 18, 5);
+  ctx.fill();
+  ctx.globalCompositeOperation = 'screen';
+  const glow = ctx.createRadialGradient(0, -4, 1, 0, -4, 42);
+  glow.addColorStop(0, state.time === 'night' ? 'rgba(255,198,79,0.5)' : 'rgba(255,226,150,0.12)');
+  glow.addColorStop(1, 'rgba(255,198,79,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(0, -4, 42, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = 'rgba(55,36,21,0.34)';
+  for (let i = 0; i < 5; i++) {
+    ctx.beginPath();
+    ctx.ellipse(-7 + i * 23, 34 + Math.sin(i) * 2, 18, 3, -0.04, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
