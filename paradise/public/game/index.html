@@ -265,6 +265,7 @@ body.clean .caption { opacity: 0; pointer-events: none; }
     <button data-time="storm">Storm</button>
     <button id="tour">Tour</button>
     <button id="cast">Cast</button>
+    <button id="motion">Motion</button>
     <button id="clean">Clean HUD</button>
   </div>
   <div class="view-row">
@@ -286,6 +287,7 @@ body.clean .caption { opacity: 0; pointer-events: none; }
 </div>
 <div class="action-pad" aria-label="fishing controls">
   <button id="mobile-cast">Cast</button>
+  <button id="mobile-motion">Move</button>
   <button id="mobile-clean">HUD</button>
 </div>
 
@@ -1577,6 +1579,10 @@ const play = {
   biteAt: 0,
   biteWindowEnds: 0,
   catchCount: 0,
+  motionEnabled: false,
+  lastMotionCastAt: 0,
+  lastAccel: 0,
+  bitePulseSent: false,
   message: 'Ready. Space/click casts; reel when the bobber dives.',
   bobberBase: new THREE.Vector3(2.2, .34, -16),
   velocity: new THREE.Vector3(),
@@ -1595,6 +1601,10 @@ function setStatus(message) {
   statusEl.textContent = message;
 }
 
+function pulse(pattern) {
+  if ('vibrate' in navigator) navigator.vibrate(pattern);
+}
+
 function setView(name) {
   const view = views[name] || views.wide;
   tour = false;
@@ -1609,10 +1619,12 @@ function castOrReel() {
   if (!play.cast) {
     play.cast = true;
     play.bite = false;
+    play.bitePulseSent = false;
     play.castAt = now;
     play.biteAt = now + 1800 + Math.random() * 3200;
     play.biteWindowEnds = play.biteAt + 2200;
     play.bobberBase.set(-2 + Math.random() * 7, .34, -13 - Math.random() * 14);
+    pulse(18);
     setStatus('Line cast. Watch the bobber and reel on the bite.');
     return;
   }
@@ -1622,10 +1634,49 @@ function castOrReel() {
     play.catchCount += 1;
     play.cast = false;
     play.bite = false;
+    play.bitePulseSent = false;
+    pulse([22, 36, 22]);
     setStatus(`Caught ${caughtName}. Cast again.`);
     return;
   }
+  pulse(8);
   setStatus('Too early. Let the fish commit before reeling.');
+}
+
+function handleMotion(ev) {
+  if (!play.motionEnabled) return;
+  const a = ev.accelerationIncludingGravity || ev.acceleration || {};
+  const x = a.x || 0;
+  const y = a.y || 0;
+  const z = a.z || 0;
+  const magnitude = Math.hypot(x, y, z);
+  const impulse = Math.abs(magnitude - play.lastAccel);
+  play.lastAccel = magnitude;
+  const now = performance.now();
+  if (impulse > 13.5 && now - play.lastMotionCastAt > 950) {
+    play.lastMotionCastAt = now;
+    castOrReel();
+  }
+}
+
+async function enableMotionControls() {
+  try {
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+      const permission = await DeviceMotionEvent.requestPermission();
+      if (permission !== 'granted') {
+        setStatus('Motion access denied. Tap Cast or use Space instead.');
+        return;
+      }
+    }
+    play.motionEnabled = true;
+    window.addEventListener('devicemotion', handleMotion, { passive: true });
+    document.getElementById('motion').classList.add('active');
+    document.getElementById('mobile-motion').classList.add('active');
+    setStatus('Motion enabled. Flick your wrist to cast or reel.');
+    pulse([16, 22, 16]);
+  } catch {
+    setStatus('Motion unavailable here. Tap Cast or use Space instead.');
+  }
 }
 
 function updatePlayerInput(dt) {
@@ -1679,6 +1730,11 @@ document.querySelectorAll('[data-view]').forEach(btn => btn.addEventListener('cl
 document.getElementById('tour').addEventListener('click', () => { tour = !tour; });
 document.getElementById('cast').addEventListener('click', castOrReel);
 document.getElementById('mobile-cast').addEventListener('pointerdown', ev => { ev.preventDefault(); castOrReel(); });
+document.getElementById('motion').addEventListener('click', enableMotionControls);
+document.getElementById('mobile-motion').addEventListener('pointerdown', ev => {
+  ev.preventDefault();
+  enableMotionControls();
+});
 document.getElementById('clean').addEventListener('click', () => document.body.classList.toggle('clean'));
 document.getElementById('mobile-clean').addEventListener('pointerdown', ev => {
   ev.preventDefault();
@@ -1807,11 +1863,16 @@ function animate(now) {
   });
   if (play.cast && !play.bite && now > play.biteAt) {
     play.bite = true;
+    if (!play.bitePulseSent) {
+      play.bitePulseSent = true;
+      pulse([18, 28, 18, 28, 26]);
+    }
     setStatus('Bite. Reel now before the tension breaks.');
   }
   if (play.bite && now > play.biteWindowEnds) {
     play.cast = false;
     play.bite = false;
+    play.bitePulseSent = false;
     setStatus('The fish slipped. Cast again.');
   }
   let tension = 0;
