@@ -55,6 +55,31 @@ button {
   cursor: pointer;
 }
 button.active { border-color: rgba(255, 220, 116, .75); background: rgba(255, 213, 111, .18); }
+body.presentation .hud {
+  width: min(320px, calc(100vw - 36px));
+  padding: 12px;
+  opacity: .58;
+  transform: translateY(-4px);
+}
+body.presentation .hud:hover,
+body.presentation .hud:focus-within {
+  opacity: .96;
+  transform: none;
+}
+body.presentation .kicker { font-size: 8px; letter-spacing: .20em; }
+body.presentation h1 { font-size: 22px; }
+body.presentation p { font-size: 11px; }
+body.presentation .row { margin-top: 9px; gap: 6px; }
+body.presentation button { padding: 7px 9px; font-size: 8px; }
+body.presentation .caption {
+  opacity: .42;
+  bottom: 12px;
+}
+body.presentation.hud-hidden .hud,
+body.presentation.hud-hidden .mobile-controls {
+  opacity: 0;
+  pointer-events: none;
+}
 body.clean .hud,
 body.clean .caption {
   opacity: 0;
@@ -137,7 +162,7 @@ body.clean .caption {
     <button data-weather="storm">Storm</button>
   </div>
 </div>
-<div class="caption">Space/tap casts and reels · drag to orbit · wheel to dolly</div>
+<div class="caption">Space/tap casts and reels · drag to orbit · wheel to dolly · H toggles HUD</div>
 <div class="mobile-controls" aria-label="Fishing controls">
   <button id="touch-cast">Cast</button>
   <button id="touch-reel">Reel</button>
@@ -164,6 +189,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const query = new URLSearchParams(location.search);
 const cinematic = query.get('quality') === 'cinematic';
+const presentation = query.get('presentation') === '1' || query.get('showcase') === '1';
+document.body.classList.toggle('presentation', presentation);
 document.body.classList.toggle('clean', query.get('clean') === '1');
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(devicePixelRatio, cinematic ? 2 : 1.75));
@@ -1407,6 +1434,10 @@ window.addEventListener('keydown', event => {
   if (event.code === 'KeyC') {
     event.preventDefault();
     clearLine();
+  }
+  if (event.code === 'KeyH') {
+    event.preventDefault();
+    document.body.classList.toggle('hud-hidden');
   }
 });
 let lastTap = 0;

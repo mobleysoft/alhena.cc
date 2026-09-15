@@ -71,7 +71,7 @@ fi
 
 root_markers=(
   "Launch 3D shore"
-  "/game-v2/?view=shore&time=dawn&weather=breeze&quality=cinematic"
+  "/game-v2/?view=shore&time=dawn&weather=breeze&quality=cinematic&presentation=1"
   "Legacy canvas prototype"
 )
 
@@ -98,6 +98,8 @@ v2_markers=(
   "v2-alhena-bartender-procedural-standin"
   "v2-near-surface-fish-glint"
   "mobile-controls"
+  "presentation"
+  "hud-hidden"
   "installRuntimeAssetSlots"
 )
 

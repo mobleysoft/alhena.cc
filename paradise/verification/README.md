@@ -185,6 +185,10 @@ taken with Playwright Chromium at `1440x900`.
   made the placeholder house/bar geometry cast ugly rectangular blocks across
   the sand. This gives the current Three.js build a cleaner presentation
   baseline while preserving the finding that real authored assets are required.
+- `paradise-game-v2-presentation-hud.png`: live root-click capture proving the
+  public launcher now opens the Three.js rebuild in `presentation=1` mode. The
+  HUD is subdued rather than fully hidden, the scene remains playable, and the
+  `H` key toggles a `hud-hidden` class for clean capture/showcase moments.
 - `scripts/verify-game.sh`: production verifier now covers the legacy canvas
   game, the root launcher, and the primary `/game-v2/` route. It syntax-checks
   both module scripts, validates asset budgets, checks root CTA markers, and
