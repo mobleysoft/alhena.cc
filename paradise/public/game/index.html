@@ -111,6 +111,32 @@ button.active { background: rgba(255, 213, 118, .24); border-color: rgba(255, 22
   color: rgba(255,244,215,.82);
   font: 11px/1.45 ui-sans-serif, system-ui, sans-serif;
 }
+.meter {
+  margin-top: 10px;
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(0,0,0,.22);
+  border: 1px solid rgba(255,255,255,.09);
+}
+.meter-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #8bd8ff, #ffe38f 55%, #ff7c63);
+  box-shadow: 0 0 18px rgba(255, 219, 126, .35);
+  transition: width .08s linear;
+}
+.catch-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  color: rgba(255,244,215,.62);
+  font: 10px/1.2 ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
 .mobile-pad {
   position: fixed;
   inset: auto auto max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
@@ -197,6 +223,8 @@ body.clean .caption { opacity: 0; pointer-events: none; }
   .hud p,
   .view-row,
   .status,
+  .meter,
+  .catch-line,
   .caption { display: none; }
   .bar { margin-top: 8px; gap: 5px; }
   button { height: 28px; padding: 0 9px; font-size: 8px; letter-spacing: .13em; }
@@ -243,6 +271,8 @@ body.clean .caption { opacity: 0; pointer-events: none; }
     <button data-view="bar">Bar</button>
   </div>
   <div class="status" id="status">Ready. Space/click casts; reel when the bobber dives.</div>
+  <div class="meter" aria-hidden="true"><div class="meter-fill" id="tension-fill"></div></div>
+  <div class="catch-line"><span id="catch-count">0 landed</span><span id="bite-state">waiting water</span></div>
 </section>
 <div class="caption">Space or tap casts and reels · WASD moves · C hides interface · cinematic views above</div>
 <div class="mobile-pad" aria-label="movement controls">
@@ -561,36 +591,37 @@ const waterMat = new THREE.ShaderMaterial({
     const float gravity = 9.81;
     float hash1(float n) { return fract(sin(n) * 43758.5453123); }
     vec2 waveDir(float i) {
-      float t = i / 15.0;
-      float theta = (t - 0.5) * PI * 0.86 + 0.18;
+      float t = i / 23.0;
+      float theta = (t - 0.5) * PI * 0.92 + 0.18 + (hash1(i * 9.17) - 0.5) * 0.34;
       return vec2(cos(theta), sin(theta));
     }
     void component(float i, out float freq, out float amp, out float phase) {
       float omegaP = 0.13 * gravity / max(uWind, 1.0) * TAU;
-      float t = i / 15.0;
-      float omegaMin = omegaP * 0.48;
-      float omegaMax = omegaP * 3.45;
+      float t = i / 23.0;
+      float omegaMin = omegaP * 0.42;
+      float omegaMax = omegaP * 5.25;
       freq = omegaMin * pow(omegaMax / omegaMin, t);
       float sigma = freq <= omegaP ? 0.07 : 0.09;
       float r = exp(-pow(freq - omegaP, 2.0) / (2.0 * sigma * sigma * omegaP * omegaP));
       float spectrum = 0.0081 * gravity * gravity / pow(freq, 5.0)
         * exp(-1.25 * pow(omegaP / freq, 4.0))
         * pow(3.3, r);
-      float dOmega = (omegaMax - omegaMin) / 16.0;
-      amp = sqrt(2.0 * spectrum * dOmega) * 0.28 * uWind / 12.0;
-      amp = clamp(amp, 0.0, 1.35);
+      float dOmega = (omegaMax - omegaMin) / 24.0;
+      amp = sqrt(2.0 * spectrum * dOmega) * 0.33 * uWind / 12.0;
+      amp = clamp(amp, 0.0, 1.55);
       phase = hash1(i * 17.31 + 0.73) * TAU;
     }
     float oceanHeight(vec2 pos) {
       float h = 0.0;
-      for (int j = 0; j < 16; j++) {
+      for (int j = 0; j < 24; j++) {
         float i = float(j);
         float freq;
         float amp;
         float phase;
         component(i, freq, amp, phase);
         float k = freq * freq / gravity;
-        h += amp * sin(dot(waveDir(i), pos) * k - freq * uTime + phase);
+        float w = dot(waveDir(i), pos) * k - freq * uTime + phase;
+        h += amp * (sin(w) + 0.18 * sin(2.0 * w + phase));
       }
       return h * uChop;
     }
@@ -598,7 +629,20 @@ const waterMat = new THREE.ShaderMaterial({
       vUv = uv;
       vec3 p = position;
       float far = smoothstep(0.1, 1.0, uv.y);
-      float h = oceanHeight(p.xz * 0.18 + vec2(uTime * 0.018, uTime * 0.011));
+      vec2 pos = p.xz * 0.18 + vec2(uTime * 0.018, uTime * 0.011);
+      float h = oceanHeight(pos);
+      vec2 lateral = vec2(0.0);
+      for (int j = 0; j < 10; j++) {
+        float i = float(j);
+        float freq;
+        float amp;
+        float phase;
+        component(i, freq, amp, phase);
+        float k = freq * freq / gravity;
+        vec2 dir = waveDir(i);
+        lateral += dir * cos(dot(dir, pos) * k - freq * uTime + phase) * amp;
+      }
+      p.xz += lateral * 0.18 * uChop * far;
       p.y += h * (.34 + far * .96);
       vH = h;
       vec4 world = modelMatrix * vec4(p, 1.0);
@@ -626,46 +670,64 @@ const waterMat = new THREE.ShaderMaterial({
       vec2 i=floor(p), f=fract(p), u=f*f*(3.0-2.0*f);
       return mix(mix(hash(i),hash(i+vec2(1,0)),u.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y);
     }
+    float fbm(vec2 p) {
+      float v = 0.0;
+      float a = 0.5;
+      for (int i = 0; i < 5; i++) {
+        v += noise(p) * a;
+        p = mat2(1.62, -1.11, 1.11, 1.62) * p;
+        a *= 0.48;
+      }
+      return v;
+    }
     vec2 waveDir(float i) {
-      float t = i / 23.0;
-      float theta = (t - 0.5) * PI * 0.92 + 0.18;
+      float t = i / 7.0;
+      float theta = (t - 0.5) * PI * 0.92 + 0.18 + (hash1(i * 9.17) - 0.5) * 0.34;
       return vec2(cos(theta), sin(theta));
     }
     void component(float i, out float freq, out float amp, out float phase) {
       float omegaP = 0.13 * gravity / max(uWind, 1.0) * TAU;
-      float t = i / 23.0;
-      float omegaMin = omegaP * 0.5;
-      float omegaMax = omegaP * 3.5;
+      float t = i / 7.0;
+      float omegaMin = omegaP * 0.42;
+      float omegaMax = omegaP * 5.25;
       freq = omegaMin * pow(omegaMax / omegaMin, t);
       float sigma = freq <= omegaP ? 0.07 : 0.09;
       float r = exp(-pow(freq - omegaP, 2.0) / (2.0 * sigma * sigma * omegaP * omegaP));
       float spectrum = 0.0081 * gravity * gravity / pow(freq, 5.0)
         * exp(-1.25 * pow(omegaP / freq, 4.0))
         * pow(3.3, r);
-      float dOmega = (omegaMax - omegaMin) / 24.0;
-      amp = sqrt(2.0 * spectrum * dOmega) * 0.35 * uWind / 12.0;
-      amp = clamp(amp, 0.0, 1.8);
+      float dOmega = (omegaMax - omegaMin) / 8.0;
+      amp = sqrt(2.0 * spectrum * dOmega) * 0.38 * uWind / 12.0;
+      amp = clamp(amp, 0.0, 1.95);
       phase = hash1(i * 17.31 + 0.73) * TAU;
     }
     float oceanHeight(vec2 pos) {
       float h = 0.0;
-      for (int j = 0; j < 24; j++) {
+      for (int j = 0; j < 8; j++) {
         float i = float(j);
         float freq;
         float amp;
         float phase;
         component(i, freq, amp, phase);
         float k = freq * freq / gravity;
-        h += amp * sin(dot(waveDir(i), pos) * k - freq * uTime + phase);
+        float w = dot(waveDir(i), pos) * k - freq * uTime + phase;
+        h += amp * (sin(w) + 0.18 * sin(2.0 * w + phase));
       }
       return h * uChop;
     }
+    vec3 shortWaveNormal(vec2 pos) {
+      float r1 = fbm(pos * 42.0 + vec2(uTime * 0.24, -uTime * 0.18));
+      float r2 = fbm(pos * 83.0 + vec2(-uTime * 0.31, uTime * 0.16));
+      vec2 ripple = vec2(r1 - 0.5, r2 - 0.5) * (0.16 + uWind * 0.008);
+      return normalize(vec3(ripple.x, 1.0, ripple.y));
+    }
     vec3 oceanNormal(vec2 pos) {
-      float eps = 0.055;
+      float eps = 0.044;
       float hc = oceanHeight(pos);
       float hx = oceanHeight(pos + vec2(eps, 0.0));
       float hy = oceanHeight(pos + vec2(0.0, eps));
-      return normalize(vec3(-(hx - hc) / eps, 1.0, -(hy - hc) / eps));
+      vec3 macro = normalize(vec3(-(hx - hc) / eps, 1.0, -(hy - hc) / eps));
+      return normalize(macro + shortWaveNormal(pos) * 0.34);
     }
     float laplacian(vec2 pos) {
       float eps = 0.11;
@@ -694,7 +756,6 @@ const waterMat = new THREE.ShaderMaterial({
     void main() {
       vec2 spectralPos = vWorld.xz * 0.18 + vec2(uTime * 0.018, uTime * 0.011);
       vec3 normal = oceanNormal(spectralPos);
-      float lap = laplacian(spectralPos);
       vec3 viewDir = normalize(cameraPosition - vWorld + vec3(0.0, vH * 0.4, 0.0));
       vec3 reflected = reflect(-viewDir, normal);
       float fresnel = fresnelSchlick(max(dot(normal, viewDir), 0.0));
@@ -706,22 +767,27 @@ const waterMat = new THREE.ShaderMaterial({
       vec3 waterCrest = vec3(0.28, 0.70, 0.88);
       vec3 waterBody = mix(waterDeep, waterShallow, depth);
       waterBody = mix(waterBody, waterCrest, pow(hNorm, 3.0) * 0.68);
-      float sss = clamp(lap * 0.15, 0.0, 1.0) + smoothstep(0.58, 0.92, hNorm) * 0.25;
-      waterBody += vec3(0.0, 0.55, 0.60) * sss * 0.34;
-      vec3 water = mix(waterBody, skyColor(reflected), fresnel * 0.82);
+      float curvature = clamp((1.0 - normal.y) * 2.2, 0.0, 1.0);
+      float crestEnergy = clamp(curvature + smoothstep(0.62, 0.94, hNorm), 0.0, 1.0);
+      float sss = crestEnergy * (0.36 + 0.18 * sin(vWorld.x * .14 + uTime));
+      waterBody += vec3(0.0, 0.58, 0.62) * sss * 0.42;
+      vec3 water = mix(waterBody, skyColor(reflected), fresnel * 0.9);
       vec3 sunDir = normalize(vec3(0.5, 0.35, 0.6));
       vec3 halfV = normalize(viewDir + sunDir);
-      float spec = pow(max(dot(normal, halfV), 0.0), 118.0) * 2.4;
-      spec += pow(max(dot(normal, halfV), 0.0), 42.0) * 0.38;
-      water += vec3(1.0, 0.95, 0.78) * spec * uGold * 1.7;
+      float ndh = max(dot(normal, halfV), 0.0);
+      float spec = pow(ndh, 184.0) * 3.8;
+      spec += pow(ndh, 58.0) * 0.62;
+      float glintMask = smoothstep(.62, .98, fbm(spectralPos * 19.0 + vec2(uTime * .18, 0.0)));
+      water += vec3(1.0, 0.95, 0.78) * spec * (0.55 + glintMask) * uGold * 1.9;
       vec2 foamUv = spectralPos * 12.0 + vec2(uTime * 0.03, -uTime * 0.025);
       float foamH = abs(h);
-      float foam = smoothstep(uFoamT * 0.72, uFoamT * 1.2, foamH);
-      float foamNoise = noise(foamUv * 0.68);
-      float foamDensity = foam * smoothstep(0.58, 0.86, foamNoise);
-      float shore = smoothstep(0.82, 1.0, vUv.y) * (0.5 + 0.5 * sin(vWorld.x * 1.7 + uTime * 2.1));
-      vec3 dispR = vec3(0.04, 0.0, 0.0) * abs(h - oceanHeight(spectralPos + vec2(0.002, 0.0))) * foamDensity * 12.0;
-      vec3 dispB = vec3(0.0, 0.0, 0.06) * abs(h - oceanHeight(spectralPos - vec2(0.002, 0.0))) * foamDensity * 12.0;
+      float foam = smoothstep(uFoamT * 0.56, uFoamT * 1.16, foamH) * crestEnergy;
+      float foamNoise = fbm(foamUv * 0.68);
+      float foamDensity = foam * smoothstep(0.47, 0.82, foamNoise);
+      float shoreComb = 0.5 + 0.5 * sin(vWorld.x * 1.7 + uTime * 2.1 + fbm(vWorld.xz * .14) * 3.4);
+      float shore = smoothstep(0.80, 1.0, vUv.y) * shoreComb;
+      vec3 dispR = vec3(0.04, 0.0, 0.0) * curvature * foamDensity;
+      vec3 dispB = vec3(0.0, 0.0, 0.06) * curvature * foamDensity;
       water = mix(water, vec3(0.88, 0.95, 0.98), clamp(foamDensity * 0.46 + shore * 0.62, 0.0, 1.0));
       water += dispR + dispB + vec3(0.025, 0.0, 0.035) * foamDensity * noise(foamUv * 0.4);
       float fogT = clamp((1.0 - vUv.y) * 1.35, 0.0, 1.0);
@@ -734,7 +800,7 @@ const waterMat = new THREE.ShaderMaterial({
   `,
 });
 
-const water = new THREE.Mesh(new THREE.PlaneGeometry(180, 126, 150, 110), waterMat);
+const water = new THREE.Mesh(new THREE.PlaneGeometry(180, 126, 220, 150), waterMat);
 water.rotation.x = -Math.PI / 2;
 water.position.set(0, -0.06, -66);
 water.receiveShadow = true;
@@ -1222,13 +1288,18 @@ let tour = false;
 let targetAngle = 0;
 camera.lookAt(look);
 const statusEl = document.getElementById('status');
+const tensionFillEl = document.getElementById('tension-fill');
+const catchCountEl = document.getElementById('catch-count');
+const biteStateEl = document.getElementById('bite-state');
 const keys = new Set();
 const moveAxis = new THREE.Vector2();
 const play = {
   cast: false,
   bite: false,
+  castAt: 0,
   biteAt: 0,
-  catchCount: 1,
+  biteWindowEnds: 0,
+  catchCount: 0,
   message: 'Ready. Space/click casts; reel when the bobber dives.',
   bobberBase: new THREE.Vector3(2.2, .34, -16),
   velocity: new THREE.Vector3(),
@@ -1261,17 +1332,20 @@ function castOrReel() {
   if (!play.cast) {
     play.cast = true;
     play.bite = false;
+    play.castAt = now;
     play.biteAt = now + 1800 + Math.random() * 3200;
+    play.biteWindowEnds = play.biteAt + 2200;
     play.bobberBase.set(-2 + Math.random() * 7, .34, -13 - Math.random() * 14);
     setStatus('Line cast. Watch the bobber and reel on the bite.');
     return;
   }
   if (play.bite) {
+    const names = ['glass minnow', 'reef snapper', 'blue runner', 'moon jack', 'amber fry'];
+    const caughtName = names[play.catchCount % names.length];
     play.catchCount += 1;
     play.cast = false;
     play.bite = false;
-    const names = ['glass minnow', 'reef snapper', 'blue runner', 'moon jack', 'amber fry'];
-    setStatus(`Caught ${names[play.catchCount % names.length]}. Cast again.`);
+    setStatus(`Caught ${caughtName}. Cast again.`);
     return;
   }
   setStatus('Too early. Let the fish commit before reeling.');
@@ -1449,6 +1523,23 @@ function animate(now) {
     play.bite = true;
     setStatus('Bite. Reel now before the tension breaks.');
   }
+  if (play.bite && now > play.biteWindowEnds) {
+    play.cast = false;
+    play.bite = false;
+    setStatus('The fish slipped. Cast again.');
+  }
+  let tension = 0;
+  let biteState = 'waiting water';
+  if (play.cast && !play.bite) {
+    tension = THREE.MathUtils.clamp((now - play.castAt) / Math.max(1, play.biteAt - play.castAt), 0, 1) * .62;
+    biteState = 'listening';
+  } else if (play.bite) {
+    tension = THREE.MathUtils.clamp(1 - ((play.biteWindowEnds - now) / Math.max(1, play.biteWindowEnds - play.biteAt)), 0, 1);
+    biteState = 'bite window';
+  }
+  tensionFillEl.style.width = `${Math.round(tension * 100)}%`;
+  catchCountEl.textContent = `${play.catchCount} landed`;
+  biteStateEl.textContent = biteState;
   const biteDive = play.bite ? -0.48 - Math.abs(Math.sin(t * 9.0)) * .15 : 0;
   const drift = play.cast ? 1 : .32;
   bobber.position.y = play.bobberBase.y + Math.sin(t * 2.5) * .13 + biteDive;
