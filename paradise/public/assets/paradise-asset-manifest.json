@@ -5,6 +5,20 @@
   "target": "high-fidelity ocean/shore fishing scene",
   "assets": [
     {
+      "id": "alhena_bartender_billboard",
+      "type": "transparent-character-card",
+      "targetPath": "/assets/alhena-bartender-billboard.png",
+      "status": "active",
+      "loadByDefault": true,
+      "currentFallback": "procedural modest bartender mesh behind ?alhenamesh=1",
+      "requirements": [
+        "transparent high-resolution modest bartender cutout",
+        "grounded contact shadow",
+        "subtle idle motion",
+        "future replacement by rigged GLB when available"
+      ]
+    },
+    {
       "id": "alhena_bartender_rig",
       "type": "rigged-character",
       "targetPath": "/assets/models/alhena-bartender.glb",

@@ -109,6 +109,8 @@ v2_markers=(
   "v2-black-lab-high-fidelity-transparent-billboard"
   "v2-black-lab-photo-contact-shadow"
   "v2-alhena-bartender-procedural-standin"
+  "v2-alhena-high-fidelity-transparent-bartender-billboard"
+  "v2-alhena-billboard-contact-shadow"
   "v2-near-surface-fish-glint"
   "v2-reflective-shoreline-tide-pool"
   "v2-left-wet-rock-cluster"

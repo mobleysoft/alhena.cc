@@ -226,6 +226,7 @@ const presentation = query.get('presentation') === '1' || query.get('showcase') 
 const canonicalPandoraWaterOnly = query.get('watermesh') !== '1';
 const experimentalShallowWater = query.get('shallowwater') === '1';
 const useDogBillboard = query.get('dogmesh') !== '1';
+const useAlhenaBillboard = query.get('alhenamesh') !== '1';
 document.body.classList.toggle('presentation', presentation);
 document.body.classList.toggle('clean', query.get('clean') === '1');
 document.body.dataset.waterArchitecture = canonicalPandoraWaterOnly
@@ -1595,6 +1596,31 @@ function makeAlhena() {
   return g;
 }
 const alhena = makeAlhena();
+alhena.visible = !useAlhenaBillboard;
+
+const alhenaBillboardTexture = new THREE.TextureLoader().load('/assets/alhena-bartender-billboard.png');
+alhenaBillboardTexture.colorSpace = THREE.SRGBColorSpace;
+alhenaBillboardTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+const alhenaBillboard = new THREE.Group();
+alhenaBillboard.name = 'v2-alhena-high-fidelity-transparent-bartender-billboard';
+alhenaBillboard.position.set(7.72, 1.55, 3.08);
+const alhenaCard = new THREE.Mesh(
+  new THREE.PlaneGeometry(1.35, 2.02),
+  new THREE.MeshBasicMaterial({
+    map: alhenaBillboardTexture,
+    transparent: true,
+    alphaTest: .05,
+    depthWrite: false,
+    toneMapped: true
+  })
+);
+alhenaCard.name = 'v2-alhena-modest-bartender-photo-cutout-card';
+alhenaCard.position.y = .36;
+alhenaBillboard.add(alhenaCard);
+alhenaBillboard.visible = useAlhenaBillboard;
+scene.add(alhenaBillboard);
+const alhenaBillboardShadow = contactShadow('v2-alhena-billboard-contact-shadow', 7.72, 3.72, .55, .32, .18);
+alhenaBillboardShadow.visible = useAlhenaBillboard;
 
 function makeDog() {
   const g = new THREE.Group();
@@ -1746,7 +1772,11 @@ async function installRuntimeAssetSlots() {
           }
         });
         scene.add(root);
-        if (slot.id === 'alhena_bartender_rig' && slot.status === 'active') alhena.visible = false;
+        if (slot.id === 'alhena_bartender_rig' && slot.status === 'active') {
+          alhena.visible = false;
+          alhenaBillboard.visible = false;
+          alhenaBillboardShadow.visible = false;
+        }
         if (slot.id === 'black_lab_rig' && slot.status === 'active') {
           dog.visible = false;
           dogBillboard.visible = false;
@@ -2144,6 +2174,9 @@ function setView(name) {
   dog.visible = !waterStudy && !useDogBillboard;
   dogBillboard.visible = !waterStudy && useDogBillboard;
   dogBillboardShadow.visible = !waterStudy && useDogBillboard;
+  alhena.visible = !waterStudy && !useAlhenaBillboard;
+  alhenaBillboard.visible = !waterStudy && useAlhenaBillboard;
+  alhenaBillboardShadow.visible = !waterStudy && useAlhenaBillboard;
   ocean.visible = !waterStudy && !canonicalPandoraWaterOnly;
   waterOptics.visible = !waterStudy && !canonicalPandoraWaterOnly;
   shallowWater.visible = experimentalShallowWater && !waterStudy;
@@ -2236,6 +2269,10 @@ function animate() {
   alhena.userData.drinkGlow.position.y = .18 + Math.sin(t * 1.0) * .012;
   alhena.userData.necklace.rotation.z = Math.sin(t * .9) * .035;
   alhena.userData.smile.scale.x = 1.0 + (play.bite ? .12 : Math.sin(t * .7) * .03);
+  alhenaBillboard.position.y = 1.55 + Math.sin(t * .86) * .018;
+  alhenaBillboard.lookAt(new THREE.Vector3(camera.position.x, alhenaBillboard.position.y, camera.position.z));
+  alhenaBillboard.rotation.z = Math.sin(t * .58) * .010;
+  alhenaBillboardShadow.material.opacity = useAlhenaBillboard ? .15 + Math.sin(t * .7) * .012 : 0;
   const sniff = Math.sin(t * .36);
   const stepClock = t * (play.bite ? 6.2 : 3.15);
   dog.name = 'v2-black-lab-procedural-four-beat-gait-standin';
