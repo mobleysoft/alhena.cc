@@ -1306,24 +1306,36 @@ function makeAlhena() {
   const group = new THREE.Group();
   group.name = 'alhena-modest-bartender-mesh-slot';
   group.position.set(8.6, 1.68, 3.28);
+  group.rotation.y = 0;
   const torso = new THREE.Mesh(new THREE.CylinderGeometry(.42, .62, 1.25, 32), clothMat);
   torso.position.y = .15;
   const waist = new THREE.Mesh(new THREE.CylinderGeometry(.36, .56, .24, 32), clothMat);
   waist.position.y = -.5;
+  const skirt = new THREE.Mesh(new THREE.CylinderGeometry(.78, .52, .82, 36), clothMat);
+  skirt.name = 'soft-aproned-dress-skirt';
+  skirt.position.y = -.86;
+  const shoulderWrap = new THREE.Mesh(new THREE.TorusGeometry(.43, .035, 8, 36, Math.PI), new THREE.MeshStandardMaterial({ color: 0x80d7e6, roughness: .52 }));
+  shoulderWrap.name = 'turquoise-shoulder-wrap';
+  shoulderWrap.position.set(0, .71, .03);
+  shoulderWrap.rotation.set(Math.PI, 0, 0);
   const neck = new THREE.Mesh(new THREE.CylinderGeometry(.11, .13, .22, 16), skinMat);
   neck.position.y = .72;
   const head = new THREE.Mesh(new THREE.SphereGeometry(.34, 32, 16), skinMat);
   head.position.y = 1.02;
   head.scale.set(.92, 1.05, .88);
   const hair = new THREE.Mesh(new THREE.SphereGeometry(.39, 32, 16), hairMat);
-  hair.position.set(0, 1.08, -.05);
-  hair.scale.set(1.05, .9, .82);
+  hair.position.set(0, 1.08, -.16);
+  hair.scale.set(1.03, .86, .62);
   const bun = new THREE.Mesh(new THREE.SphereGeometry(.16, 18, 10), hairMat);
   bun.position.set(0, 1.15, -.34);
+  const facePlane = new THREE.Mesh(new THREE.SphereGeometry(.245, 24, 12), skinMat);
+  facePlane.name = 'warm-lit-face-front';
+  facePlane.position.set(0, 1.005, .34);
+  facePlane.scale.set(.9, 1.08, .16);
   const bangMat = hairMat;
   const bangs = [];
-  for (const [x, z, r] of [[-.16,.28,-.18],[0,.31,.03],[.16,.28,.18]]) {
-    const bang = new THREE.Mesh(new THREE.CapsuleGeometry(.035, .26, 5, 10), bangMat);
+  for (const [x, z, r, len] of [[-.18,.29,-.22,.31],[-.06,.33,-.06,.24],[.08,.33,.08,.25],[.20,.28,.24,.29]]) {
+    const bang = new THREE.Mesh(new THREE.CapsuleGeometry(.033, len, 5, 10), bangMat);
     bang.position.set(x, .98, z);
     bang.rotation.set(.9, 0, r);
     bangs.push(bang);
@@ -1343,20 +1355,58 @@ function makeAlhena() {
   leftHand.position.set(-.78, .08, .22);
   const rightHand = new THREE.Mesh(new THREE.SphereGeometry(.085, 14, 8), skinMat);
   rightHand.position.set(.78, .08, .22);
+  const tray = new THREE.Mesh(new THREE.CylinderGeometry(.38, .38, .035, 42), new THREE.MeshStandardMaterial({ color: 0xd8c08a, roughness: .34, metalness: .18 }));
+  tray.name = 'bartender-serving-tray';
+  tray.position.set(-.8, .04, .32);
+  tray.scale.z = .7;
+  const glass = new THREE.Mesh(new THREE.CylinderGeometry(.055, .075, .22, 18), bottleMat);
+  glass.name = 'small-tropical-glass-on-tray';
+  glass.position.set(-.83, .18, .33);
   const eyes = new THREE.Group();
   const eyeMat = new THREE.MeshBasicMaterial({ color: 0x070504 });
   for (const x of [-.11,.11]) {
     const eye = new THREE.Mesh(new THREE.SphereGeometry(.028, 10, 6), eyeMat);
-    eye.position.set(x, 1.05, .31);
+    eye.position.set(x, 1.05, .48);
     eyes.add(eye);
+    const brow = new THREE.Mesh(new THREE.CapsuleGeometry(.01, .08, 3, 8), hairMat);
+    brow.position.set(x, 1.115, .492);
+    brow.rotation.z = x < 0 ? .18 : -.18;
+    eyes.add(brow);
   }
   const nose = new THREE.Mesh(new THREE.ConeGeometry(.035, .1, 10), skinMat);
-  nose.position.set(0, 1.0, .34);
+  nose.position.set(0, 1.0, .515);
   nose.rotation.x = Math.PI / 2;
+  const cheekMat = new THREE.MeshBasicMaterial({ color: 0xb6715d, transparent: true, opacity: .35 });
+  const cheeks = new THREE.Group();
+  for (const x of [-.16, .16]) {
+    const cheek = new THREE.Mesh(new THREE.SphereGeometry(.042, 10, 6), cheekMat);
+    cheek.position.set(x, .965, .50);
+    cheek.scale.set(1.25, .56, .18);
+    cheeks.add(cheek);
+  }
   const smile = new THREE.Mesh(new THREE.TorusGeometry(.075, .008, 5, 24, Math.PI), new THREE.MeshBasicMaterial({ color: 0x2e1710 }));
-  smile.position.set(0, .91, .33);
+  smile.position.set(0, .91, .505);
   smile.rotation.set(0, 0, Math.PI);
-  group.add(torso, waist, neck, head, hair, bun, ...bangs, apron, apronTie, leftArm, rightArm, leftHand, rightHand, eyes, nose, smile);
+  const earringMat = new THREE.MeshStandardMaterial({ color: 0xffd56f, roughness: .25, metalness: .7 });
+  const earrings = new THREE.Group();
+  for (const x of [-.33, .33]) {
+    const earring = new THREE.Mesh(new THREE.TorusGeometry(.032, .006, 5, 14), earringMat);
+    earring.position.set(x, .98, .13);
+    earrings.add(earring);
+  }
+  const foldMat = new THREE.LineBasicMaterial({ color: 0x17768b, transparent: true, opacity: .42 });
+  const folds = new THREE.Group();
+  for (const x of [-.28, -.14, 0, .14, .28]) {
+    const fold = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(x * .7, -.18, .465),
+      new THREE.Vector3(x, -.86, .43)
+    ]), foldMat);
+    folds.add(fold);
+  }
+  const keyLight = new THREE.PointLight(0xffd08a, .62, 4.2);
+  keyLight.name = 'warm-bar-character-fill';
+  keyLight.position.set(-.35, .92, 1.0);
+  group.add(torso, waist, skirt, shoulderWrap, neck, head, facePlane, hair, bun, ...bangs, apron, apronTie, leftArm, rightArm, leftHand, rightHand, tray, glass, eyes, nose, cheeks, smile, earrings, folds, keyLight);
   group.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   scene.add(group);
   return { group, leftArm, rightArm };
@@ -1537,7 +1587,7 @@ const views = {
   water: { pos: [2.6, 1.28, 4.9], look: [1.0, .28, -54], note: 'Low shore-water view.' },
   dock: { pos: [-7.8, 2.35, 7.8], look: [-1.0, .78, -8.5], note: 'Dock and cast lane.' },
   dog: { pos: [3.6, 1.22, 7.75], look: [1.6, .66, 5.85], note: 'Articulated black lab companion view.' },
-  bar: { pos: [4.8, 2.75, 9.8], look: [8.8, 1.38, 3.3], note: 'Alhena bartender slot.' },
+  bar: { pos: [8.45, 2.55, 8.8], look: [8.6, 1.38, 3.22], note: 'Alhena bartender slot.' },
 };
 
 function setStatus(message) {
