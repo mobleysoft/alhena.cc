@@ -883,6 +883,65 @@ function makeReflectionSprite(url, x, y, z, sx, sy, opacity = 0.12) {
   scene.add(sprite);
   return sprite;
 }
+function makeFishTexture(kind = 0) {
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 128;
+  const x = c.getContext('2d');
+  x.clearRect(0, 0, c.width, c.height);
+  const body = kind % 3 === 0 ? '#082c33' : kind % 3 === 1 ? '#0c4b50' : '#143342';
+  const fin = kind % 3 === 1 ? '#87c9be' : '#d7b36a';
+  x.save();
+  x.translate(128, 64);
+  x.fillStyle = body;
+  x.globalAlpha = 0.86;
+  x.beginPath();
+  x.ellipse(6, 0, 72, kind % 2 ? 22 : 17, 0, 0, Math.PI * 2);
+  x.fill();
+  x.beginPath();
+  x.moveTo(-64, 0);
+  x.lineTo(-116, -30);
+  x.lineTo(-102, 0);
+  x.lineTo(-116, 30);
+  x.closePath();
+  x.fill();
+  x.globalAlpha = 0.38;
+  x.fillStyle = fin;
+  x.beginPath();
+  x.moveTo(12, -8);
+  x.lineTo(-12, -34);
+  x.lineTo(36, -12);
+  x.closePath();
+  x.fill();
+  x.beginPath();
+  x.arc(62, -4, 4, 0, Math.PI * 2);
+  x.fillStyle = '#dffcff';
+  x.globalAlpha = 0.68;
+  x.fill();
+  x.restore();
+  const texture = new THREE.CanvasTexture(c);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+const fishShoal = [];
+const fishTextures = [makeFishTexture(0), makeFishTexture(1), makeFishTexture(2)];
+function makeFish(x, y, z, scale, speed, phase, kind = 0) {
+  const mat = new THREE.SpriteMaterial({
+    map: fishTextures[kind % fishTextures.length],
+    transparent: true,
+    depthWrite: false,
+    opacity: 0.18,
+    color: 0x9ae6e6,
+  });
+  const sprite = new THREE.Sprite(mat);
+  sprite.position.set(x, y, z);
+  sprite.scale.set(scale * 1.25, scale * 0.48, 1);
+  sprite.renderOrder = 1;
+  sprite.userData = { x, y, z, scale, speed, phase, kind };
+  scene.add(sprite);
+  fishShoal.push(sprite);
+  return sprite;
+}
 
 function cropTextureFromImage(image, sx, sy, sw, sh) {
   const c = document.createElement('canvas');
@@ -1266,6 +1325,19 @@ const waterReflections = [
   makeReflectionSprite('/assets/beach-bar-billboard.png', 6.6, -0.25, 4.35, 4.4, 1.45, 0.12),
   makeReflectionSprite('/assets/alhena-bartender-billboard.png', 6.25, -0.06, 3.85, 1.35, 1.28, 0.09),
 ];
+for (let i = 0; i < 18; i++) {
+  const band = i % 6;
+  const depth = band / 5;
+  makeFish(
+    -13 + ((i * 5.73) % 26),
+    -0.24 - depth * 0.10,
+    -14 + depth * 15.5 + Math.sin(i * 1.7) * 0.8,
+    0.42 + depth * 0.50 + (i % 3) * 0.08,
+    0.32 + depth * 0.42 + (i % 4) * 0.05,
+    i * 1.91,
+    i
+  );
+}
 const articulatedLab = makeArticulatedLab('/assets/alhena-black-lab.png');
 const articulatedAlhena = makeArticulatedAlhena('/assets/alhena-bartender-billboard.png');
 const houseShadow = makeContactShadow(-8.7, 7.9, 3.4, 0.72, 0.20);
@@ -1422,6 +1494,7 @@ window.__paradiseDebug = {
   getBobber: () => bobber.position.toArray(),
   getCamera: () => camera.position.toArray(),
   getOceanSrc: () => oceanFrame?.src,
+  getFishCount: () => fishShoal.length,
   getEnvironment: () => ({
     time: timeKey,
     weather: weatherKey,
@@ -1593,6 +1666,19 @@ function animate() {
     reflection.material.opacity = reflection.userData.baseOpacity * shimmer * weatherReflection * (timeKey === 'night' ? 0.55 : 1);
     reflection.position.y = reflection.userData.baseY + Math.sin(elapsed * 0.9 + reflection.userData.phase) * 0.012;
     reflection.scale.x = reflection.userData.baseScaleX + Math.sin(elapsed * 0.45 + reflection.userData.phase) * 0.018;
+  }
+  for (const fish of fishShoal) {
+    const d = fish.userData;
+    const lane = Math.sin(elapsed * 0.18 + d.phase);
+    let x = d.x + Math.sin(elapsed * d.speed + d.phase) * (2.8 + d.scale * 1.8) + lane * 0.8;
+    if (x > 15) x -= 30;
+    if (x < -15) x += 30;
+    fish.position.x = x;
+    fish.position.y = d.y + Math.sin(elapsed * (0.9 + d.speed * 0.25) + d.phase) * 0.055;
+    fish.position.z = d.z + Math.cos(elapsed * 0.34 + d.phase) * 0.32;
+    fish.material.rotation = Math.sin(elapsed * 1.4 + d.phase) * 0.055;
+    fish.material.opacity = (0.10 + d.scale * 0.07) * weatherProfiles[weatherKey].reflection * (timeKey === 'night' ? 0.42 : 1);
+    fish.scale.x = Math.sign(Math.cos(elapsed * d.speed * 0.33 + d.phase)) * Math.abs(d.scale * 1.25);
   }
   person.rotation.y = Math.sin(elapsed * 0.38) * 0.08;
   const progressTarget = playState.cast ? 1 : 0;
