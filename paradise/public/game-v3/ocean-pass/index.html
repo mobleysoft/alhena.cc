@@ -9,15 +9,15 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
 canvas { display: block; width: 100vw; height: 100vh; }
 </style>
 </head>
-<body data-water-system="paradise-standalone-pandorachat-jonswap-ocean-v2">
+<body data-water-system="paradise-standalone-pandorachat-jonswap-ocean-v3">
 <canvas id="ocean"></canvas>
 <script>
 const canvas = document.getElementById('ocean');
 const gl = canvas.getContext('webgl', { alpha: false, antialias: false, depth: false, stencil: false, premultipliedAlpha: false });
 const query = new URLSearchParams(location.search);
 const palettes = {
-  dawn: { skyTop: [0.10,0.28,0.46], skyMid: [0.40,0.66,0.78], horizon: [0.82,0.64,0.42], sun: [1.00,0.85,0.48], near: [0.02,0.31,0.42], far: [0.22,0.52,0.63], sunPos: [0.38,0.29], light: 0.84 },
-  noon: { skyTop: [0.20,0.53,0.86], skyMid: [0.47,0.78,0.93], horizon: [0.84,0.94,0.98], sun: [1.00,0.96,0.80], near: [0.12,0.52,0.64], far: [0.39,0.76,0.84], sunPos: [0.58,0.18], light: 1.08 },
+  dawn: { skyTop: [0.08,0.35,0.58], skyMid: [0.47,0.76,0.87], horizon: [0.95,0.73,0.43], sun: [1.00,0.88,0.50], near: [0.00,0.42,0.52], far: [0.18,0.62,0.72], sunPos: [0.38,0.29], light: 0.94 },
+  noon: { skyTop: [0.13,0.54,0.92], skyMid: [0.48,0.82,0.96], horizon: [0.88,0.96,1.00], sun: [1.00,0.97,0.80], near: [0.08,0.62,0.72], far: [0.34,0.82,0.90], sunPos: [0.58,0.18], light: 1.14 },
   sunset: { skyTop: [0.14,0.10,0.24], skyMid: [0.78,0.38,0.32], horizon: [1.00,0.78,0.45], sun: [1.00,0.55,0.30], near: [0.08,0.24,0.34], far: [0.66,0.38,0.38], sunPos: [0.75,0.38], light: 0.78 },
   night: { skyTop: [0.02,0.04,0.10], skyMid: [0.06,0.13,0.25], horizon: [0.18,0.28,0.40], sun: [0.72,0.86,1.00], near: [0.03,0.09,0.15], far: [0.10,0.25,0.36], sunPos: [0.68,0.24], light: 0.42 },
 };
@@ -126,14 +126,16 @@ vec3 acesTone(vec3 x) {
   return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
 }
 vec3 skyColor(vec2 uv, vec2 q) {
-  vec3 sky = mix(u_horizon, u_sky_mid, smoothstep(0.30, 0.64, uv.y));
+  vec3 horizonTint = mix(u_horizon, u_sky_mid, 0.18);
+  vec3 sky = mix(horizonTint, u_sky_mid, smoothstep(0.24, 0.70, uv.y));
   sky = mix(sky, u_sky_top, smoothstep(0.56, 1.0, uv.y));
   float sun = exp(-distance(uv, u_sun) * 18.0);
   float glow = exp(-distance(uv, u_sun) * 3.4);
-  sky += u_sun_color * (sun * 0.72 + glow * 0.10) * u_light;
+  sky += u_sun_color * (sun * 0.86 + glow * 0.13) * u_light;
+  sky += vec3(0.16, 0.34, 0.42) * smoothstep(0.34, 0.0, abs(uv.y - 0.48)) * 0.08;
   float clouds = smoothstep(0.48, 0.80, fbm(vec2(uv.x * 3.3 + u_time * 0.008, uv.y * 5.8)));
   clouds *= smoothstep(0.42, 0.82, uv.y) * smoothstep(1.08, 0.70, uv.y);
-  sky = mix(sky, mix(vec3(0.84,0.90,0.92), vec3(0.44,0.50,0.52), u_haze), clouds * (0.05 + u_cloud * 0.22));
+  sky = mix(sky, mix(vec3(0.88,0.94,0.96), vec3(0.44,0.50,0.52), u_haze), clouds * (0.035 + u_cloud * 0.18));
   return sky;
 }
 vec3 oceanColor(vec2 uv, vec2 q, float horizon) {
@@ -145,41 +147,47 @@ vec3 oceanColor(vec2 uv, vec2 q, float horizon) {
   vec2 p = vec2(q.x * range * 3.05, range * 5.12 - u_time * (0.34 + windSpeed * 0.018));
   p += vec2(fbm(p * 0.045 + vec2(7.0, u_time * 0.02)), fbm(p * 0.075 + vec2(-3.0, -u_time * 0.018))) * 0.35 * u_chop;
   Sample s = sampleOcean(p, windSpeed);
+  float detailFade = smoothstep(0.045, 0.22, d);
+  s.h *= detailFade;
+  s.grad *= detailFade;
+  s.curve *= detailFade;
+  s.energy *= detailFade;
   vec2 micro = vec2(fbm(p * vec2(0.52, 2.4) + vec2(u_time * 0.11, -u_time * 0.06)), fbm(p * vec2(1.8, 0.48) + vec2(-u_time * 0.16, u_time * 0.04))) - 0.5;
-  vec3 n = normalize(vec3(-s.grad.x, 1.0, -s.grad.y) + vec3(micro.x, 0.0, micro.y) * (0.16 + u_chop * 0.16));
+  vec3 n = normalize(vec3(-s.grad.x, 1.0, -s.grad.y) + vec3(micro.x, 0.0, micro.y) * (0.16 + u_chop * 0.16) * detailFade);
   vec3 viewDir = normalize(vec3(q.x * 0.48, d * 0.58 + 0.12, 1.0));
   float fresnel = 0.0204 + 0.9796 * pow(1.0 - clamp(dot(n, viewDir), 0.0, 1.0), 5.0);
   vec3 reflected = skyColor(vec2(uv.x + n.x * 0.05, horizon + d * 0.52 + n.z * 0.08), q);
   vec3 deep = mix(u_sea_far * 0.34, vec3(0.002, 0.015, 0.050), 0.46);
   vec3 middle = mix(u_sea_far, u_sea_near, 0.34);
-  vec3 shallow = mix(u_sea_near, vec3(0.025, 0.25, 0.28), 0.38);
+  vec3 shallow = mix(u_sea_near, vec3(0.025, 0.42, 0.42), 0.30);
   vec3 body = mix(deep, middle, smoothstep(0.04, 0.66, d));
   body = mix(body, shallow, nearShore);
   float slope = clamp(length(s.grad) * 1.05, 0.0, 1.0);
   float curve = clamp(abs(s.curve) * 0.12 + s.energy * 0.42, 0.0, 1.0);
-  float caustics = smoothstep(0.62, 0.92, fbm(p * vec2(0.42, 1.18) + micro * 0.7));
+  float caustics = smoothstep(0.62, 0.92, fbm(p * vec2(0.42, 1.18) + micro * 0.7)) * detailFade;
   body += vec3(0.00, 0.34, 0.31) * pow(max(dot(n, normalize(vec3(-0.22, 0.74, 0.62))), 0.0), 1.6) * d * 0.32;
   body += vec3(0.10, 0.58, 0.52) * caustics * nearShore * (1.0 - u_haze) * 0.13;
   vec3 col = mix(body, reflected, clamp(fresnel * 0.74 + slope * 0.055, 0.0, 0.72));
   float sunPath = pow(max(0.0, 1.0 - abs(uv.x - u_sun.x) * 4.8), 3.0) * pow(1.0 - abs(d - 0.26), 2.4);
-  float glints = smoothstep(0.68, 0.96, fbm(p * vec2(4.8, 1.25) + vec2(u_time * 0.28, -u_time * 0.10)));
+  float glints = smoothstep(0.68, 0.96, fbm(p * vec2(4.8, 1.25) + vec2(u_time * 0.28, -u_time * 0.10))) * detailFade;
   float specular = pow(max(dot(reflect(-normalize(vec3(-0.34, .86, .38)), n), viewDir), 0.0), 36.0) * glints * sunPath * (0.32 + u_chop * 0.78) * u_light;
   float crestEnergy = smoothstep(0.05, 0.42, abs(s.h)) * max(slope, curve);
-  float streaks = smoothstep(0.48, 0.86, fbm(vec2(p.x * 0.09 - u_time * 0.035, p.y * 1.65 + u_time * 0.15)));
+  float streaks = smoothstep(0.48, 0.86, fbm(vec2(p.x * 0.09 - u_time * 0.035, p.y * 1.65 + u_time * 0.15))) * detailFade;
   float foamNoise = fbm(p * vec2(0.86, 1.95) + vec2(u_time * 0.08, -u_time * 0.05));
   float microFoam = smoothstep(0.36 + (1.0 - u_foam) * 0.22, 0.86, abs(s.h) + slope * 0.14) * smoothstep(0.42, 0.82, foamNoise);
   float shoreLine = 0.86 + sin(p.x * 0.065 + u_time * 0.70) * 0.018;
   float shoreFoam = smoothstep(0.045, 0.0, abs(d - shoreLine)) * smoothstep(0.42, 0.82, fbm(vec2(p.x * 0.58, u_time * 0.42)));
   float foam = clamp((crestEnergy * microFoam * (0.46 + streaks * 0.72) + shoreFoam * 0.88) * (0.45 + u_foam * 1.55), 0.0, 1.0);
-  float swellShadow = smoothstep(0.40, 0.84, fbm(vec2(p.x * 0.025 - u_time * 0.012, p.y * 0.15 + u_time * 0.035)));
+  float swellShadow = smoothstep(0.40, 0.84, fbm(vec2(p.x * 0.025 - u_time * 0.012, p.y * 0.15 + u_time * 0.035))) * detailFade;
   col = mix(col, col * vec3(0.58, 0.74, 0.80), swellShadow * smoothstep(0.04, 0.82, 1.0 - d) * 0.32);
   col += vec3(0.012, 0.13, 0.18) * streaks * smoothstep(0.02, 0.88, d) * 1.25;
-  col += vec3(1.0, 0.78, 0.38) * specular * 1.35;
-  col = mix(col, vec3(0.91, 0.975, 1.0), foam * 0.48);
-  col = mix(col, vec3(0.005, 0.18, 0.25), smoothstep(0.70, 1.0, d) * 0.34);
-  col = mix(col, col * vec3(0.58, 0.76, 0.86), smoothstep(0.12, 0.54, d) * (1.0 - smoothstep(0.78, 1.0, d)) * 0.24);
-  float horizonFog = pow(1.0 - d, 2.85) * (0.18 + u_haze * 0.62);
-  col = mix(col, mix(u_horizon, vec3(0.55,0.66,0.69), u_haze), horizonFog);
+  col += vec3(1.0, 0.80, 0.42) * specular * 1.55;
+  col = mix(col, vec3(0.93, 0.985, 1.0), foam * 0.54);
+  col = mix(col, vec3(0.005, 0.23, 0.30), smoothstep(0.70, 1.0, d) * 0.24);
+  col = mix(col, col * vec3(0.64, 0.84, 0.90), smoothstep(0.12, 0.54, d) * (1.0 - smoothstep(0.78, 1.0, d)) * 0.16);
+  float horizonFog = pow(1.0 - d, 3.25) * (0.09 + u_haze * 0.36);
+  col = mix(col, mix(u_sea_far, u_horizon, 0.58), smoothstep(0.07, 0.0, d) * 0.82);
+  col = mix(col, mix(u_horizon, vec3(0.62,0.76,0.78), u_haze), horizonFog);
   return col;
 }
 void main() {
@@ -188,11 +196,11 @@ void main() {
   float horizon = 0.415 + sin(q.x * 1.4 + u_time * 0.04) * 0.004;
   vec3 col = skyColor(uv, q);
   if (uv.y < horizon) col = mix(col, oceanColor(uv, q, horizon), smoothstep(0.0, 0.006, horizon - uv.y));
-  col = mix(col, vec3(0.55,0.62,0.64), u_haze * 0.22);
-  col *= 0.62 + u_light * 0.38;
+  col = mix(col, vec3(0.55,0.62,0.64), u_haze * 0.13);
+  col *= 0.66 + u_light * 0.40;
   float vignette = smoothstep(1.05, 0.20, length((uv - 0.5) * vec2(1.02, 0.86)));
   col *= 0.76 + vignette * 0.34;
-  col = acesTone(col * 1.02);
+  col = acesTone(col * 1.08);
   col = pow(col, vec3(0.4545));
   gl_FragColor = vec4(col, 1.0);
 }
