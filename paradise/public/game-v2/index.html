@@ -225,6 +225,7 @@ const cinematic = query.get('quality') === 'cinematic';
 const presentation = query.get('presentation') === '1' || query.get('showcase') === '1';
 const canonicalPandoraWaterOnly = query.get('watermesh') !== '1';
 const experimentalShallowWater = query.get('shallowwater') === '1';
+const useDogBillboard = query.get('dogmesh') !== '1';
 document.body.classList.toggle('presentation', presentation);
 document.body.classList.toggle('clean', query.get('clean') === '1');
 document.body.dataset.waterArchitecture = canonicalPandoraWaterOnly
@@ -1689,6 +1690,31 @@ function makeDog() {
   return g;
 }
 const dog = makeDog();
+dog.visible = !useDogBillboard;
+
+const dogBillboardTexture = new THREE.TextureLoader().load('/assets/alhena-black-lab.png');
+dogBillboardTexture.colorSpace = THREE.SRGBColorSpace;
+dogBillboardTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+const dogBillboard = new THREE.Group();
+dogBillboard.name = 'v2-black-lab-high-fidelity-transparent-billboard';
+dogBillboard.position.set(1.35, .72, 5.45);
+const dogCard = new THREE.Mesh(
+  new THREE.PlaneGeometry(2.45, 1.65),
+  new THREE.MeshBasicMaterial({
+    map: dogBillboardTexture,
+    transparent: true,
+    alphaTest: .05,
+    depthWrite: false,
+    toneMapped: true
+  })
+);
+dogCard.name = 'v2-black-lab-photo-cutout-card';
+dogCard.position.y = .24;
+dogBillboard.add(dogCard);
+dogBillboard.visible = useDogBillboard;
+scene.add(dogBillboard);
+const dogBillboardShadow = contactShadow('v2-black-lab-photo-contact-shadow', 1.35, 5.58, 1.35, .46, .24);
+dogBillboardShadow.visible = useDogBillboard;
 
 async function installRuntimeAssetSlots() {
   try {
@@ -1721,7 +1747,11 @@ async function installRuntimeAssetSlots() {
         });
         scene.add(root);
         if (slot.id === 'alhena_bartender_rig' && slot.status === 'active') alhena.visible = false;
-        if (slot.id === 'black_lab_rig' && slot.status === 'active') dog.visible = false;
+        if (slot.id === 'black_lab_rig' && slot.status === 'active') {
+          dog.visible = false;
+          dogBillboard.visible = false;
+          dogBillboardShadow.visible = false;
+        }
         if (slot.id === 'shoreline_environment' && query.get('replace') === '1') {
           beach.visible = false;
           wet.visible = false;
@@ -2111,6 +2141,9 @@ function setView(name) {
     if (!obj.name) return;
     if (hideForWaterStudy.some(pattern => pattern.test(obj.name))) obj.visible = !waterStudy;
   });
+  dog.visible = !waterStudy && !useDogBillboard;
+  dogBillboard.visible = !waterStudy && useDogBillboard;
+  dogBillboardShadow.visible = !waterStudy && useDogBillboard;
   ocean.visible = !waterStudy && !canonicalPandoraWaterOnly;
   waterOptics.visible = !waterStudy && !canonicalPandoraWaterOnly;
   shallowWater.visible = experimentalShallowWater && !waterStudy;
@@ -2238,6 +2271,14 @@ function animate() {
     dog.userData.paws[i].position.x += reach * lift - reach * .35 * plant;
     dog.userData.paws[i].scale.y = .45 + plant * .035;
   });
+  dogBillboard.position.x = 1.35 + Math.sin(t * .34) * .18 + Math.sin(t * .77) * .04;
+  dogBillboard.position.z = 5.45 + Math.cos(t * .29) * .10;
+  dogBillboard.position.y = .72 + Math.max(0, Math.sin(t * 1.8)) * .012;
+  dogBillboard.lookAt(new THREE.Vector3(camera.position.x, dogBillboard.position.y, camera.position.z));
+  dogBillboard.rotation.z = Math.sin(t * .9) * .012;
+  dogBillboardShadow.position.x = dogBillboard.position.x;
+  dogBillboardShadow.position.z = dogBillboard.position.z + .10;
+  dogBillboardShadow.material.opacity = useDogBillboard ? .20 + Math.sin(t * .8) * .018 : 0;
   if (play.cast && !play.bite && now > play.biteAt) {
     play.bite = true;
     play.tension = .18;

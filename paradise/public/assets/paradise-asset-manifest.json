@@ -19,6 +19,20 @@
       ]
     },
     {
+      "id": "black_lab_billboard",
+      "type": "transparent-character-card",
+      "targetPath": "/assets/alhena-black-lab.png",
+      "status": "active",
+      "loadByDefault": true,
+      "currentFallback": "procedural articulated black lab mesh behind ?dogmesh=1",
+      "requirements": [
+        "transparent high-resolution black lab cutout",
+        "grounded contact shadow",
+        "subtle idle motion",
+        "future replacement by rigged GLB when available"
+      ]
+    },
+    {
       "id": "black_lab_rig",
       "type": "rigged-animal",
       "targetPath": "/assets/models/black-lab.glb",

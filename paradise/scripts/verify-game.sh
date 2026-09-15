@@ -106,6 +106,8 @@ v2_markers=(
   "v2-softened-distant-island-silhouette"
   "v2-black-lab-procedural-rig-standin"
   "v2-black-lab-procedural-four-beat-gait-standin"
+  "v2-black-lab-high-fidelity-transparent-billboard"
+  "v2-black-lab-photo-contact-shadow"
   "v2-alhena-bartender-procedural-standin"
   "v2-near-surface-fish-glint"
   "v2-reflective-shoreline-tide-pool"
