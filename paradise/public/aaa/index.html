@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Paradise AAA Prototype</title>
+<style>
+:root {
+  --ink: #f8efd4;
+  --glass: rgba(7, 19, 28, 0.58);
+  --edge: rgba(255, 236, 178, 0.32);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #08131d; color: var(--ink); font-family: Georgia, serif; }
+#stage { position: fixed; inset: 0; }
+.hud {
+  position: fixed;
+  top: max(18px, env(safe-area-inset-top));
+  left: max(18px, env(safe-area-inset-left));
+  width: min(360px, calc(100vw - 36px));
+  padding: 18px;
+  background: var(--glass);
+  border: 1px solid var(--edge);
+  border-radius: 18px;
+  backdrop-filter: blur(18px);
+  box-shadow: 0 24px 80px rgba(0,0,0,0.36);
+}
+.hud h1 { margin: 0 0 8px; font-size: 26px; line-height: 1; letter-spacing: -0.02em; }
+.hud p { margin: 0; color: rgba(248,239,212,0.78); font: 12px/1.55 ui-sans-serif, system-ui, sans-serif; }
+.pill {
+  position: fixed;
+  left: 50%;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  color: rgba(248,239,212,0.76);
+  background: rgba(6, 15, 21, 0.62);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 999px;
+  font: 10px/1 ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+button {
+  margin-top: 14px;
+  width: 100%;
+  height: 44px;
+  border: 1px solid rgba(255,236,178,0.44);
+  border-radius: 12px;
+  background: rgba(255,236,178,0.08);
+  color: var(--ink);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<section class="hud">
+  <h1>Paradise</h1>
+  <p>3D scene-graph prototype: real perspective camera, shader ocean plane, extruded shoreline, modeled bar/house placeholders, and replaceable character slots.</p>
+  <button id="cast">Cast line</button>
+</section>
+<div class="pill">WASD / ARROWS MOVE CAMERA · SPACE CASTS · DRAG LOOKS</div>
+<script type="module">
+import * as THREE from 'https://unpkg.com/three@0.168.0/build/three.module.js';
+
+const canvas = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.12;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x8fc8df);
+scene.fog = new THREE.FogExp2(0x91bfd1, 0.012);
+
+const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 240);
+camera.position.set(0, 3.2, 12);
+camera.lookAt(0, 1.1, -18);
+
+const hemi = new THREE.HemisphereLight(0xb7eaff, 0x6a4f31, 1.35);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffd18a, 3.2);
+sun.position.set(-12, 13, 8);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 80;
+sun.shadow.camera.left = -28;
+sun.shadow.camera.right = 28;
+sun.shadow.camera.top = 28;
+sun.shadow.camera.bottom = -18;
+scene.add(sun);
+
+const uniforms = {
+  uTime: { value: 0 },
+  uSun: { value: new THREE.Vector3(-0.55, 0.62, 0.55).normalize() },
+  uNear: { value: new THREE.Color('#2e8fa1') },
+  uFar: { value: new THREE.Color('#9fd7dc') },
+};
+
+const waterMaterial = new THREE.ShaderMaterial({
+  uniforms,
+  transparent: false,
+  vertexShader: `
+    uniform float uTime;
+    varying vec2 vUv;
+    varying float vHeight;
+    varying vec3 vWorld;
+    float wave(vec2 p, float a, float f, float s) {
+      return sin(p.x * f + p.y * f * .37 + uTime * s) * a;
+    }
+    void main() {
+      vUv = uv;
+      vec3 pos = position;
+      float d = smoothstep(0.0, 1.0, uv.y);
+      float h = wave(pos.xz, .13, 1.3, 1.0) + wave(pos.zx, .07, 2.7, 1.7) + wave(pos.xz + 4.0, .035, 6.0, 2.3);
+      pos.y += h * (0.35 + d);
+      vHeight = h;
+      vec4 world = modelMatrix * vec4(pos, 1.0);
+      vWorld = world.xyz;
+      gl_Position = projectionMatrix * viewMatrix * world;
+    }
+  `,
+  fragmentShader: `
+    precision highp float;
+    uniform float uTime;
+    uniform vec3 uSun;
+    uniform vec3 uNear;
+    uniform vec3 uFar;
+    varying vec2 vUv;
+    varying float vHeight;
+    varying vec3 vWorld;
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
+    float noise(vec2 p){
+      vec2 i=floor(p), f=fract(p), u=f*f*(3.0-2.0*f);
+      return mix(mix(hash(i),hash(i+vec2(1,0)),u.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y);
+    }
+    void main() {
+      vec2 p = vWorld.xz;
+      float n = noise(p * 0.42 + uTime * 0.08);
+      float foam = smoothstep(0.13, 0.23, vHeight + n * 0.08) * smoothstep(0.18, 0.92, vUv.y);
+      float shoreFoam = smoothstep(0.82, 0.98, vUv.y) * (0.5 + 0.5 * sin(p.x * 2.2 + uTime * 2.0));
+      vec3 base = mix(uFar, uNear, pow(vUv.y, 1.4));
+      vec3 sky = vec3(0.62, 0.84, 0.92);
+      float fresnel = pow(1.0 - clamp(dot(normalize(cameraPosition - vWorld), vec3(0.0,1.0,0.0)), 0.0, 1.0), 2.4);
+      float glitter = pow(max(0.0, sin((p.x - p.y) * 7.0 + uTime * 3.0) * 0.5 + 0.5), 18.0) * smoothstep(0.0, 0.72, vUv.y);
+      vec3 col = mix(base, sky, fresnel * 0.55);
+      col += vec3(1.0, .78, .34) * glitter * 0.28;
+      col = mix(col, vec3(.92,.98,1.0), clamp(foam + shoreFoam * .8, 0.0, 1.0) * .72);
+      col *= 0.86 + vHeight * 0.7;
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `,
+});
+
+const water = new THREE.Mesh(new THREE.PlaneGeometry(140, 130, 240, 240), waterMaterial);
+water.rotation.x = -Math.PI / 2;
+water.position.z = -44;
+water.receiveShadow = true;
+scene.add(water);
+
+function makeSkyTexture() {
+  const c = document.createElement('canvas');
+  c.width = 2;
+  c.height = 512;
+  const g = c.getContext('2d').createLinearGradient(0, 0, 0, c.height);
+  g.addColorStop(0, '#245a81');
+  g.addColorStop(0.45, '#7cc2de');
+  g.addColorStop(0.72, '#ffd69a');
+  g.addColorStop(1, '#b6a66f');
+  c.getContext('2d').fillStyle = g;
+  c.getContext('2d').fillRect(0, 0, c.width, c.height);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const skyPlane = new THREE.Mesh(
+  new THREE.PlaneGeometry(220, 110),
+  new THREE.MeshBasicMaterial({ map: makeSkyTexture(), depthWrite: false })
+);
+skyPlane.position.set(0, 18, -84);
+scene.add(skyPlane);
+
+const sunDisk = new THREE.Mesh(
+  new THREE.CircleGeometry(3.8, 64),
+  new THREE.MeshBasicMaterial({ color: 0xffefad, transparent: true, opacity: 0.88, depthWrite: false })
+);
+sunDisk.position.set(-18, 16, -80);
+scene.add(sunDisk);
+
+for (const [x, z, sx] of [[-22, -55, 10], [17, -62, 16], [39, -52, 9]]) {
+  const island = new THREE.Mesh(
+    new THREE.ConeGeometry(sx, 3, 5),
+    new THREE.MeshBasicMaterial({ color: 0x746b4a, transparent: true, opacity: 0.42, depthWrite: false })
+  );
+  island.position.set(x, 1.6, z);
+  island.rotation.y = Math.random() * Math.PI;
+  island.scale.y = 0.22;
+  scene.add(island);
+}
+
+const sand = new THREE.Mesh(
+  new THREE.PlaneGeometry(80, 34, 80, 12),
+  new THREE.MeshStandardMaterial({ color: 0xcaa86d, roughness: 0.92, metalness: 0.0 })
+);
+sand.rotation.x = -Math.PI / 2;
+sand.position.set(0, -0.18, 7.6);
+sand.receiveShadow = true;
+scene.add(sand);
+
+function box(name, size, pos, color, rough = 0.8) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), new THREE.MeshStandardMaterial({ color, roughness: rough }));
+  mesh.name = name;
+  mesh.position.set(...pos);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  return mesh;
+}
+
+box('beach-house-body', [4.2, 2.2, 2.6], [-9.5, 1.0, 2.6], 0x8b5633);
+const roof = box('beach-house-roof', [4.9, 0.35, 3.2], [-9.5, 2.28, 2.6], 0x5b1d17, 0.7);
+roof.rotation.z = 0.08;
+box('bar-bamboo-face', [5.8, 1.35, 1.0], [8.0, 0.66, 2.0], 0x8a5a2c);
+box('bar-counter', [6.3, 0.28, 1.35], [8.0, 1.52, 2.0], 0x3b2517, 0.48);
+box('cooler', [1.4, 0.62, 0.86], [-1.2, 0.18, 5.2], 0x9bd8e6);
+box('chair', [0.9, 0.16, 1.0], [1.0, 0.28, 5.1], 0xd36d45);
+
+const loader = new THREE.TextureLoader();
+loader.load('../assets/alhena-black-lab.png', tex => {
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+  const dog = new THREE.Sprite(mat);
+  dog.name = 'black-lab-rig-slot';
+  dog.scale.set(2.6, 1.75, 1);
+  dog.position.set(-5.0, 0.85, 3.9);
+  scene.add(dog);
+});
+
+const alhenaGroup = new THREE.Group();
+alhenaGroup.name = 'alhena-character-rig-slot';
+alhenaGroup.position.set(8.1, 1.96, 2.05);
+scene.add(alhenaGroup);
+const skin = new THREE.MeshStandardMaterial({ color: 0x956044, roughness: 0.55 });
+const dress = new THREE.MeshStandardMaterial({ color: 0x1796ab, roughness: 0.72 });
+const hair = new THREE.MeshStandardMaterial({ color: 0x160f0d, roughness: 0.78 });
+const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 0.9, 8, 16), dress);
+torso.scale.set(0.9, 1.0, 0.5);
+torso.castShadow = true;
+alhenaGroup.add(torso);
+const head = new THREE.Mesh(new THREE.SphereGeometry(0.34, 32, 20), skin);
+head.position.y = 0.86;
+head.castShadow = true;
+alhenaGroup.add(head);
+const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.37, 24, 14), hair);
+hairCap.position.set(-0.03, 0.98, -0.03);
+hairCap.scale.set(1.04, 0.82, 0.92);
+hairCap.castShadow = true;
+alhenaGroup.add(hairCap);
+for (const x of [-0.58, 0.58]) {
+  const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.85, 8, 12), skin);
+  arm.position.set(x, 0.18, 0.28);
+  arm.rotation.z = x > 0 ? -0.85 : 0.85;
+  arm.rotation.x = 1.08;
+  arm.castShadow = true;
+  alhenaGroup.add(arm);
+}
+
+const bobber = new THREE.Mesh(new THREE.SphereGeometry(0.13, 24, 12), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.32 }));
+bobber.position.set(0, 0.1, -9);
+scene.add(bobber);
+const line = new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(7.2, 1.4, 2.3), bobber.position]),
+  new THREE.LineBasicMaterial({ color: 0xfff2cc, transparent: true, opacity: 0.62 })
+);
+scene.add(line);
+
+let dragging = false;
+let yaw = 0;
+let pitch = 0;
+const keys = new Set();
+window.addEventListener('keydown', e => {
+  keys.add(e.code);
+  if (e.code === 'Space') castLine();
+});
+window.addEventListener('keyup', e => keys.delete(e.code));
+window.addEventListener('pointerdown', () => dragging = true);
+window.addEventListener('pointerup', () => dragging = false);
+window.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  yaw -= e.movementX * 0.002;
+  pitch = THREE.MathUtils.clamp(pitch - e.movementY * 0.0015, -0.22, 0.26);
+});
+document.getElementById('cast').addEventListener('click', castLine);
+
+function castLine() {
+  bobber.position.x = THREE.MathUtils.randFloatSpread(7);
+  bobber.position.z = THREE.MathUtils.randFloat(-18, -8);
+}
+
+function resize() {
+  const w = innerWidth;
+  const h = innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+resize();
+
+function animate(now) {
+  const t = now * 0.001;
+  uniforms.uTime.value = t;
+  const speed = keys.has('ShiftLeft') ? 0.13 : 0.07;
+  if (keys.has('KeyW') || keys.has('ArrowUp')) camera.position.z -= speed;
+  if (keys.has('KeyS') || keys.has('ArrowDown')) camera.position.z += speed;
+  if (keys.has('KeyA') || keys.has('ArrowLeft')) camera.position.x -= speed;
+  if (keys.has('KeyD') || keys.has('ArrowRight')) camera.position.x += speed;
+  camera.position.x = THREE.MathUtils.clamp(camera.position.x, -10, 10);
+  camera.position.z = THREE.MathUtils.clamp(camera.position.z, -6, 15);
+  camera.lookAt(camera.position.x + Math.sin(yaw) * 4, 1.2 + pitch * 8, camera.position.z - 12);
+  bobber.position.y = 0.13 + Math.sin(t * 2.2) * 0.08;
+  line.geometry.setFromPoints([new THREE.Vector3(7.2, 1.4, 2.3), bobber.position]);
+  const dog = scene.getObjectByName('black-lab-rig-slot');
+  if (dog) {
+    dog.position.x = -5 + Math.sin(t * 0.46) * 1.2;
+    dog.position.y = 0.82 + Math.sin(t * 2.1) * 0.025;
+  }
+  alhenaGroup.rotation.y = Math.sin(t * 0.7) * 0.05;
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
