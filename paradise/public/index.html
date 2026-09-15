@@ -15,7 +15,7 @@
 <style>
 :root {
   --paper: #f7edce;
-  --glass: rgba(5, 14, 25, 0.56);
+  --glass: rgba(5, 14, 25, 0.5);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -107,7 +107,7 @@ button { font: inherit; color: inherit; }
 
 .hint {
   position: fixed;
-  top: max(14px, env(safe-area-inset-top));
+  bottom: 18px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 4;
@@ -128,10 +128,10 @@ body.started .hint { opacity: 1; }
 
 .hud {
   position: fixed;
-  inset: auto 18px 18px 18px;
+  inset: 18px 18px auto 18px;
   z-index: 5;
   display: grid;
-  grid-template-columns: minmax(240px, 420px) 1fr minmax(230px, 340px);
+  grid-template-columns: minmax(238px, 390px) minmax(260px, 480px) minmax(218px, 310px);
   gap: 14px;
   align-items: end;
   pointer-events: none;
@@ -144,11 +144,11 @@ body.started .hud { opacity: 1; transform: none; }
   pointer-events: auto;
   background: var(--glass);
   border: 1px solid rgba(255,240,190,0.2);
-  border-radius: 22px;
-  box-shadow: 0 22px 80px rgba(0,0,0,0.32), inset 0 1px rgba(255,255,255,0.08);
-  backdrop-filter: blur(18px) saturate(1.2);
+  border-radius: 16px;
+  box-shadow: 0 18px 62px rgba(0,0,0,0.28), inset 0 1px rgba(255,255,255,0.08);
+  backdrop-filter: blur(16px) saturate(1.18);
 }
-.panel { padding: 18px; }
+.panel { padding: 14px; }
 .brand {
   display: flex;
   justify-content: space-between;
@@ -158,7 +158,7 @@ body.started .hud { opacity: 1; transform: none; }
 }
 .brand h1 {
   font-family: "Cormorant Garamond", serif;
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 500;
   letter-spacing: -0.02em;
 }
@@ -169,15 +169,15 @@ body.started .hud { opacity: 1; transform: none; }
   text-transform: uppercase;
 }
 .status {
-  min-height: 48px;
+  min-height: 42px;
   color: rgba(247,237,206,0.78);
   line-height: 1.5;
   font-size: 14px;
 }
 .status strong { color: #fff2b6; }
 .meter {
-  margin: 12px 0 14px;
-  height: 8px;
+  margin: 10px 0 12px;
+  height: 7px;
   overflow: hidden;
   border-radius: 99px;
   background: rgba(255,255,255,0.08);
@@ -192,14 +192,14 @@ body.started .hud { opacity: 1; transform: none; }
 }
 .actions {
   display: grid;
-  grid-template-columns: 1fr 86px;
+  grid-template-columns: 1fr 78px;
   gap: 8px;
 }
 .actions button, .pill-row button {
   border: 1px solid rgba(255,240,190,0.24);
-  border-radius: 14px;
+  border-radius: 10px;
   background: rgba(255,255,255,0.06);
-  padding: 12px 10px;
+  padding: 10px 9px;
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 0.16em;
@@ -214,8 +214,8 @@ body.started .hud { opacity: 1; transform: none; }
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px;
-  min-width: min(580px, 100%);
+  padding: 9px;
+  min-width: min(500px, 100%);
 }
 .pill-row {
   display: flex;
@@ -230,8 +230,8 @@ body.started .hud { opacity: 1; transform: none; }
 }
 .pill-row button.active { color: #fff2b6; }
 .log {
-  padding: 16px;
-  max-height: 172px;
+  padding: 13px;
+  max-height: 154px;
   overflow: hidden;
 }
 .log-title {
@@ -317,7 +317,7 @@ body.started .hud { opacity: 1; transform: none; }
   .log { display: none; }
   .brand h1 { font-size: 24px; }
   .status { min-height: 36px; font-size: 13px; }
-  .hint { top: 10px; width: calc(100vw - 20px); text-align: center; }
+  .hint { top: 10px; bottom: auto; width: calc(100vw - 20px); text-align: center; }
 }
 
 @media (orientation: landscape) and (max-height: 560px) {
@@ -503,6 +503,24 @@ function rgbToHex(rgb) {
 function mix(a, b, t) {
   const ar = hexToRgb(a), br = hexToRgb(b);
   return rgbToHex(ar.map((v, i) => v + (br[i] - v) * t));
+}
+
+function shade(hex, amount) {
+  const rgb = hexToRgb(hex).map(v => v + (amount > 0 ? (255 - v) * amount : v * amount));
+  return rgbToHex(rgb);
+}
+
+function lit(base, time, weather, amount = 0) {
+  const cool = weather.haze + weather.cloud * 0.16;
+  let color = mix(base, state.time === 'night' ? '#06101d' : time.sun, Math.max(0, amount) * time.light);
+  color = mix(color, '#1a2430', (1 - time.light) * 0.42 + cool * 0.26);
+  return color;
+}
+
+function materialGradient(x0, y0, x1, y1, stops) {
+  const g = ctx.createLinearGradient(x0, y0, x1, y1);
+  stops.forEach(([p, c]) => g.addColorStop(p, c));
+  return g;
 }
 
 function hexToUnit(hex) {
@@ -930,22 +948,80 @@ function drawSky(t, time, weather) {
   ctx.fill();
 
   drawClouds(t, weather, skyH);
+  drawAtmosphere(t, time, weather, skyH);
+  drawDistantLand(t, time, weather, skyH);
+}
+
+function drawAtmosphere(t, time, weather, skyH) {
+  const w = state.w, h = state.h;
+  ctx.save();
+  const sx = w * time.sunX;
+  const sy = h * time.sunY;
+  ctx.globalCompositeOperation = 'screen';
+  for (let i = 0; i < 7; i++) {
+    const angle = -0.45 + i * 0.15 + Math.sin(t * 0.00018 + i) * 0.04;
+    const length = w * (0.55 + i * 0.035);
+    const width = h * (0.04 + i * 0.008);
+    const grad = ctx.createLinearGradient(sx, sy, sx + Math.cos(angle) * length, sy + Math.sin(angle) * length);
+    grad.addColorStop(0, `rgba(255,229,160,${0.05 * time.light * (1 - weather.cloud * 0.55)})`);
+    grad.addColorStop(1, 'rgba(255,229,160,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx + Math.cos(angle - 0.045) * length, sy + Math.sin(angle - 0.045) * length + width);
+    ctx.lineTo(sx + Math.cos(angle + 0.045) * length, sy + Math.sin(angle + 0.045) * length - width);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawDistantLand(t, time, weather, skyH) {
+  const w = state.w, h = state.h;
+  const base = h * 0.532;
+  ctx.save();
+  ctx.globalAlpha = 0.12 + weather.haze * 0.16;
+  ctx.fillStyle = mix('#284454', time.skyTop, 0.32);
+  ctx.beginPath();
+  ctx.moveTo(0, base);
+  for (let x = 0; x <= w; x += 44) {
+    const y = base - 8 - Math.sin(x * 0.012 + t * 0.00008) * 8 - Math.sin(x * 0.004) * 18;
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(w, base + 10);
+  ctx.lineTo(0, base + 10);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawClouds(t, weather, skyH) {
   if (weather.cloud <= 0.02) return;
   const w = state.w;
   ctx.save();
-  ctx.globalAlpha = weather.cloud;
-  ctx.fillStyle = 'rgba(245,242,225,0.42)';
-  for (let i = 0; i < 8; i++) {
-    const baseX = ((i * 287 + t * (0.006 + i * 0.001)) % (w + 320)) - 160;
-    const y = skyH * (0.16 + ((i * 37) % 38) / 100);
-    const scale = 0.7 + ((i * 19) % 44) / 100;
-    blob(baseX, y, 92 * scale, 18 * scale);
-    blob(baseX + 60 * scale, y + 8 * scale, 118 * scale, 28 * scale);
-    blob(baseX + 145 * scale, y + 2 * scale, 88 * scale, 20 * scale);
+  ctx.filter = `blur(${6 + weather.cloud * 10}px)`;
+  const night = state.time === 'night';
+  const cloudTone = night ? 'rgba(24,29,42,' : 'rgba(245,242,225,';
+  const shadowTone = night ? 'rgba(8,11,20,' : 'rgba(95,108,112,';
+  for (let i = 0; i < 6; i++) {
+    const baseX = ((i * 337 + t * (0.004 + i * 0.0007)) % (w + 560)) - 280;
+    const y = skyH * (0.13 + ((i * 31) % 34) / 100);
+    const scale = 0.9 + ((i * 23) % 80) / 100;
+    const width = 230 * scale * (0.86 + weather.cloud);
+    const height = 34 * scale * (0.8 + weather.cloud * 0.8);
+    const g = ctx.createLinearGradient(baseX - width, y - height, baseX + width, y + height);
+    g.addColorStop(0, `${cloudTone}${0.04 + weather.cloud * 0.12})`);
+    g.addColorStop(0.46, `${cloudTone}${0.12 + weather.cloud * 0.32})`);
+    g.addColorStop(1, `${shadowTone}${0.04 + weather.cloud * 0.18})`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(baseX - width * 0.58, y + height * 0.22);
+    ctx.bezierCurveTo(baseX - width * 0.42, y - height * 0.75, baseX - width * 0.12, y - height * 1.08, baseX + width * 0.06, y - height * 0.42);
+    ctx.bezierCurveTo(baseX + width * 0.32, y - height * 1.15, baseX + width * 0.72, y - height * 0.48, baseX + width * 0.68, y + height * 0.1);
+    ctx.bezierCurveTo(baseX + width * 0.48, y + height * 0.62, baseX - width * 0.1, y + height * 0.66, baseX - width * 0.58, y + height * 0.22);
+    ctx.fill();
   }
+  ctx.filter = 'none';
   ctx.restore();
 }
 
@@ -1004,6 +1080,24 @@ function drawWater(t, time, weather) {
   ctx.fillStyle = foam;
   ctx.fillRect(0, foamY - 18, w, 42);
 
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  for (let i = 0; i < 18; i++) {
+    const depth = i / 17;
+    const y = top + (bottom - top) * (0.18 + depth * 0.72);
+    const glow = 0.018 + (1 - depth) * 0.045 * time.light;
+    ctx.strokeStyle = `rgba(255,238,179,${glow})`;
+    ctx.lineWidth = 1.2 + (1 - depth) * 1.8;
+    ctx.beginPath();
+    for (let x = -40; x <= w + 40; x += 18) {
+      const yy = y + Math.sin(x * 0.017 + t * 0.002 + i) * (4 + weather.wave * 9);
+      if (x === -40) ctx.moveTo(x, yy);
+      else ctx.lineTo(x, yy);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+
   drawFishShadows(t, top, bottom);
   drawBobber(t);
   ctx.restore();
@@ -1035,7 +1129,8 @@ function drawShore(t, time) {
   const w = state.w, h = state.h;
   const y = h * 0.84;
   const g = ctx.createLinearGradient(0, y, 0, h);
-  g.addColorStop(0, mix(time.sand, '#ffffff', 0.09));
+  g.addColorStop(0, mix(time.sand, '#ffffff', 0.15));
+  g.addColorStop(0.28, mix(time.sand, '#6b6656', 0.18));
   g.addColorStop(1, mix(time.sand, '#4d3926', 0.24));
   ctx.fillStyle = g;
   ctx.beginPath();
@@ -1043,6 +1138,19 @@ function drawShore(t, time) {
   ctx.lineTo(0, y + 30);
   ctx.bezierCurveTo(w * 0.25, y + 12, w * 0.58, y + 34, w, y + 10);
   ctx.lineTo(w, h);
+  ctx.closePath();
+  ctx.fill();
+
+  const wet = ctx.createLinearGradient(0, y - 4, 0, y + h * 0.13);
+  wet.addColorStop(0, 'rgba(215,244,255,0.36)');
+  wet.addColorStop(0.45, 'rgba(80,95,90,0.12)');
+  wet.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = wet;
+  ctx.beginPath();
+  ctx.moveTo(0, y + 14);
+  ctx.bezierCurveTo(w * 0.26, y + 2, w * 0.57, y + 24, w, y + 2);
+  ctx.lineTo(w, y + h * 0.16);
+  ctx.bezierCurveTo(w * 0.65, y + h * 0.12, w * 0.32, y + h * 0.15, 0, y + h * 0.1);
   ctx.closePath();
   ctx.fill();
 
@@ -1058,27 +1166,76 @@ function drawShore(t, time) {
   }
   ctx.restore();
 
-  drawBeachHouse(w * 0.1, h * 0.83, 0.92, time);
-  drawBlackLab(w * 0.47, h * 0.91, 1);
-  drawBarAndAlhena(w * 0.84, h * 0.84);
+  drawSandGrain(t, y, time);
+  drawBeachHouse(w * 0.11, h * 0.735, 1.14, time);
+  drawBlackLab(w * 0.31, h * 0.82, 1.18);
   drawRod(t);
+  drawBarAndAlhena(w * 0.80, h * 0.725);
+}
+
+function drawSandGrain(t, top, time) {
+  const w = state.w, h = state.h;
+  ctx.save();
+  ctx.globalAlpha = 0.13 * time.light;
+  for (let i = 0; i < 340; i++) {
+    const x = (i * 97.13) % w;
+    const y = top + 8 + ((i * 53.7) % (h - top - 8));
+    const r = 0.4 + ((i * 11) % 4) * 0.13;
+    ctx.fillStyle = i % 5 === 0 ? 'rgba(255,248,205,0.65)' : 'rgba(73,50,28,0.46)';
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 function drawBeachHouse(x, y, s, time) {
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(s, s);
-  ctx.fillStyle = mix('#9e613b', '#201512', 1 - time.light);
-  ctx.fillRect(0, 0, 118, 54);
-  ctx.fillStyle = '#6b2819';
+  ctx.shadowColor = 'rgba(0,0,0,0.35)';
+  ctx.shadowBlur = 18;
+  ctx.shadowOffsetY = 10;
+  ctx.fillStyle = mix('#a66a40', '#201512', 1 - time.light);
+  roundRect(0, 0, 130, 62, 2);
+  ctx.fill();
+  ctx.fillStyle = mix('#7b2b1c', '#1c0c08', 1 - time.light);
   ctx.beginPath();
-  ctx.moveTo(-10, 0);
-  ctx.lineTo(58, -34);
-  ctx.lineTo(130, 0);
+  ctx.moveTo(-12, 2);
+  ctx.lineTo(64, -42);
+  ctx.lineTo(142, 2);
   ctx.closePath();
   ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(35,20,11,0.38)';
+  for (let i = 0; i < 5; i++) ctx.fillRect(10 + i * 23, 4, 2, 58);
   ctx.fillStyle = state.time === 'night' ? 'rgba(255,211,105,0.92)' : 'rgba(255,218,121,0.5)';
-  ctx.fillRect(48, 18, 24, 29);
+  roundRect(49, 20, 27, 34, 2);
+  ctx.fill();
+  drawPalm(138, 12, 0.85);
+  ctx.restore();
+}
+
+function drawPalm(x, y, s) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  ctx.strokeStyle = '#44301d';
+  ctx.lineWidth = 8;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, 62);
+  ctx.quadraticCurveTo(6, 30, -4, 0);
+  ctx.stroke();
+  ctx.strokeStyle = '#23482d';
+  ctx.lineWidth = 7;
+  for (let i = 0; i < 7; i++) {
+    const a = -Math.PI * 0.95 + i * 0.35;
+    ctx.beginPath();
+    ctx.moveTo(-4, 0);
+    ctx.quadraticCurveTo(Math.cos(a) * 32, Math.sin(a) * 18, Math.cos(a) * 58, Math.sin(a) * 30);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -1086,12 +1243,28 @@ function drawBlackLab(x, y, s) {
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(s, s);
+  ctx.shadowColor = 'rgba(0,0,0,0.35)';
+  ctx.shadowBlur = 12;
+  ctx.shadowOffsetY = 5;
   ctx.fillStyle = '#050506';
   ctx.beginPath();
-  ctx.ellipse(0, 0, 30, 12, -0.08, 0, Math.PI * 2);
+  ctx.ellipse(0, 0, 35, 13, -0.08, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
-  ctx.arc(29, -12, 12, 0, Math.PI * 2);
+  ctx.arc(33, -13, 13, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(255,255,255,0.14)';
+  ctx.beginPath();
+  ctx.ellipse(12, -6, 13, 3, -0.05, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#030304';
+  ctx.beginPath();
+  ctx.ellipse(42, -7, 7, 10, 0.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#c7d6df';
+  ctx.beginPath();
+  ctx.arc(37, -16, 1.4, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = '#070707';
   ctx.lineWidth = 8;
@@ -1107,18 +1280,25 @@ function drawBarAndAlhena(x, y) {
   const a = ALHENA[state.alhena % ALHENA.length];
   ctx.save();
   ctx.translate(x, y);
+  ctx.shadowColor = 'rgba(0,0,0,0.42)';
+  ctx.shadowBlur = 20;
+  ctx.shadowOffsetY = 9;
   const barGrad = ctx.createLinearGradient(-80, 0, 80, 80);
   barGrad.addColorStop(0, '#5b351e');
   barGrad.addColorStop(1, '#1b100b');
   ctx.fillStyle = barGrad;
-  roundRect(-86, 32, 150, 58, 4);
+  roundRect(-94, 34, 170, 64, 5);
   ctx.fill();
+  ctx.shadowBlur = 0;
   ctx.fillStyle = '#122f32';
-  roundRect(-96, 20, 170, 13, 7);
+  roundRect(-106, 20, 194, 15, 8);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  roundRect(-98, 22, 72, 5, 3);
   ctx.fill();
   ctx.fillStyle = 'rgba(255,221,120,0.64)';
   ctx.font = '9px DM Sans';
-  ctx.fillText('ALHENA', -54, 60);
+  ctx.fillText('ALHENA', -64, 66);
 
   ctx.fillStyle = a.dress;
   ctx.beginPath();
@@ -1151,35 +1331,35 @@ function drawBarAndAlhena(x, y) {
 
 function drawRod(t) {
   const w = state.w, h = state.h;
-  const baseX = w - 62;
-  const baseY = h - 44;
+  const baseX = w - 70;
+  const baseY = h - 18;
   const castLift = state.mode === 'waiting' ? Math.min(1, (performance.now() - state.lastCastAt) / 420) : 0;
   const biteShake = state.mode === 'bite' ? Math.sin(t * 0.045) * 5 : 0;
-  const tipX = w * 0.69 - castLift * 80;
-  const tipY = h * 0.71 - castLift * 70 + biteShake;
+  const tipX = w * 0.74 - castLift * 92;
+  const tipY = h * 0.735 - castLift * 88 + biteShake;
 
   ctx.save();
   ctx.strokeLinecap = 'round';
   ctx.strokeStyle = '#4b271b';
-  ctx.lineWidth = 22;
+  ctx.lineWidth = 18;
   ctx.beginPath();
   ctx.moveTo(baseX, baseY);
-  ctx.lineTo(baseX + 26, baseY + 52);
+  ctx.lineTo(baseX + 16, baseY + 38);
   ctx.stroke();
 
   const rodGrad = ctx.createLinearGradient(baseX, baseY, tipX, tipY);
   rodGrad.addColorStop(0, '#ffe19a');
   rodGrad.addColorStop(1, '#59401e');
   ctx.strokeStyle = rodGrad;
-  ctx.lineWidth = 8;
+  ctx.lineWidth = 6;
   ctx.beginPath();
-  ctx.moveTo(baseX - 12, baseY - 4);
-  ctx.quadraticCurveTo(w * 0.86, h * 0.77, tipX, tipY);
+  ctx.moveTo(baseX - 7, baseY - 5);
+  ctx.quadraticCurveTo(w * 0.86, h * 0.79, tipX, tipY);
   ctx.stroke();
 
   ctx.fillStyle = '#b7e7f3';
   ctx.beginPath();
-  ctx.arc(baseX - 22, baseY - 4, 17, 0, Math.PI * 2);
+  ctx.arc(baseX - 18, baseY - 5, 13, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = 'rgba(255,255,255,0.46)';
   ctx.lineWidth = 2;
