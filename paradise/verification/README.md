@@ -96,6 +96,16 @@ taken with Playwright Chromium at `1440x900`.
 - `paradise-game-v2-textured-dog.png`: live V2 focused dog capture after adding
   procedural fur texture/bump detail. Still rejected as AAA-quality because the
   animal needs a skeletal dog asset and authored gait clips.
+- `paradise-game-v2-lit-shore.png`: live V2 shore capture after adding stronger
+  hemisphere/ocean fill, warm practical lights, shadow-bias tuning, brighter
+  wood/glass response, and geometry-based palms/sea-grass for stronger beach
+  silhouette and scale.
+- `paradise-game-v2-lit-bar.png`: live V2 bar capture from the same lighting and
+  environment pass. It verifies the bartender is more readable but still proves
+  the need for a real rigged character asset.
+- `paradise-game-v2-lit-dog.png`: live V2 dog capture from the same lighting and
+  environment pass. It verifies better material readability and beach context,
+  while preserving the conclusion that the dog must become a skeletal GLB.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.
