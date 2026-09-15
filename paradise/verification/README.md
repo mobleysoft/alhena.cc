@@ -157,6 +157,11 @@ taken with Playwright Chromium at `1440x900`.
   near-surface silhouettes/glints so fish activity remains visible through the
   opaque spectral ocean. This improves gameplay readability, but realistic fish
   still require authored meshes, animations, and water-material integration.
+- `paradise-game-v2-shorebreak.png`: live shore capture after adding procedural
+  shorebreak wash texture, layered animated surf sheets, weather-reactive foam
+  opacity, and moving shallow-water highlights at the beach/ocean boundary. This
+  makes the shoreline transition more legible and less like two intersecting
+  planes, while still requiring authored terrain/water integration for AAA.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.
