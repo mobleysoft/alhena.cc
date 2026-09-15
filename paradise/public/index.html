@@ -1222,6 +1222,15 @@ function drawWater(t, time, weather) {
   ctx.rect(0, top, w, bottom - top);
   ctx.clip();
 
+  if (waterProgram) {
+    drawShaderWaterForeground(t, top, bottom, time, weather);
+    drawFishShadows(t, top, bottom);
+    drawBobber(t);
+    drawSplashes(t);
+    ctx.restore();
+    return;
+  }
+
   for (let layer = 0; layer < 16; layer++) {
     const depth = layer / 15;
     const y = top + depth * (bottom - top);
@@ -1273,6 +1282,49 @@ function drawWater(t, time, weather) {
   drawFishShadows(t, top, bottom);
   drawBobber(t);
   drawSplashes(t);
+  ctx.restore();
+}
+
+function drawShaderWaterForeground(t, top, bottom, time, weather) {
+  const w = state.w;
+  const height = bottom - top;
+  const foamBase = top + height * 0.91;
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  for (let i = 0; i < 6; i++) {
+    const y = foamBase + i * 4 + Math.sin(t * 0.0014 + i) * (2 + weather.wave * 4);
+    const alpha = (0.035 + i * 0.010) * (0.72 + weather.foam);
+    ctx.strokeStyle = `rgba(237,253,255,${alpha})`;
+    ctx.lineWidth = 1.0 + i * 0.45;
+    ctx.beginPath();
+    for (let x = -30; x <= w + 30; x += 18) {
+      const yy = y
+        + Math.sin(x * 0.013 + t * 0.0021 + i * 1.7) * (2.2 + i * 0.8)
+        + Math.sin(x * 0.047 - t * 0.0014) * 1.2;
+      if (x === -30) ctx.moveTo(x, yy);
+      else ctx.lineTo(x, yy);
+    }
+    ctx.stroke();
+  }
+
+  const sunTrack = state.w * time.sunX;
+  for (let i = 0; i < 24; i++) {
+    const depth = i / 23;
+    const x = sunTrack + Math.sin(i * 7.37 + t * 0.002) * (36 + depth * 420);
+    const y = top + height * (0.10 + depth * 0.72);
+    const rx = 14 + depth * 80 + weather.chop * 22;
+    const ry = 2 + depth * 10;
+    const alpha = (0.018 + time.light * 0.055) * (1 - depth * 0.48) * (1 - weather.cloud * 0.52);
+    drawGaussianBlob(x, y, rx, ry, `rgba(255,229,150,${alpha})`, 0.18);
+  }
+
+  ctx.globalCompositeOperation = 'multiply';
+  for (let i = 0; i < 8; i++) {
+    const depth = i / 7;
+    const y = top + height * (0.14 + depth * 0.70) + Math.sin(t * 0.001 + i) * 8;
+    const x = ((i * 233 + t * (0.018 + depth * 0.016)) % (w + 420)) - 210;
+    drawGaussianBlob(x, y, 190 + depth * 330, 10 + depth * 28, `rgba(7,18,24,${0.016 + depth * 0.030})`, 0.08);
+  }
   ctx.restore();
 }
 
