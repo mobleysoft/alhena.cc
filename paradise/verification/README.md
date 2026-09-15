@@ -210,6 +210,13 @@ taken with Playwright Chromium at `1440x900`.
   spectrum, analytical normals, Fresnel/sky reflection, subsurface color, foam,
   fog, and ACES-style tone mapping. In `view=water`, shore props and the V2 mesh
   water are hidden so the proven optical shader can be evaluated directly.
+- `paradise-game-v2-pure-pandorachat-water-study.png`: live clean water capture
+  after hiding all Three.js shore/atmosphere placeholders in `view=water`, making
+  the PandoraChat-style full-screen shader the sole visible water/sky renderer.
+- `paradise-game-v2-storm-water-horizon-correction.png`: live capture showing
+  the shader’s weather coupling pass: storm now cools/darkens the sky and water,
+  lowers the foam threshold, reduces golden sun contribution, and removes the
+  placeholder island/atmosphere-card horizon slab from the clean water view.
 - `paradise-game-v2-dog-four-beat-gait.png`: live dog-focused capture after
   replacing simple sine bobbing with a procedural quadruped stand-in that stores
   base transforms, offsets paw/hock/shoulder phases, plants paws, sniffs, wags,

@@ -654,6 +654,7 @@ function makePandoraOceanPass(canvas) {
     uniform float uWind;
     uniform float uChop;
     uniform float uFoamT;
+    uniform float uStorm;
     uniform vec3 uSkyTint;
     const float PI = 3.14159265359;
     const float TAU = 6.28318530718;
@@ -731,16 +732,19 @@ function makePandoraOceanPass(canvas) {
       return normalize(macro + vec3(capillary.x + windRipple.x, 0.0, capillary.y + windRipple.y) * (0.10 + uWind * 0.014));
     }
     vec3 skyColor(vec2 uv) {
-      vec3 zenith = uSkyTint * 2.5 + vec3(0.035, 0.08, 0.15);
-      vec3 horizonCol = mix(vec3(0.30, 0.47, 0.55), vec3(0.70, 0.52, 0.28), uGold * 0.36);
+      vec3 zenith = mix(uSkyTint * 2.5 + vec3(0.035, 0.08, 0.15), vec3(0.12, 0.18, 0.22), uStorm * .72);
+      vec3 horizonCol = mix(vec3(0.36, 0.54, 0.58), vec3(0.64, 0.50, 0.36), uGold * 0.24);
+      horizonCol = mix(horizonCol, vec3(0.25, 0.31, 0.33), uStorm * .68);
       vec3 sky = mix(horizonCol, zenith, smoothstep(0.36, 1.0, uv.y));
       vec2 sunUv = vec2(0.34, 0.58);
       float sun = exp(-distance(uv, sunUv) * 18.0);
       float glow = exp(-distance(uv, sunUv) * 3.7);
       float clouds = smoothstep(0.48, 0.78, fbm(vec2(uv.x * 3.2 + uTime * .008, uv.y * 5.5)));
       clouds *= smoothstep(0.45, 0.82, uv.y) * smoothstep(1.08, 0.72, uv.y);
-      sky = mix(sky, vec3(0.78, 0.86, 0.90), clouds * (0.07 + uGold * 0.06));
-      sky += vec3(1.0, 0.70, 0.32) * (sun * .48 + glow * .055) * uGold;
+      float veil = smoothstep(.28, .54, fbm(vec2(uv.x * 1.2 - uTime * .006, uv.y * 7.0 + 4.0)));
+      sky = mix(sky, mix(vec3(0.78, 0.86, 0.90), vec3(.42,.48,.50), uStorm), clouds * (0.07 + uGold * 0.06 + uStorm * .22));
+      sky = mix(sky, vec3(.52,.58,.58), veil * smoothstep(.30, .55, uv.y) * smoothstep(.90, .52, uv.y) * (.06 + uStorm * .18));
+      sky += vec3(1.0, 0.70, 0.32) * (sun * .48 + glow * .055) * uGold * (1.0 - uStorm * .74);
       return sky;
     }
     vec3 acesTone(vec3 x) {
@@ -759,9 +763,9 @@ function makePandoraOceanPass(canvas) {
       vec3 viewDir = normalize(vec3(q.x * .48, d * .42 + .13, 1.0));
       float fresnel = 0.0204 + 0.9796 * pow(1.0 - clamp(dot(n, viewDir), 0.0, 1.0), 5.0);
       vec3 refl = skyColor(vec2(uv.x + n.x * .095, horizon + d * .60 + n.z * .075));
-      vec3 deep = vec3(0.001, 0.020, 0.085);
-      vec3 mid = vec3(0.004, 0.112, 0.185);
-      vec3 shallow = vec3(0.018, 0.215, 0.285);
+      vec3 deep = mix(vec3(0.001, 0.020, 0.085), vec3(0.001, 0.014, 0.026), uStorm);
+      vec3 mid = mix(vec3(0.004, 0.112, 0.185), vec3(0.018, 0.080, 0.105), uStorm);
+      vec3 shallow = mix(vec3(0.018, 0.215, 0.285), vec3(0.070, 0.165, 0.180), uStorm);
       float nearShore = smoothstep(0.55, 1.0, d);
       float farDepth = smoothstep(0.07, 0.42, d) * (1.0 - nearShore * 0.44);
       vec3 body = mix(mid, shallow, nearShore);
@@ -773,7 +777,7 @@ function makePandoraOceanPass(canvas) {
       body += vec3(0.0, 0.20, 0.23) * curvature * 0.16;
       float crestEnergy = smoothstep(0.10, 0.48, abs(h)) * max(slope, curvature);
       float foamNoise = fbm(p * 5.6 + vec2(uTime * .08, -uTime * .05));
-      float microFoam = smoothstep(uFoamT * .50, uFoamT * 1.18, abs(h)) * smoothstep(.48, .84, foamNoise);
+      float microFoam = smoothstep(uFoamT * .42, uFoamT * 1.04, abs(h)) * smoothstep(.42 - uStorm * .10, .84, foamNoise);
       float shoreLine = 0.218 + 0.012 * sin(q.x * 3.4 + uTime * .18);
       float shoreFoam = smoothstep(0.030, 0.0, abs(uv.y - shoreLine)) * smoothstep(.34, .82, fbm(vec2(q.x * 24.0, uTime * .42)));
       float foam = clamp(crestEnergy * microFoam + smoothstep(0.08, 0.38, -sample.curvature) * .26 + shoreFoam * .50, 0.0, .86);
@@ -785,7 +789,8 @@ function makePandoraOceanPass(canvas) {
       float glints = smoothstep(.62, .96, fbm(p * 31.0 + vec2(uTime * .55, -uTime * .21)));
       water += vec3(1.0, .84, .46) * spec * glints * (0.9 + uGold * 1.6);
       water = mix(water, vec3(.88, .97, .99), foam * .46);
-      water = mix(water, mix(vec3(.20, .33, .39), vec3(.58, .67, .67), uGold * .14), smoothstep(0.24, 0.0, d) * .28);
+      water = mix(water, mix(vec3(.20, .33, .39), vec3(.58, .67, .67), uGold * .14), smoothstep(0.24, 0.0, d) * (.28 + uStorm * .20));
+      water = mix(water, vec3(.03,.09,.105), uStorm * smoothstep(.08, .78, d) * .22);
       return water;
     }
     void main() {
@@ -824,6 +829,7 @@ function makePandoraOceanPass(canvas) {
     wind: gl.getUniformLocation(program, 'uWind'),
     chop: gl.getUniformLocation(program, 'uChop'),
     foamT: gl.getUniformLocation(program, 'uFoamT'),
+    storm: gl.getUniformLocation(program, 'uStorm'),
     skyTint: gl.getUniformLocation(program, 'uSkyTint')
   };
   return {
@@ -846,6 +852,7 @@ function makePandoraOceanPass(canvas) {
       gl.uniform1f(uniforms.wind, preset.wind);
       gl.uniform1f(uniforms.chop, preset.chop);
       gl.uniform1f(uniforms.foamT, preset.foamT);
+      gl.uniform1f(uniforms.storm, preset.storm);
       gl.uniform3f(uniforms.skyTint, preset.skyTint[0], preset.skyTint[1], preset.skyTint[2]);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
@@ -853,7 +860,7 @@ function makePandoraOceanPass(canvas) {
 }
 
 const pandoraOceanPass = makePandoraOceanPass(oceanCanvas);
-let pandoraOceanPreset = { gold: 1.0, wind: 10.8, chop: 1.0, foamT: .32, skyTint: [.08, .18, .32] };
+let pandoraOceanPreset = { gold: 1.0, wind: 10.8, chop: 1.0, foamT: .32, storm: 0.0, skyTint: [.08, .18, .32] };
 if (pandoraOceanPass) skyDome.visible = false;
 
 const oceanUniforms = {
@@ -2006,6 +2013,7 @@ function applyEnvironment(timeName = activeTime, weatherName = activeWeather) {
     wind: weather.wind,
     chop: THREE.MathUtils.clamp(weather.wind / 10.8, .62, 1.72),
     foamT: THREE.MathUtils.clamp(.48 / Math.max(weather.foam, .48), .22, .62),
+    storm: activeWeather === 'storm' ? 1.0 : activeWeather === 'breeze' ? .15 : 0.0,
     skyTint: [sky.r * .36, sky.g * .42, sky.b * .54]
   };
   document.querySelectorAll('[data-time]').forEach(b => b.classList.toggle('active', b.dataset.time === activeTime));
@@ -2019,12 +2027,21 @@ function setView(name) {
   const waterStudy = name === 'water';
   const hideForWaterStudy = [
     /^v2-sculpted-beach/,
+    /^v2-low-sun/,
+    /^v2-volumetric-sun/,
+    /^v2-cinematic-atmospheric/,
+    /^v2-golden-hour-volumetric/,
+    /^v2-layered-atmospheric-cloud/,
+    /^v2-soft-horizon-cloud/,
+    /^v2-ocean-horizon-haze/,
+    /^v2-layered-depth-mist/,
     /^v2-reflective-wet-sand/,
     /^v2-layered-shorebreak/,
     /^v2-animated-shoreline/,
     /^v2-weathered-dock/,
     /^v2-dock-/,
     /^v2-coiled-rope/,
+    /^v2-atmospheric-distant-island/,
     /^v2-beach-house/,
     /^v2-beach-shell/,
     /^v2-beach-pebble/,

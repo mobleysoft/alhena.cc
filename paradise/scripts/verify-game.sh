@@ -92,6 +92,7 @@ v2_markers=(
   "v2-jonswap-displaced-ocean-mesh"
   "v2-pandorachat-fullscreen-ocean-pass"
   "v2-pandorachat-jonswap-fresnel-water-optics-overlay"
+  "uStorm"
   "v2-pbr-sky-ocean-environment-map"
   "v2-layered-shorebreak-wash-sheet"
   "v2-layered-atmospheric-cloud-bank"
