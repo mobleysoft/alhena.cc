@@ -227,6 +227,7 @@ const canonicalPandoraWaterOnly = query.get('watermesh') !== '1';
 const experimentalShallowWater = query.get('shallowwater') === '1';
 const useDogBillboard = query.get('dogmesh') !== '1';
 const useAlhenaBillboard = query.get('alhenamesh') !== '1';
+const useBarBillboard = query.get('barmesh') !== '1';
 document.body.classList.toggle('presentation', presentation);
 document.body.classList.toggle('clean', query.get('clean') === '1');
 document.body.dataset.waterArchitecture = canonicalPandoraWaterOnly
@@ -1390,6 +1391,30 @@ for (const x of [5.15, 6.35, 9.05, 10.45]) {
   cyl('v2-low-beach-bar-stool-post', .06, .72, [x, .36, 5.18], [0,0,0], darkWoodMat, 12);
   cyl('v2-low-beach-bar-stool-seat', .28, .08, [x, .74, 5.18], [0,0,0], woodMat, 24);
 }
+const barBillboardTexture = new THREE.TextureLoader().load('/assets/beach-bar-billboard.png');
+barBillboardTexture.colorSpace = THREE.SRGBColorSpace;
+barBillboardTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+const barBillboard = new THREE.Group();
+barBillboard.name = 'v2-high-fidelity-transparent-beach-bar-billboard';
+barBillboard.position.set(7.7, 1.55, 4.24);
+const barCard = new THREE.Mesh(
+  new THREE.PlaneGeometry(8.4, 5.6),
+  new THREE.MeshBasicMaterial({
+    map: barBillboardTexture,
+    transparent: true,
+    alphaTest: .05,
+    depthWrite: false,
+    toneMapped: true
+  })
+);
+barCard.name = 'v2-beach-bar-photo-cutout-card';
+barCard.position.y = .72;
+barBillboard.add(barCard);
+barBillboard.visible = useBarBillboard;
+scene.add(barBillboard);
+const barBillboardShadow = contactShadow('v2-beach-bar-billboard-contact-shadow', 7.7, 5.25, 4.05, .92, .22);
+barBillboardShadow.visible = useBarBillboard;
+
 const shellMat = new THREE.MeshStandardMaterial({ color: 0xf3dfb6, roughness: .6 });
 const pebbleMat = new THREE.MeshStandardMaterial({ color: 0x5e5144, roughness: .92 });
 const tidePoolMat = new THREE.MeshPhysicalMaterial({
@@ -2170,7 +2195,12 @@ function setView(name) {
   scene.traverse(obj => {
     if (!obj.name) return;
     if (hideForWaterStudy.some(pattern => pattern.test(obj.name))) obj.visible = !waterStudy;
+    if (/^v2-bar/.test(obj.name) || /^v2-glass-bottle/.test(obj.name) || /^v2-low-beach-bar/.test(obj.name)) {
+      obj.visible = !waterStudy && !useBarBillboard;
+    }
   });
+  barBillboard.visible = !waterStudy && useBarBillboard;
+  barBillboardShadow.visible = !waterStudy && useBarBillboard;
   dog.visible = !waterStudy && !useDogBillboard;
   dogBillboard.visible = !waterStudy && useDogBillboard;
   dogBillboardShadow.visible = !waterStudy && useDogBillboard;
@@ -2273,6 +2303,9 @@ function animate() {
   alhenaBillboard.lookAt(new THREE.Vector3(camera.position.x, alhenaBillboard.position.y, camera.position.z));
   alhenaBillboard.rotation.z = Math.sin(t * .58) * .010;
   alhenaBillboardShadow.material.opacity = useAlhenaBillboard ? .15 + Math.sin(t * .7) * .012 : 0;
+  barBillboard.lookAt(new THREE.Vector3(camera.position.x, barBillboard.position.y, camera.position.z));
+  barBillboard.rotation.z = Math.sin(t * .18) * .004;
+  barBillboardShadow.material.opacity = useBarBillboard ? .18 + Math.sin(t * .38) * .010 : 0;
   const sniff = Math.sin(t * .36);
   const stepClock = t * (play.bite ? 6.2 : 3.15);
   dog.name = 'v2-black-lab-procedural-four-beat-gait-standin';

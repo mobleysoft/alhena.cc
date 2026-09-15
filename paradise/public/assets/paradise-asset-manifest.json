@@ -47,6 +47,20 @@
       ]
     },
     {
+      "id": "beach_bar_billboard",
+      "type": "transparent-environment-card",
+      "targetPath": "/assets/beach-bar-billboard.png",
+      "status": "active",
+      "loadByDefault": true,
+      "currentFallback": "procedural bar mesh behind ?barmesh=1",
+      "requirements": [
+        "transparent high-resolution beach bar cutout",
+        "grounded contact shadow",
+        "subtle idle presentation motion",
+        "future replacement by authored GLB/PBR environment kit"
+      ]
+    },
+    {
       "id": "black_lab_rig",
       "type": "rigged-animal",
       "targetPath": "/assets/models/black-lab.glb",
