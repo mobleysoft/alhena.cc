@@ -1128,6 +1128,42 @@ water.receiveShadow = true;
 water.visible = query.get('meshwater') === '1';
 scene.add(water);
 
+let reflectiveWater = null;
+async function installExperimentalReflectiveWater() {
+  if (query.get('water3d') !== '1') return;
+  try {
+    const { Water } = await import('https://unpkg.com/three@0.168.0/examples/jsm/objects/Water.js');
+    const waterNormals = new THREE.TextureLoader().load(
+      'https://unpkg.com/three@0.168.0/examples/textures/waternormals.jpg',
+      texture => {
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+        texture.colorSpace = THREE.NoColorSpace;
+      }
+    );
+    reflectiveWater = new Water(
+      new THREE.PlaneGeometry(190, 86, 1, 1),
+      {
+        textureWidth: qualityMode === 'cinematic' ? 1024 : 512,
+        textureHeight: qualityMode === 'cinematic' ? 1024 : 512,
+        waterNormals,
+        sunDirection: new THREE.Vector3().copy(sun.position).normalize(),
+        sunColor: 0xffd276,
+        waterColor: 0x0b4151,
+        distortionScale: .72,
+        fog: true
+      }
+    );
+    reflectiveWater.name = 'threejs-reflective-water-surface-experimental';
+    reflectiveWater.rotation.x = -Math.PI / 2;
+    reflectiveWater.position.set(0, -0.09, -54);
+    reflectiveWater.renderOrder = -1;
+    scene.add(reflectiveWater);
+  } catch (err) {
+    runtime.runtimeErrors.push(`water3d import failed: ${err.message}`);
+    setStatus('Experimental Water.js import failed; shader ocean remains active.');
+  }
+}
+
 const oceanRidgeMat = new THREE.LineBasicMaterial({
   color: 0x9fe8e2,
   transparent: true,
@@ -2125,6 +2161,11 @@ function setPreset(name) {
   renderer.toneMappingExposure = activePreset.exposure;
   sun.position.set(...activePreset.sun);
   sun.color.setHex(activePreset.sunColor);
+  if (reflectiveWater) {
+    reflectiveWater.material.uniforms.sunDirection.value.copy(sun.position).normalize();
+    reflectiveWater.material.uniforms.sunColor.value.setHex(activePreset.sunColor);
+    reflectiveWater.material.uniforms.waterColor.value.setHex(activePreset === presets.storm ? 0x0b2230 : 0x0b4151);
+  }
   waterUniforms.uWind.value = activePreset.wind;
   waterUniforms.uFoamT.value = activePreset.foam;
   waterUniforms.uSkyTint.value.set(...activePreset.skyTint);
@@ -2242,6 +2283,7 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 setPreset('dawn');
+installExperimentalReflectiveWater();
 applyInitialPresentationState();
 
 let lastNow = performance.now();
@@ -2276,6 +2318,7 @@ function animate(now) {
   oceanPass?.render(t, activePreset);
   waterUniforms.uTime.value = t;
   skyUniforms.uTime.value = t;
+  if (reflectiveWater) reflectiveWater.material.uniforms.time.value = t * .48;
   sunDisk.lookAt(camera.position);
   sunHalo.lookAt(camera.position);
   wetSandReflection.position.x = -13.5 + Math.sin(t * .18) * .7;

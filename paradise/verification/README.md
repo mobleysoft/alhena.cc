@@ -12,6 +12,11 @@ taken with Playwright Chromium at `1440x900`.
 - `paradise-material-cinematic.png`: production capture after adding a warmer sun
   halo, wet-sand reflection, and beach microgeometry for stronger foreground
   material read.
+- `paradise-water3d-cinematic.png`: first `water3d=1` capture using Three.js
+  `Water`; rejected because it flooded the foreground and washed out the beach.
+- `paradise-water3d-offshore-cinematic.png`: adjusted `water3d=1` capture after
+  lazy-loading the dependency and moving the reflector offshore; still kept
+  experimental because the visible banding is weaker than the shader-first path.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.
