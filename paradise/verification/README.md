@@ -179,6 +179,12 @@ taken with Playwright Chromium at `1440x900`.
   correct browser-shader direction, but still not the final AAA path; the scene
   needs authored 3D assets, PBR materials, and likely a Godot/Web export or
   equivalent asset pipeline for the next major leap.
+- `paradise-game-v2-pbr-environment-soft-shadows.png`: live clean shore capture
+  after adding a generated equirectangular sky/ocean environment map for PBR
+  material reflections and disabling the harsh large-object sun shadows that
+  made the placeholder house/bar geometry cast ugly rectangular blocks across
+  the sand. This gives the current Three.js build a cleaner presentation
+  baseline while preserving the finding that real authored assets are required.
 - `scripts/verify-game.sh`: production verifier now covers the legacy canvas
   game, the root launcher, and the primary `/game-v2/` route. It syntax-checks
   both module scripts, validates asset budgets, checks root CTA markers, and
