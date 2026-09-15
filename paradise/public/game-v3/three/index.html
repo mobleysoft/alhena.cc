@@ -150,6 +150,57 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
   .hud p { display: none; }
   .row { margin-top: 10px; }
 }
+@media (orientation: landscape) and (max-height: 520px) {
+  .hud {
+    left: max(10px, env(safe-area-inset-left));
+    top: auto;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    width: min(680px, calc(100vw - 20px));
+    padding: 10px;
+    border-radius: 18px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .kicker {
+    font-size: 8px;
+    letter-spacing: .16em;
+  }
+  h1,
+  .hud p {
+    display: none;
+  }
+  .row {
+    margin-top: 0;
+    gap: 6px;
+  }
+  button,
+  a.button {
+    min-height: 34px;
+    padding: 8px 10px;
+    font-size: 9px;
+    letter-spacing: .11em;
+  }
+  .play-row {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr .8fr;
+  }
+  .play-row button,
+  .play-row #cast-reel {
+    min-width: 0;
+    width: 100%;
+  }
+  .readout {
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    font-size: 8px;
+    padding: 8px 10px;
+    max-width: 32vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
 </style>
 <script type="importmap">
 {
