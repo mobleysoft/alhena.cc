@@ -397,9 +397,9 @@ body.started .hud { opacity: 1; transform: none; }
   <div class="intro-card">
     <div class="intro-kicker">Alhena presents</div>
     <div class="intro-title">Paradise</div>
-    <p class="intro-copy">A quiet shoreline, a fishing rod, a black lab in the sand, and an ocean whose color follows the day and the weather.</p>
-    <button class="start" id="start">Enter the shore</button>
-    <a class="rebuild-link" href="/game-v2/">Preview 3D rebuild</a>
+    <p class="intro-copy">A 3D shoreline fishing prototype with a PandoraChat-style spectral ocean shader, time-of-day lighting, weather-driven water, a beach bar, Alhena, and a black lab in the sand.</p>
+    <button class="start" id="start">Launch 3D shore</button>
+    <a class="rebuild-link" href="/game/?view=ocean&quality=cinematic">Legacy canvas prototype</a>
   </div>
 </section>
 
@@ -2699,6 +2699,8 @@ function drawFilmGrade(t, time, weather) {
 }
 
 startBtn.addEventListener('click', () => {
+  window.location.href = '/game-v2/?view=shore&time=dawn&weather=breeze&quality=cinematic';
+  return;
   state.started = true;
   document.body.classList.add('started');
   intro.classList.add('hidden');

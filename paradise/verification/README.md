@@ -131,6 +131,12 @@ taken with Playwright Chromium at `1440x900`.
   foam/shore streaks, fog, and tone mapping. It proves the intended water
   framework is active, while still showing that photorealism requires a proper
   authored 3D/PBR pipeline rather than more placeholder scene hacking.
+- `paradise-root-v2-primary.png`: live root-page capture after promoting the
+  verified `/game-v2/` Three.js rebuild to the primary Paradise entry point.
+  Playwright verified that clicking the root CTA navigates to
+  `/game-v2/?view=shore&time=dawn&weather=breeze&quality=cinematic` with a
+  rendered canvas and zero browser/runtime errors. The older canvas prototype is
+  still preserved as a legacy link.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.
