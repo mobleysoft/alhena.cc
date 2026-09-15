@@ -128,7 +128,7 @@ body.started .hint { opacity: 1; }
 body.cinematic .hint {
   opacity: 0.34;
 }
-body.cinematic .hud {
+body.started.cinematic .hud {
   opacity: 0;
   transform: translateY(-10px);
   pointer-events: none;
@@ -391,6 +391,7 @@ body.started .hud { opacity: 1; transform: none; }
       <button id="clear">clear</button>
       <button id="motion">enable motion</button>
       <button id="face">Alhena</button>
+      <button id="view">view</button>
     </div>
   </section>
 
@@ -433,6 +434,7 @@ const castBtn = document.getElementById('cast');
 const clearBtn = document.getElementById('clear');
 const motionBtn = document.getElementById('motion');
 const faceBtn = document.getElementById('face');
+const viewBtn = document.getElementById('view');
 const statusEl = document.getElementById('status');
 const countEl = document.getElementById('count');
 const meterEl = document.getElementById('meter');
@@ -844,6 +846,7 @@ function updateControlState() {
 function setCinematic(enabled) {
   state.cinematic = enabled;
   document.body.classList.toggle('cinematic', enabled);
+  viewBtn.textContent = enabled ? 'controls' : 'view';
   hintEl.textContent = enabled
     ? 'Cinematic view · press C or double-tap to restore controls'
     : 'Tap/click to cast · space reels · C or double-tap hides controls';
@@ -1141,6 +1144,8 @@ function drawWater(t, time, weather) {
     ctx.stroke();
   }
 
+  drawMolecularSurface(t, top, bottom, time, weather);
+
   const foamY = h * 0.85 + Math.sin(t * 0.0016) * 4;
   const foam = ctx.createLinearGradient(0, foamY - 12, 0, foamY + 18);
   foam.addColorStop(0, 'rgba(255,255,255,0)');
@@ -1170,6 +1175,37 @@ function drawWater(t, time, weather) {
 
   drawFishShadows(t, top, bottom);
   drawBobber(t);
+  ctx.restore();
+}
+
+function drawMolecularSurface(t, top, bottom, time, weather) {
+  const w = state.w;
+  const height = bottom - top;
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  ctx.lineWidth = 0.75;
+  for (let row = 0; row < 7; row++) {
+    const depth = row / 6;
+    const y = top + height * (0.18 + depth * 0.7);
+    const spacing = 44 + depth * 34;
+    const drift = (t * (0.007 + depth * 0.012) + row * 91) % spacing;
+    for (let x = -spacing; x < w + spacing; x += spacing) {
+      const px = x + drift + Math.sin(row * 4.7 + t * 0.0014) * 18;
+      const py = y + Math.sin(px * 0.012 + t * 0.002 + row) * (4 + weather.wave * 6);
+      const qx = px + spacing * 0.52;
+      const qy = py + Math.sin(qx * 0.018 - t * 0.0017) * (3 + weather.chop * 7);
+      const alpha = (0.014 + time.light * 0.018) * (1 - depth * 0.42);
+      ctx.strokeStyle = `rgba(210,252,255,${alpha})`;
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(qx, qy);
+      ctx.stroke();
+      ctx.fillStyle = `rgba(245,255,255,${alpha * 2.2})`;
+      ctx.beginPath();
+      ctx.arc(px, py, 1.1 + depth * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
   ctx.restore();
 }
 
@@ -1256,6 +1292,7 @@ function drawShore(t, time) {
   drawSandGrain(t, y, time);
   drawWetSandCaustics(t, y, time);
   drawShellsAndPebbles(t, y, time);
+  drawFootprintsAndTideWrack(t, y, time);
   drawBeachHouse(w * 0.11, h * 0.735, 1.14, time);
   drawBlackLab(w * 0.31, h * 0.82, 1.18);
   drawForegroundPlants(w * 0.965, h * 0.87, 1.0, time);
@@ -1298,6 +1335,33 @@ function drawShellsAndPebbles(t, shoreTop, time) {
     ctx.beginPath();
     ctx.ellipse(x, y, 2.8 * s, 1.5 * s, Math.sin(i * 2.1), 0, Math.PI * 2);
     ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawFootprintsAndTideWrack(t, shoreTop, time) {
+  const w = state.w, h = state.h;
+  ctx.save();
+  ctx.globalAlpha = 0.17 + time.light * 0.14;
+  ctx.fillStyle = 'rgba(78,52,31,0.45)';
+  for (let i = 0; i < 11; i++) {
+    const x = w * 0.38 + i * 28;
+    const y = shoreTop + 42 + Math.sin(i * 0.9) * 8;
+    ctx.beginPath();
+    ctx.ellipse(x, y, 5, 2.3, -0.48, 0, Math.PI * 2);
+    ctx.ellipse(x + 10, y + 8, 5, 2.3, -0.48, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.strokeStyle = 'rgba(65,58,30,0.32)';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 26; i++) {
+    const x = (i * 83.5 + 37) % w;
+    const y = shoreTop + 18 + ((i * 29.7) % Math.max(20, h - shoreTop - 60));
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.quadraticCurveTo(x + 8, y - 3, x + 18, y + Math.sin(t * 0.001 + i) * 3);
+    ctx.stroke();
   }
   ctx.restore();
 }
@@ -1366,11 +1430,30 @@ function drawBeachHouse(x, y, s, time) {
   ctx.fillStyle = siding;
   roundRect(0, 0, 130, 62, 2);
   ctx.fill();
+  const side = ctx.createLinearGradient(130, 2, 162, 58);
+  side.addColorStop(0, mix('#65371f', '#120a07', 1 - time.light));
+  side.addColorStop(1, mix('#3d2416', '#050302', 1 - time.light));
+  ctx.fillStyle = side;
+  ctx.beginPath();
+  ctx.moveTo(130, 0);
+  ctx.lineTo(162, 17);
+  ctx.lineTo(162, 58);
+  ctx.lineTo(130, 62);
+  ctx.closePath();
+  ctx.fill();
   ctx.fillStyle = mix('#7b2b1c', '#1c0c08', 1 - time.light);
   ctx.beginPath();
   ctx.moveTo(-12, 2);
   ctx.lineTo(64, -42);
   ctx.lineTo(142, 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = mix('#4b1b14', '#090403', 1 - time.light);
+  ctx.beginPath();
+  ctx.moveTo(64, -42);
+  ctx.lineTo(142, 2);
+  ctx.lineTo(172, 18);
+  ctx.lineTo(98, -30);
   ctx.closePath();
   ctx.fill();
   ctx.shadowBlur = 0;
@@ -1384,6 +1467,14 @@ function drawBeachHouse(x, y, s, time) {
   ctx.fillStyle = 'rgba(0,0,0,0.24)';
   ctx.fillRect(61, 20, 2, 34);
   ctx.fillRect(49, 35, 27, 2);
+  ctx.strokeStyle = 'rgba(255,236,154,0.34)';
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.moveTo(54 + i * 5, 56);
+    ctx.lineTo(24 + i * 16, 83);
+    ctx.stroke();
+  }
   drawPalm(138, 12, 0.85);
   ctx.restore();
 }
@@ -1425,6 +1516,14 @@ function drawBlackLab(x, y, s) {
   ctx.beginPath();
   ctx.ellipse(0, 0, 35, 13, -0.08, 0, Math.PI * 2);
   ctx.fill();
+  const backSheen = ctx.createLinearGradient(-22, -15, 31, -3);
+  backSheen.addColorStop(0, 'rgba(255,255,255,0.02)');
+  backSheen.addColorStop(0.55, 'rgba(190,215,220,0.18)');
+  backSheen.addColorStop(1, 'rgba(255,255,255,0.01)');
+  ctx.fillStyle = backSheen;
+  ctx.beginPath();
+  ctx.ellipse(4, -7, 26, 5, -0.13, 0, Math.PI * 2);
+  ctx.fill();
   ctx.beginPath();
   ctx.arc(33, -13, 13, 0, Math.PI * 2);
   ctx.fill();
@@ -1444,6 +1543,10 @@ function drawBlackLab(x, y, s) {
   ctx.fillStyle = '#030304';
   ctx.beginPath();
   ctx.ellipse(45, -9, 9, 7, 0.18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#0b0b0c';
+  ctx.beginPath();
+  ctx.ellipse(48, -4, 8, 4, 0.2, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = '#111';
   ctx.beginPath();
@@ -1469,6 +1572,12 @@ function drawBlackLab(x, y, s) {
   ctx.moveTo(-26, -4);
   ctx.quadraticCurveTo(-45, -22, -58, -12);
   ctx.stroke();
+  ctx.fillStyle = 'rgba(225,235,238,0.13)';
+  for (const paw of [-21, -6, 13, 25]) {
+    ctx.beginPath();
+    ctx.ellipse(paw - 5, 23, 6, 2.4, -0.08, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -1494,6 +1603,7 @@ function drawBarAndAlhena(x, y) {
   ctx.fillStyle = 'rgba(255,221,120,0.64)';
   ctx.font = '9px DM Sans';
   ctx.fillText('ALHENA', -64, 66);
+  drawBarDetails(-92, 24);
 
   ctx.strokeStyle = a.skin;
   ctx.lineWidth = 6;
@@ -1550,6 +1660,34 @@ function drawBarAndAlhena(x, y) {
   ctx.lineWidth = 1.4;
   ctx.beginPath();
   ctx.arc(-9, -5, 5, 0.1, Math.PI - 0.1);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawBarDetails(x, y) {
+  ctx.save();
+  ctx.translate(x, y);
+  for (let i = 0; i < 6; i++) {
+    const bx = 28 + i * 21;
+    const h = 16 + (i % 3) * 6;
+    ctx.fillStyle = i % 2 ? 'rgba(43,113,102,0.7)' : 'rgba(152,92,45,0.74)';
+    roundRect(bx, 0 - h, 8, h, 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,244,190,0.38)';
+    ctx.fillRect(bx + 2, -h + 3, 2, h - 5);
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.beginPath();
+  ctx.ellipse(146, -3, 8, 2.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(146, -3);
+  ctx.lineTo(146, -16);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(146, -20, 6, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
 }
@@ -1722,6 +1860,7 @@ castBtn.addEventListener('click', () => {
 
 clearBtn.addEventListener('click', clearLog);
 motionBtn.addEventListener('click', enableMotion);
+viewBtn.addEventListener('click', toggleCinematic);
 faceBtn.addEventListener('click', () => {
   state.alhena = (state.alhena + 1) % ALHENA.length;
   localStorage.setItem('paradise_alhena', String(state.alhena));
