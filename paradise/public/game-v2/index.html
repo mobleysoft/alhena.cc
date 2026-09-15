@@ -760,8 +760,8 @@ function makePandoraOceanPass(canvas) {
     }
     vec3 oceanColor(vec2 uv, vec2 q, float horizon) {
       float d = clamp((horizon - uv.y) / horizon, 0.0, 1.0);
-      float farField = smoothstep(0.010, 0.18, d);
-      float range = min(145.0, 1.0 / max(0.030, pow(d + 0.020, 1.74)));
+      float farField = smoothstep(0.060, 0.30, d);
+      float range = min(96.0, 1.0 / max(0.048, pow(d + 0.040, 1.58)));
       vec2 p = vec2(q.x * range * 2.42, range * 3.95 - uTime * (0.34 + uWind * 0.017));
       p += vec2(sampleJonswapSurface(p * 0.21 + 8.0).h, sampleJonswapSurface(p * 0.17 - 4.0).h) * 0.028 * uChop;
       WaveSample sample = sampleJonswapSurface(p);
@@ -788,7 +788,7 @@ function makePandoraOceanPass(canvas) {
       float foamNoise = fbm(p * 5.6 + vec2(uTime * .08, -uTime * .05));
       float microFoam = smoothstep(uFoamT * .42, uFoamT * 1.04, abs(h)) * smoothstep(.42 - uStorm * .10, .84, foamNoise) * farField;
       float shoreLine = 0.218 + 0.012 * sin(q.x * 3.4 + uTime * .18);
-      float shoreFoam = smoothstep(0.030, 0.0, abs(uv.y - shoreLine)) * smoothstep(.34, .82, fbm(vec2(q.x * 24.0, uTime * .42)));
+      float shoreFoam = smoothstep(0.030, 0.0, abs(uv.y - shoreLine)) * smoothstep(.34, .82, fbm(vec2(q.x * 24.0, uTime * .42))) * farField;
       float foam = clamp(crestEnergy * microFoam + smoothstep(0.08, 0.38, -sample.curvature) * .26 + shoreFoam * .50, 0.0, .86);
       vec3 water = mix(body, refl, fresnel * mix(.36, .68, smoothstep(0.0, 0.18, d)));
       float windLines = smoothstep(.42, .88, fbm(vec2(p.x * .08 + h * 1.7, p.y * .18 - uTime * .26)));
@@ -799,7 +799,7 @@ function makePandoraOceanPass(canvas) {
       water += vec3(1.0, .84, .46) * spec * glints * (0.9 + uGold * 1.6) * farField;
       water = mix(water, vec3(.88, .97, .99), foam * .46);
       water = mix(water, mix(vec3(.20, .33, .39), vec3(.58, .67, .67), uGold * .14), smoothstep(0.24, 0.0, d) * (.28 + uStorm * .20));
-      water = mix(water, vec3(.50, .62, .64), smoothstep(0.18, 0.0, d) * (.70 + uStorm * .20));
+      water = mix(water, vec3(.52, .64, .66), smoothstep(0.30, 0.0, d) * (.88 + uStorm * .10));
       water = mix(water, vec3(.03,.09,.105), uStorm * smoothstep(.08, .78, d) * .22);
       return water;
     }
