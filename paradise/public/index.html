@@ -458,6 +458,8 @@ const catchCard = document.getElementById('catch-card');
 const catchFish = document.getElementById('catch-fish');
 const catchName = document.getElementById('catch-name');
 const hintEl = document.getElementById('hint');
+const labSprite = new Image();
+labSprite.src = './assets/alhena-black-lab.png';
 let waterProgram = null;
 
 const TIMES = {
@@ -1801,6 +1803,10 @@ function drawPalm(x, y, s) {
 }
 
 function drawBlackLab(x, y, s, t, time) {
+  if (labSprite.complete && labSprite.naturalWidth) {
+    drawBlackLabAsset(x, y, s, t, time);
+    return;
+  }
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(s, s);
@@ -1913,6 +1919,28 @@ function drawBlackLab(x, y, s, t, time) {
     ctx.ellipse(paw - 5, 23, 6, 2.4, -0.08, 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.restore();
+}
+
+function drawBlackLabAsset(x, y, s, t, time) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  const breathe = 1 + Math.sin(t * 0.003) * 0.012;
+  const w = 154 * breathe;
+  const h = 104 / breathe;
+  drawContactShadow(6, 28, 78, 16, 0.3);
+  ctx.globalAlpha = 0.98;
+  ctx.drawImage(labSprite, -76, -72, w, h);
+  ctx.globalCompositeOperation = 'screen';
+  const rim = ctx.createLinearGradient(-70, -64, 78, 22);
+  rim.addColorStop(0, `rgba(255,210,121,${0.08 + time.light * 0.08})`);
+  rim.addColorStop(0.62, 'rgba(255,255,255,0)');
+  rim.addColorStop(1, `rgba(108,209,235,${0.08 + time.light * 0.06})`);
+  ctx.fillStyle = rim;
+  ctx.beginPath();
+  ctx.ellipse(2, -20, 76, 42, -0.03, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
