@@ -27,6 +27,11 @@ taken with Playwright Chromium at `1440x900`.
   JavaScript-side spectral surface sampler shared by bobber buoyancy, ridge
   geometry, glints, ripple rings, and fish depth. This is primarily a motion
   coherence improvement, not a still-frame leap.
+- `paradise-jonswap-ocean-pass.png`: production capture after replacing the
+  full-screen ocean pass with a PandoraChat-style JONSWAP surface sampler that
+  returns height, analytic gradient, curvature, and energy from one spectrum.
+- `paradise-jonswap-ocean-tuned.png`: production capture after reducing the
+  blanket reflection/fog washout and deepening the spectral water body.
 
 Current conclusion: the shader-first water pass is improved and live, but the scene
 still requires a true 3D/PBR asset pipeline to approach AAA quality.
