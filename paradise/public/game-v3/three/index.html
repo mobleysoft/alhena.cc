@@ -152,6 +152,32 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
 .play-row button.alert {
   animation: bitePulse 720ms ease-in-out infinite alternate;
 }
+.catch-log {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 10px;
+}
+.catch-slot {
+  min-height: 28px;
+  padding: 7px 8px;
+  border: 1px solid rgba(120,216,237,.20);
+  border-radius: 10px;
+  background: rgba(7, 33, 48, .22);
+  color: rgba(247,237,206,.70);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.catch-slot.filled {
+  color: #07131b;
+  background: linear-gradient(135deg, rgba(223,252,255,.92), rgba(240,207,122,.84));
+  border-color: transparent;
+}
 @keyframes bitePulse {
   from { filter: drop-shadow(0 0 0 rgba(240,207,122,0)); transform: translateY(0); }
   to { filter: drop-shadow(0 0 16px rgba(240,207,122,.75)); transform: translateY(-1px); }
@@ -211,6 +237,17 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
     display: grid;
     grid-template-columns: 1.2fr 1fr .8fr;
   }
+  .catch-log {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 4px;
+    margin-top: 0;
+  }
+  .catch-slot {
+    min-height: 22px;
+    padding: 5px 6px;
+    font-size: 7px;
+    letter-spacing: .06em;
+  }
   .play-row button,
   .play-row #cast-reel {
     min-width: 0;
@@ -261,6 +298,7 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
     <button id="view-cycle">View: Wide</button>
     <button id="reset-cast">Reset</button>
   </div>
+  <div class="catch-log" id="catch-log" aria-label="catch log"></div>
 </aside>
 <div class="readout" id="readout">loading mesh ocean</div>
 
@@ -272,6 +310,7 @@ const readout = document.getElementById('readout');
 const castButton = document.getElementById('cast-reel');
 const viewButton = document.getElementById('view-cycle');
 const resetButton = document.getElementById('reset-cast');
+const catchLog = document.getElementById('catch-log');
 const palette = {
   dawn: { sky: 0x8fcde0, horizon: 0xffd89a, sun: 0xffefb4, deep: [0.00, 0.04, 0.10], mid: [0.00, 0.19, 0.28], shallow: [0.05, 0.42, 0.44], fog: 0xaad0d4, light: 1.15, gold: 1.0, wind: 8.4, chop: 0.92, foam: 0.72, exposure: 1.03, hemi: 1.22, sunPower: 2.55, fogDensity: 0.018, grade: 0.92 },
   noon: { sky: 0x55aeea, horizon: 0xd7eff7, sun: 0xfff5cf, deep: [0.00, 0.05, 0.16], mid: [0.00, 0.23, 0.38], shallow: [0.06, 0.54, 0.56], fog: 0xbfe4ea, light: 1.35, gold: 0.62, wind: 7.6, chop: 0.86, foam: 0.58, exposure: 1.10, hemi: 1.42, sunPower: 2.95, fogDensity: 0.013, grade: 0.74 },
@@ -1410,7 +1449,18 @@ const playState = {
   biteUntil: 0,
   tension: 0,
   view: 0,
+  catches: [],
 };
+const fishSpecies = [
+  'Glass Minnow',
+  'Blue Runner',
+  'Sunlit Pompano',
+  'Moon Tang',
+  'Reef Snapper',
+  'Storm Jack',
+  'Golden Needlefish',
+  'Alhena Ray',
+];
 const viewTargets = [
   { label: 'Wide', pos: new THREE.Vector3(0, 5.1, 19.5), look: new THREE.Vector3(0, 0.85, -24) },
   { label: 'Water', pos: new THREE.Vector3(-1.4, 3.25, 12.8), look: new THREE.Vector3(0.2, 0.1, -11.5) },
@@ -1432,6 +1482,24 @@ function refreshPlayHud() {
   castButton.classList.toggle('alert', playState.bite);
   viewButton.textContent = `View: ${viewTargets[playState.view].label}`;
 }
+function renderCatchLog() {
+  catchLog.replaceChildren();
+  for (let i = 0; i < 8; i++) {
+    const slot = document.createElement('div');
+    slot.className = `catch-slot${playState.catches[i] ? ' filled' : ''}`;
+    slot.textContent = playState.catches[i]?.name || 'unknown';
+    catchLog.appendChild(slot);
+  }
+}
+function recordCatch(forceIndex = null) {
+  const speciesIndex = forceIndex ?? Math.floor((performance.now() * 0.013 + playState.catches.length * 2.7) % fishSpecies.length);
+  const name = fishSpecies[speciesIndex % fishSpecies.length];
+  const catchItem = { name, time: timeKey, weather: weatherKey, at: Date.now() };
+  playState.catches.unshift(catchItem);
+  playState.catches = playState.catches.slice(0, 8);
+  renderCatchLog();
+  return catchItem;
+}
 function resetCast() {
   playState.cast = false;
   playState.castProgress = 0;
@@ -1451,7 +1519,8 @@ function castLine() {
 }
 function reelLine() {
   if (playState.bite) {
-    readout.textContent = 'bite registered / tension cleared';
+    const catchItem = recordCatch();
+    readout.textContent = `landed ${catchItem.name}`;
     vibrate([28, 35, 28]);
   } else {
     readout.textContent = 'reeling line back';
@@ -1489,12 +1558,22 @@ addEventListener('keydown', event => {
   }
 });
 refreshPlayHud();
+renderCatchLog();
 window.__paradiseDebug = {
   playState,
   getBobber: () => bobber.position.toArray(),
   getCamera: () => camera.position.toArray(),
   getOceanSrc: () => oceanFrame?.src,
   getFishCount: () => fishShoal.length,
+  getCatchLog: () => playState.catches.map(c => c.name),
+  forceCatch: (index = 0) => {
+    playState.bite = true;
+    const catchItem = recordCatch(index);
+    playState.bite = false;
+    readout.textContent = `landed ${catchItem.name}`;
+    refreshPlayHud();
+    return catchItem;
+  },
   getEnvironment: () => ({
     time: timeKey,
     weather: weatherKey,
