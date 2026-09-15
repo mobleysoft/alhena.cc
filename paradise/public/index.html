@@ -322,10 +322,34 @@ body.started .hud { opacity: 1; transform: none; }
 
 @media (orientation: landscape) and (max-height: 560px) {
   .hud {
-    grid-template-columns: minmax(260px, 360px) 1fr minmax(210px, 300px);
-    inset: auto 12px 10px 12px;
+    display: flex;
+    grid-template-columns: none;
+    inset: auto 10px 8px 10px;
+    justify-content: center;
+    align-items: end;
   }
-  .log { display: block; max-height: 140px; }
+  .log { display: none; }
+  .panel {
+    width: min(40vw, 330px);
+    padding: 10px;
+    border-radius: 18px;
+  }
+  .brand { margin-bottom: 0; }
+  .brand h1 { font-size: 18px; }
+  .count { display: none; }
+  .status, .meter { display: none; }
+  .actions {
+    grid-template-columns: 1fr 66px 92px 66px;
+    margin-top: 8px;
+  }
+  .actions button, .pill-row button { padding: 8px 7px; font-size: 8px; }
+  .tray {
+    width: min(48vw, 390px);
+    padding: 8px;
+    border-radius: 18px;
+  }
+  .pill-row { gap: 6px; }
+  .hint { display: none; }
   .intro-card { padding: 24px; }
   .intro-title { font-size: clamp(44px, 10vw, 76px); }
 }
@@ -1169,6 +1193,7 @@ function drawShore(t, time) {
   drawSandGrain(t, y, time);
   drawBeachHouse(w * 0.11, h * 0.735, 1.14, time);
   drawBlackLab(w * 0.31, h * 0.82, 1.18);
+  drawForegroundPlants(w * 0.965, h * 0.87, 1.0, time);
   drawRod(t);
   drawBarAndAlhena(w * 0.80, h * 0.725);
 }
@@ -1189,14 +1214,52 @@ function drawSandGrain(t, top, time) {
   ctx.restore();
 }
 
+function drawContactShadow(x, y, rx, ry, alpha=0.22) {
+  ctx.save();
+  const g = ctx.createRadialGradient(x, y, 1, x, y, rx);
+  g.addColorStop(0, `rgba(0,0,0,${alpha})`);
+  g.addColorStop(0.58, `rgba(0,0,0,${alpha * 0.38})`);
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawForegroundPlants(x, y, s, time) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  ctx.globalAlpha = 0.72 + time.light * 0.2;
+  drawContactShadow(4, 61, 54, 11, 0.2);
+  for (let i = 0; i < 9; i++) {
+    const a = -1.2 + i * 0.3;
+    const len = 44 + (i % 3) * 18;
+    ctx.strokeStyle = i % 2 ? '#234a35' : '#315d42';
+    ctx.lineWidth = 6 - Math.abs(i - 4) * 0.35;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, 60);
+    ctx.quadraticCurveTo(Math.cos(a) * len * 0.34, 28 + Math.sin(a) * 18, Math.cos(a) * len, 12 + Math.sin(a) * 28);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawBeachHouse(x, y, s, time) {
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(s, s);
-  ctx.shadowColor = 'rgba(0,0,0,0.35)';
-  ctx.shadowBlur = 18;
-  ctx.shadowOffsetY = 10;
-  ctx.fillStyle = mix('#a66a40', '#201512', 1 - time.light);
+  drawContactShadow(66, 69, 98, 17, 0.26);
+  ctx.shadowColor = 'rgba(0,0,0,0.24)';
+  ctx.shadowBlur = 14;
+  ctx.shadowOffsetY = 8;
+  const siding = ctx.createLinearGradient(0, 0, 130, 62);
+  siding.addColorStop(0, mix('#b87949', '#231713', 1 - time.light));
+  siding.addColorStop(0.5, mix('#8f5633', '#1f120c', 1 - time.light));
+  siding.addColorStop(1, mix('#6f3f27', '#120a07', 1 - time.light));
+  ctx.fillStyle = siding;
   roundRect(0, 0, 130, 62, 2);
   ctx.fill();
   ctx.fillStyle = mix('#7b2b1c', '#1c0c08', 1 - time.light);
@@ -1209,9 +1272,14 @@ function drawBeachHouse(x, y, s, time) {
   ctx.shadowBlur = 0;
   ctx.fillStyle = 'rgba(35,20,11,0.38)';
   for (let i = 0; i < 5; i++) ctx.fillRect(10 + i * 23, 4, 2, 58);
+  ctx.fillStyle = 'rgba(255,240,184,0.16)';
+  ctx.fillRect(3, 5, 124, 2);
   ctx.fillStyle = state.time === 'night' ? 'rgba(255,211,105,0.92)' : 'rgba(255,218,121,0.5)';
   roundRect(49, 20, 27, 34, 2);
   ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.24)';
+  ctx.fillRect(61, 20, 2, 34);
+  ctx.fillRect(49, 35, 27, 2);
   drawPalm(138, 12, 0.85);
   ctx.restore();
 }
@@ -1243,29 +1311,53 @@ function drawBlackLab(x, y, s) {
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(s, s);
-  ctx.shadowColor = 'rgba(0,0,0,0.35)';
-  ctx.shadowBlur = 12;
-  ctx.shadowOffsetY = 5;
-  ctx.fillStyle = '#050506';
+  drawContactShadow(2, 12, 62, 14, 0.32);
+  const fur = ctx.createLinearGradient(-38, -17, 46, 14);
+  fur.addColorStop(0, '#010102');
+  fur.addColorStop(0.42, '#09090b');
+  fur.addColorStop(0.62, '#171a1c');
+  fur.addColorStop(1, '#030304');
+  ctx.fillStyle = fur;
   ctx.beginPath();
   ctx.ellipse(0, 0, 35, 13, -0.08, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
   ctx.arc(33, -13, 13, 0, Math.PI * 2);
   ctx.fill();
-  ctx.shadowBlur = 0;
+  ctx.strokeStyle = '#040405';
+  ctx.lineWidth = 7;
+  ctx.lineCap = 'round';
+  for (const leg of [-18, -3, 16, 28]) {
+    ctx.beginPath();
+    ctx.moveTo(leg, 8);
+    ctx.lineTo(leg - 4, 21);
+    ctx.stroke();
+  }
   ctx.fillStyle = 'rgba(255,255,255,0.14)';
   ctx.beginPath();
   ctx.ellipse(12, -6, 13, 3, -0.05, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = '#030304';
   ctx.beginPath();
-  ctx.ellipse(42, -7, 7, 10, 0.5, 0, Math.PI * 2);
+  ctx.ellipse(45, -9, 9, 7, 0.18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.beginPath();
+  ctx.ellipse(28, -22, 6, 11, -0.75, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = '#c7d6df';
   ctx.beginPath();
   ctx.arc(37, -16, 1.4, 0, Math.PI * 2);
   ctx.fill();
+  ctx.fillStyle = '#1b1b1d';
+  ctx.beginPath();
+  ctx.arc(52, -10, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#c6a54d';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(29, -4, 8, 0.1, Math.PI * 0.82);
+  ctx.stroke();
   ctx.strokeStyle = '#070707';
   ctx.lineWidth = 8;
   ctx.lineCap = 'round';
@@ -1280,16 +1372,15 @@ function drawBarAndAlhena(x, y) {
   const a = ALHENA[state.alhena % ALHENA.length];
   ctx.save();
   ctx.translate(x, y);
-  ctx.shadowColor = 'rgba(0,0,0,0.42)';
-  ctx.shadowBlur = 20;
-  ctx.shadowOffsetY = 9;
+  drawContactShadow(-8, 101, 112, 19, 0.34);
   const barGrad = ctx.createLinearGradient(-80, 0, 80, 80);
   barGrad.addColorStop(0, '#5b351e');
   barGrad.addColorStop(1, '#1b100b');
   ctx.fillStyle = barGrad;
   roundRect(-94, 34, 170, 64, 5);
   ctx.fill();
-  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  for (let i = 0; i < 7; i++) ctx.fillRect(-83 + i * 24, 39, 2, 53);
   ctx.fillStyle = '#122f32';
   roundRect(-106, 20, 194, 15, 8);
   ctx.fill();
@@ -1300,6 +1391,17 @@ function drawBarAndAlhena(x, y) {
   ctx.font = '9px DM Sans';
   ctx.fillText('ALHENA', -64, 66);
 
+  ctx.strokeStyle = a.skin;
+  ctx.lineWidth = 6;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-21, 17);
+  ctx.quadraticCurveTo(-42, 32, -52, 47);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(2, 18);
+  ctx.quadraticCurveTo(24, 30, 38, 44);
+  ctx.stroke();
   ctx.fillStyle = a.dress;
   ctx.beginPath();
   ctx.moveTo(-20, 22);
@@ -1308,13 +1410,32 @@ function drawBarAndAlhena(x, y) {
   ctx.lineTo(-32, 68);
   ctx.closePath();
   ctx.fill();
+  const dressHi = ctx.createLinearGradient(-24, 15, 12, 68);
+  dressHi.addColorStop(0, 'rgba(255,255,255,0.28)');
+  dressHi.addColorStop(0.55, 'rgba(255,255,255,0.03)');
+  dressHi.addColorStop(1, 'rgba(0,0,0,0.2)');
+  ctx.fillStyle = dressHi;
+  ctx.beginPath();
+  ctx.moveTo(-14, 24);
+  ctx.quadraticCurveTo(-7, -4, 2, 22);
+  ctx.lineTo(9, 64);
+  ctx.lineTo(-10, 64);
+  ctx.closePath();
+  ctx.fill();
   ctx.fillStyle = a.skin;
   ctx.beginPath();
   ctx.arc(-9, -12, 15, 0, Math.PI * 2);
   ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.16)';
+  ctx.beginPath();
+  ctx.ellipse(-15, -16, 4, 7, -0.6, 0, Math.PI * 2);
+  ctx.fill();
   ctx.fillStyle = a.hair;
   ctx.beginPath();
   ctx.arc(-10, -19, 16, Math.PI, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(-25, -11, 6, 14, -0.15, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = 'rgba(255,244,206,0.9)';
   ctx.beginPath();
@@ -1340,12 +1461,16 @@ function drawRod(t) {
 
   ctx.save();
   ctx.strokeLinecap = 'round';
+  ctx.shadowColor = 'rgba(0,0,0,0.22)';
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 5;
   ctx.strokeStyle = '#4b271b';
   ctx.lineWidth = 18;
   ctx.beginPath();
   ctx.moveTo(baseX, baseY);
   ctx.lineTo(baseX + 16, baseY + 38);
   ctx.stroke();
+  ctx.shadowBlur = 0;
 
   const rodGrad = ctx.createLinearGradient(baseX, baseY, tipX, tipY);
   rodGrad.addColorStop(0, '#ffe19a');
