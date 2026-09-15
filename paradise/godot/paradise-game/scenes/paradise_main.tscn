@@ -1,0 +1,125 @@
+[gd_scene load_steps=13 format=3 uid="uid://paradise_v3_main"]
+
+[ext_resource type="Script" path="res://scripts/paradise_controller.gd" id="1_controller"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_v3"]
+sky_top_color = Color(0.29, 0.49, 0.62, 1)
+sky_horizon_color = Color(0.84, 0.72, 0.52, 1)
+ground_bottom_color = Color(0.02, 0.08, 0.10, 1)
+ground_horizon_color = Color(0.18, 0.39, 0.44, 1)
+sun_angle_max = 18.0
+sun_curve = 0.08
+
+[sub_resource type="Sky" id="Sky_v3"]
+sky_material = SubResource("ProceduralSkyMaterial_v3")
+
+[sub_resource type="Environment" id="Environment_v3"]
+background_mode = 2
+sky = SubResource("Sky_v3")
+ambient_light_source = 2
+ambient_light_color = Color(0.58, 0.74, 0.78, 1)
+ambient_light_energy = 0.9
+tonemap_mode = 2
+tonemap_exposure = 1.08
+glow_enabled = true
+glow_intensity = 0.18
+fog_enabled = true
+fog_light_color = Color(0.58, 0.72, 0.75, 1)
+fog_density = 0.006
+
+[sub_resource type="StandardMaterial3D" id="SandMaterial_v3"]
+resource_name = "v3_pbr_sand_placeholder"
+albedo_color = Color(0.72, 0.58, 0.36, 1)
+roughness = 0.92
+
+[sub_resource type="StandardMaterial3D" id="WaterMaterial_v3"]
+resource_name = "v3_pandorachat_water_placeholder_surface"
+transparency = 1
+albedo_color = Color(0.02, 0.29, 0.34, 0.72)
+metallic = 0.0
+roughness = 0.05
+
+[sub_resource type="StandardMaterial3D" id="WoodMaterial_v3"]
+resource_name = "v3_pbr_wood_placeholder"
+albedo_color = Color(0.34, 0.18, 0.08, 1)
+roughness = 0.72
+
+[sub_resource type="PlaneMesh" id="BeachMesh_v3"]
+size = Vector2(1, 1)
+subdivide_width = 48
+subdivide_depth = 24
+
+[sub_resource type="PlaneMesh" id="WaterMesh_v3"]
+size = Vector2(1, 1)
+subdivide_width = 96
+subdivide_depth = 96
+
+[sub_resource type="BoxMesh" id="BarMesh_v3"]
+
+[sub_resource type="CapsuleMesh" id="AlhenaMesh_v3"]
+
+[sub_resource type="CapsuleMesh" id="DogMesh_v3"]
+
+[node name="ParadiseV3" type="Node3D"]
+script = ExtResource("1_controller")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_v3")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.754407, -0.133022, 0.642788, 0, 0.979203, 0.202881, -0.656407, -0.153091, 0.738716, -18, 24, 18)
+light_energy = 3.2
+shadow_enabled = true
+
+[node name="CameraRig" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.985, 0.172, 0, -0.172, 0.985, 0, 3.8, 14)
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig"]
+transform = Transform3D(1, 0, 0, 0, 0.956305, 0.292372, 0, -0.292372, 0.956305, 0, 0, 0)
+current = true
+fov = 55.0
+
+[node name="ShorelineEnvironmentSlot" type="Node3D" parent="."]
+metadata/asset_slot = "shoreline_environment"
+metadata/expected_path = "public/assets/models/paradise-shoreline.glb"
+
+[node name="BeachPlane" type="MeshInstance3D" parent="ShorelineEnvironmentSlot"]
+transform = Transform3D(60, 0, 0, 0, 1, 0, 0, 0, 24, 0, -0.18, 10)
+mesh = SubResource("BeachMesh_v3")
+surface_material_override/0 = SubResource("SandMaterial_v3")
+
+[node name="OceanSlot" type="Node3D" parent="."]
+metadata/asset_slot = "spectral_ocean"
+metadata/source = "Paradise V2 WebGL2 full-screen PandoraChat ocean shader"
+
+[node name="WaterPlane" type="MeshInstance3D" parent="OceanSlot"]
+transform = Transform3D(120, 0, 0, 0, 1, 0, 0, 0, 90, 0, -0.12, -38)
+mesh = SubResource("WaterMesh_v3")
+surface_material_override/0 = SubResource("WaterMaterial_v3")
+
+[node name="BeachBarSlot" type="Node3D" parent="."]
+metadata/asset_slot = "beach_bar_billboard"
+metadata/future_asset_slot = "shoreline_environment"
+
+[node name="BarBlockout" type="MeshInstance3D" parent="BeachBarSlot"]
+transform = Transform3D(6.2, 0, 0, 0, 2.8, 0, 0, 0, 1.4, 7.8, 1.2, 4.7)
+mesh = SubResource("BarMesh_v3")
+surface_material_override/0 = SubResource("WoodMaterial_v3")
+
+[node name="AlhenaSlot" type="Node3D" parent="."]
+metadata/asset_slot = "alhena_bartender_rig"
+metadata/expected_path = "public/assets/models/alhena-bartender.glb"
+
+[node name="AlhenaBlockout" type="MeshInstance3D" parent="AlhenaSlot"]
+transform = Transform3D(0.42, 0, 0, 0, 1.75, 0, 0, 0, 0.42, 10.9, 0.7, 3.5)
+mesh = SubResource("AlhenaMesh_v3")
+surface_material_override/0 = SubResource("SandMaterial_v3")
+
+[node name="BlackLabSlot" type="Node3D" parent="."]
+metadata/asset_slot = "black_lab_rig"
+metadata/expected_path = "public/assets/models/black-lab.glb"
+
+[node name="DogBlockout" type="MeshInstance3D" parent="BlackLabSlot"]
+transform = Transform3D(1.2, 0, 0, 0, 0.48, 0, 0, 0, 0.42, 1.4, 0.35, 5.6)
+mesh = SubResource("DogMesh_v3")
+surface_material_override/0 = SubResource("WoodMaterial_v3")

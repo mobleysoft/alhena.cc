@@ -39,7 +39,8 @@ PY
 
 node --check "$TMP_V2_MODULE"
 node "$ROOT/scripts/verify-assets.mjs" >/tmp/paradise-assets-verify.json
-git -C "$ROOT/.." diff --check -- paradise/public/game/index.html paradise/public/game-v2/index.html paradise/public/game-v3/index.html paradise/public/index.html paradise/public/_headers paradise/verification/README.md
+"$ROOT/scripts/verify-godot-v3.sh" >/tmp/paradise-godot-v3-verify.txt
+git -C "$ROOT/.." diff --check -- paradise/godot/paradise-game paradise/scripts/verify-godot-v3.sh paradise/public/game/index.html paradise/public/game-v2/index.html paradise/public/game-v3/index.html paradise/public/index.html paradise/public/_headers paradise/verification/README.md
 
 http_code="$(curl -L -s -o "$TMP_LIVE" -w '%{http_code}' "$URL")"
 if [[ "$http_code" != "200" ]]; then
@@ -172,4 +173,5 @@ echo "Paradise game verified: $URL"
 echo "Paradise root verified: $ROOT_URL"
 echo "Paradise V2 verified: $V2_URL"
 echo "Paradise V3 verified: $V3_URL"
+echo "Paradise Godot V3 scaffold verified: /tmp/paradise-godot-v3-verify.txt"
 echo "Paradise assets verified: /tmp/paradise-assets-verify.json"
