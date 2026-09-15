@@ -923,6 +923,7 @@ const water = new THREE.Mesh(new THREE.PlaneGeometry(180, 126, 220, 150), waterM
 water.rotation.x = -Math.PI / 2;
 water.position.set(0, -0.06, -66);
 water.receiveShadow = true;
+water.visible = false;
 scene.add(water);
 
 const shoreGeo = new THREE.PlaneGeometry(100, 42, 170, 70);
@@ -955,6 +956,7 @@ wetSand.name = 'reflective-wet-sand-transition';
 wetSand.rotation.x = -Math.PI / 2;
 wetSand.position.set(0, -0.105, -1.5);
 wetSand.receiveShadow = true;
+wetSand.visible = false;
 scene.add(wetSand);
 
 const shallowsMat = new THREE.MeshBasicMaterial({ color: 0xb7e7e1, transparent: true, opacity: .18, depthWrite: false });
@@ -963,6 +965,7 @@ for (let i = 0; i < 4; i++) {
   shallows.name = 'transparent-shallow-water-band';
   shallows.rotation.x = -Math.PI / 2;
   shallows.position.set(0, -0.055 + i * .002, -3.2 - i * 1.05);
+  shallows.visible = false;
   scene.add(shallows);
 }
 
@@ -981,6 +984,7 @@ for (let i = 0; i < 3; i++) {
   band.rotation.x = -Math.PI / 2;
   band.position.set(0, -0.045 + i * .006, -1.7 - i * 1.45);
   band.material.opacity = .18 - i * .035;
+  band.visible = false;
   scene.add(band);
   causticBands.push(band);
 }
@@ -1062,8 +1066,8 @@ for (const offset of [.34, -.34]) {
   scene.add(rope);
 }
 
-const foamMat = new THREE.LineBasicMaterial({ color: 0xdff7f7, transparent: true, opacity: .34 });
-const goldFoamMat = new THREE.LineBasicMaterial({ color: 0xffd47c, transparent: true, opacity: .22 });
+const foamMat = new THREE.LineBasicMaterial({ color: 0xdff7f7, transparent: true, opacity: .14 });
+const goldFoamMat = new THREE.LineBasicMaterial({ color: 0xffd47c, transparent: true, opacity: .09 });
 const shoreFoamLines = [];
 for (let row = 0; row < 7; row++) {
   const pts = [];
@@ -1711,9 +1715,10 @@ function animate(now) {
   shoreFoamLines.forEach(({ line, row, baseZ }) => {
     line.position.z = Math.sin(t * .8 + row * .7) * .12;
     line.position.y = .028 + Math.sin(t * 1.4 + row) * .01;
-    line.material.opacity = row % 2 ? .16 + Math.sin(t + row) * .04 : .28 + Math.sin(t * .7 + row) * .06;
+    line.material.opacity = row % 2 ? .07 + Math.sin(t + row) * .02 : .12 + Math.sin(t * .7 + row) * .025;
   });
   causticBands.forEach((band, i) => {
+    if (!band.visible) return;
     band.material.map.offset.x = t * (.018 + i * .006);
     band.material.map.offset.y = Math.sin(t * .25 + i) * .035;
     band.material.opacity = (activePreset === presets.storm ? .09 : .16) + Math.max(0, Math.sin(t * .7 + i)) * .055;
