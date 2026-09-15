@@ -332,31 +332,42 @@ body.started .hud { opacity: 1; transform: none; }
   .hud {
     display: flex;
     grid-template-columns: none;
-    inset: auto 10px 8px 10px;
-    justify-content: center;
+    inset: auto 8px 7px 8px;
+    justify-content: space-between;
     align-items: end;
+    gap: 8px;
   }
   .log { display: none; }
   .panel {
-    width: min(40vw, 330px);
-    padding: 10px;
-    border-radius: 18px;
+    width: auto;
+    max-width: 53vw;
+    padding: 7px;
+    border-radius: 999px;
   }
-  .brand { margin-bottom: 0; }
-  .brand h1 { font-size: 18px; }
+  .brand { display: none; }
   .count { display: none; }
   .status, .meter { display: none; }
   .actions {
-    grid-template-columns: 1fr 66px 92px 66px;
-    margin-top: 8px;
+    display: flex;
+    grid-template-columns: none;
+    gap: 6px;
+    margin-top: 0;
   }
-  .actions button, .pill-row button { padding: 8px 7px; font-size: 8px; }
+  .actions button, .pill-row button {
+    padding: 8px 10px;
+    font-size: 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  #motion { min-width: 104px; }
   .tray {
-    width: min(48vw, 390px);
-    padding: 8px;
-    border-radius: 18px;
+    width: auto;
+    max-width: 45vw;
+    flex-direction: row;
+    padding: 7px;
+    border-radius: 999px;
   }
-  .pill-row { gap: 6px; }
+  .pill-row { flex-wrap: nowrap; gap: 5px; }
   .hint { display: none; }
   .intro-card { padding: 24px; }
   .intro-title { font-size: clamp(44px, 10vw, 76px); }
