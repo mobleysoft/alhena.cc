@@ -701,7 +701,7 @@ function initWaterShader() {
       float e = mix(0.19, 0.055, depth);
       float hx = oceanHeight(world + vec2(e, 0.0)) - oceanHeight(world - vec2(e, 0.0));
       float hy = oceanHeight(world + vec2(0.0, e)) - oceanHeight(world - vec2(0.0, e));
-      vec3 normal = normalize(vec3(-hx * 2.6, 0.72 + depth * 1.8, -hy * 2.6));
+      vec3 normal = normalize(vec3(-hx * 4.8, 0.62 + depth * 1.46, -hy * 4.8));
 
       vec3 viewDir = normalize(vec3(0.0, 0.5 + depth * 1.25, 1.0));
       float fresnel = pow(1.0 - clamp(dot(normal, viewDir), 0.0, 1.0), 3.0);
@@ -712,7 +712,7 @@ function initWaterShader() {
       vec2 sunUv = vec2(u_sun.x, 1.0 - u_sun.y);
       vec2 toSun = normalize((sunUv - uv) * vec2(u_resolution.x / u_resolution.y, 1.0));
       vec2 slope = normalize(normal.xz + vec2(0.0001));
-      float glitter = pow(max(dot(slope, toSun), 0.0), 36.0) * (0.16 + u_chop * 0.7);
+      float glitter = pow(max(dot(slope, toSun), 0.0), 24.0) * (0.34 + u_chop * 1.08);
       float sunPath = pow(max(0.0, 1.0 - abs(uv.x - u_sun.x) * 5.0), 3.0) * pow(1.0 - depth, 1.7);
       float specular = glitter * sunPath * u_light;
 
@@ -726,6 +726,7 @@ function initWaterShader() {
 
       vec3 color = mix(body, reflectedSky, fresnel * 0.58);
       color += vec3(0.0, 0.27, 0.29) * scatter;
+      color *= 0.92 + smoothstep(0.02, 0.2, h + curvature * 0.18) * 0.18;
       vec3 shimmer = vec3(
         specular * (1.02 + 0.18 * sin((uv.x + normal.x) * 620.0 + u_time * 4.7)),
         specular * 0.86,
@@ -1174,6 +1175,7 @@ function drawWater(t, time, weather) {
     ctx.stroke();
   }
 
+  drawOceanPerspectiveRibbons(t, top, bottom, time, weather);
   drawMolecularSurface(t, top, bottom, time, weather);
   drawWaterVolumeBlobs(t, top, bottom, time, weather);
 
@@ -1207,6 +1209,81 @@ function drawWater(t, time, weather) {
   drawFishShadows(t, top, bottom);
   drawBobber(t);
   drawSplashes(t);
+  ctx.restore();
+}
+
+function drawOceanPerspectiveRibbons(t, top, bottom, time, weather) {
+  const w = state.w;
+  const height = bottom - top;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, top, w, height);
+  ctx.clip();
+
+  const horizonY = top + height * 0.04;
+  const vanishingX = w * (0.5 + state.camera.x * 0.018);
+  for (let i = 0; i < 22; i++) {
+    const d = i / 21;
+    const y = top + height * (0.06 + Math.pow(d, 1.72) * 0.86);
+    const perspectiveWidth = w * (0.1 + d * 1.18);
+    const amp = (1.5 + d * 17) * weather.wave;
+    const freq = 0.012 + d * 0.025;
+    const phase = t * (0.0014 + d * 0.0022) + i * 1.93;
+    const crestAlpha = (0.018 + d * 0.07) * (0.7 + weather.foam * 0.8);
+    const troughAlpha = (0.012 + d * 0.05) * (0.7 + weather.chop * 0.55);
+
+    ctx.globalCompositeOperation = 'multiply';
+    const trough = ctx.createLinearGradient(0, y - amp * 0.8, 0, y + amp * 2.2);
+    trough.addColorStop(0, 'rgba(0,0,0,0)');
+    trough.addColorStop(0.42, `rgba(7,18,24,${troughAlpha})`);
+    trough.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = trough;
+    ctx.beginPath();
+    for (let x = vanishingX - perspectiveWidth; x <= vanishingX + perspectiveWidth; x += 18) {
+      const p = (x - vanishingX) / Math.max(1, perspectiveWidth);
+      const yy = y + Math.sin(p * 7.8 + phase) * amp + Math.sin(p * 18.0 - phase * 0.73) * amp * 0.24;
+      if (x === vanishingX - perspectiveWidth) ctx.moveTo(x, yy);
+      else ctx.lineTo(x, yy);
+    }
+    for (let x = vanishingX + perspectiveWidth; x >= vanishingX - perspectiveWidth; x -= 18) {
+      const p = (x - vanishingX) / Math.max(1, perspectiveWidth);
+      const yy = y + 10 + d * 38 + Math.sin(p * 7.8 + phase + 0.6) * amp * 0.58;
+      ctx.lineTo(x, yy);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.globalCompositeOperation = 'screen';
+    ctx.strokeStyle = `rgba(238,252,255,${crestAlpha})`;
+    ctx.lineWidth = 0.7 + d * 2.4;
+    ctx.beginPath();
+    for (let x = vanishingX - perspectiveWidth; x <= vanishingX + perspectiveWidth; x += 12) {
+      const p = (x - vanishingX) / Math.max(1, perspectiveWidth);
+      const taper = 1 - Math.min(1, Math.abs(p));
+      const yy = y + Math.sin(p * 7.8 + phase) * amp + Math.sin(p * 18.0 - phase * 0.73) * amp * 0.24;
+      if (x === vanishingX - perspectiveWidth) ctx.moveTo(x, yy);
+      else ctx.lineTo(x, yy - taper * d * 2.2);
+    }
+    ctx.stroke();
+  }
+
+  ctx.globalCompositeOperation = 'screen';
+  for (let i = 0; i < 10; i++) {
+    const side = i % 2 ? -1 : 1;
+    const startX = vanishingX + side * (18 + i * 21);
+    const endX = vanishingX + side * w * (0.52 + (i % 5) * 0.08);
+    const endY = bottom - height * (0.05 + (i % 4) * 0.06);
+    const g = ctx.createLinearGradient(startX, horizonY, endX, endY);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(0.6, `rgba(204,246,255,${0.018 + weather.foam * 0.03})`);
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.strokeStyle = g;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(startX, horizonY);
+    ctx.quadraticCurveTo((startX + endX) * 0.5, top + height * 0.45 + Math.sin(t * 0.001 + i) * 22, endX, endY);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
