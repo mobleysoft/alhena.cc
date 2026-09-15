@@ -10,10 +10,19 @@ TMP_LIVE="/tmp/paradise-live-verify.html"
 TMP_V2_LIVE="/tmp/paradise-v2-live-verify.html"
 TMP_ROOT_LIVE="/tmp/paradise-root-live-verify.html"
 TMP_V3_LIVE="/tmp/paradise-v3-live-verify.html"
+TMP_V3_GODOT_LIVE="/tmp/paradise-v3-godot-live-verify.html"
 URL="${1:-https://paradise.alhena.cc/game/?v=verify}"
 V2_URL="${2:-https://paradise.alhena.cc/game-v2/?view=shore&time=sunset&weather=breeze&quality=cinematic&v=verify}"
 ROOT_URL="${3:-https://paradise.alhena.cc/?v=verify}"
 V3_URL="${4:-https://paradise.alhena.cc/game-v3/?v=verify}"
+V3_GODOT_URL="${5:-https://paradise.alhena.cc/game-v3/godot/?v=verify}"
+ORIGIN="$(python3 - "$ROOT_URL" <<'PY'
+from urllib.parse import urlparse
+import sys
+url = urlparse(sys.argv[1])
+print(f"{url.scheme}://{url.netloc}")
+PY
+)"
 
 python3 - "$GAME_HTML" > "$TMP_MODULE" <<'PY'
 from pathlib import Path
@@ -40,7 +49,7 @@ PY
 node --check "$TMP_V2_MODULE"
 node "$ROOT/scripts/verify-assets.mjs" >/tmp/paradise-assets-verify.json
 "$ROOT/scripts/verify-godot-v3.sh" >/tmp/paradise-godot-v3-verify.txt
-git -C "$ROOT/.." diff --check -- paradise/godot/paradise-game paradise/scripts/verify-godot-v3.sh paradise/public/game/index.html paradise/public/game-v2/index.html paradise/public/game-v3/index.html paradise/public/index.html paradise/public/_headers paradise/verification/README.md
+git -C "$ROOT/.." diff --check -- paradise/godot/paradise-game paradise/scripts/verify-godot-v3.sh paradise/public/game/index.html paradise/public/game-v2/index.html paradise/public/game-v3/index.html paradise/public/game-v3/godot paradise/public/index.html paradise/public/_headers paradise/verification/README.md
 
 http_code="$(curl -L -s -o "$TMP_LIVE" -w '%{http_code}' "$URL")"
 if [[ "$http_code" != "200" ]]; then
@@ -97,7 +106,9 @@ v2_markers=(
   "v2-pandorachat-fullscreen-ocean-pass"
   "v2-canonical-pandorachat-webgl2-ocean-shader"
   "v2-jonswap-inspired-analytical-normals-fresnel-scatter-foam-fog-tonemap"
-  "v2-pandorachat-jonswap-analytical-ocean-optics-v2"
+  "v2-pandorachat-jonswap-analytical-ocean-optics-v3"
+  "waveShadow"
+  "horizonFoam"
   "spectralStreak"
   "scatterVolume"
   "v2-pandorachat-legacy-reflection-folding-haze-inheritance"
@@ -161,6 +172,7 @@ v3_markers=(
   "authored-assets-before-promotion"
   "Runtime Asset Gate"
   "JONSWAP-inspired waves"
+  "Open Godot Candidate"
   "/assets/paradise-asset-manifest.json"
 )
 
@@ -171,9 +183,53 @@ for marker in "${v3_markers[@]}"; do
   fi
 done
 
+v3_godot_code="$(curl -L -s -o "$TMP_V3_GODOT_LIVE" -w '%{http_code}' "$V3_GODOT_URL")"
+if [[ "$v3_godot_code" != "200" ]]; then
+  echo "Paradise V3 Godot live check failed: HTTP $v3_godot_code for $V3_GODOT_URL" >&2
+  exit 1
+fi
+
+v3_godot_markers=(
+  "Paradise Fishing V3"
+  "index.js"
+  "/api/paradise-godot/index.wasm"
+  "index.pck"
+)
+
+for marker in "${v3_godot_markers[@]}"; do
+  if ! grep -Fq "$marker" "$TMP_V3_GODOT_LIVE"; then
+    echo "Paradise V3 Godot live check failed: missing marker: $marker" >&2
+    exit 1
+  fi
+done
+
+wasm_code="$(curl -L -s -o /dev/null -w '%{http_code}' "${V3_GODOT_URL%/}/index.wasm")"
+if [[ "$wasm_code" != "200" ]]; then
+  echo "Paradise V3 Godot WASM check failed: HTTP $wasm_code" >&2
+  exit 1
+fi
+
+api_wasm_code="$(curl -L -s -o /tmp/paradise-godot-api-wasm-magic.bin -w '%{http_code}' --range 0-7 "$ORIGIN/api/paradise-godot/index.wasm")"
+if [[ "$api_wasm_code" != "200" && "$api_wasm_code" != "206" ]]; then
+  echo "Paradise V3 Godot API WASM check failed: HTTP $api_wasm_code" >&2
+  exit 1
+fi
+
+if ! head -c 4 /tmp/paradise-godot-api-wasm-magic.bin | cmp -s - <(printf '\x00asm'); then
+  echo "Paradise V3 Godot API WASM check failed: invalid WASM magic bytes" >&2
+  exit 1
+fi
+
+pck_code="$(curl -L -s -o /dev/null -w '%{http_code}' "${V3_GODOT_URL%/}/index.pck")"
+if [[ "$pck_code" != "200" ]]; then
+  echo "Paradise V3 Godot pack check failed: HTTP $pck_code" >&2
+  exit 1
+fi
+
 echo "Paradise game verified: $URL"
 echo "Paradise root verified: $ROOT_URL"
 echo "Paradise V2 verified: $V2_URL"
 echo "Paradise V3 verified: $V3_URL"
+echo "Paradise V3 Godot verified: $V3_GODOT_URL"
 echo "Paradise Godot V3 scaffold verified: /tmp/paradise-godot-v3-verify.txt"
 echo "Paradise assets verified: /tmp/paradise-assets-verify.json"

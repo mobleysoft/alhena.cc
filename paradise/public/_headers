@@ -4,6 +4,20 @@
 /game-v3/*.pck
   Content-Type: application/octet-stream
 
+/game-v3/godot/*.wasm
+  Content-Type: application/wasm
+
+/game-v3/godot/*.wasm.br
+  Content-Type: application/wasm
+  Content-Encoding: br
+
+/game-v3/godot/*.pck
+  Content-Type: application/octet-stream
+
 /game-v3/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cache-Control: public, max-age=60
+
+/game-v3/godot/*
   Cross-Origin-Opener-Policy: same-origin
   Cache-Control: public, max-age=60
