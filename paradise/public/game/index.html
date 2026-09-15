@@ -422,29 +422,29 @@ function makeOceanPass(canvas) {
       return v;
     }
     void waveComponent(float i, out vec2 dir, out float k, out float omega, out float amp, out float phase) {
-      float t = i / 13.0;
-      float spread = mix(0.72, 0.18, smoothstep(0.0, 1.0, t));
-      float theta = -PI * 0.5 + (t - 0.5) * PI * spread + 0.28 + (hash(i * 8.31) - 0.5) * 0.22;
+      float t = i / 31.0;
+      float spread = mix(0.92, 0.16, smoothstep(0.0, 1.0, t));
+      float theta = -PI * 0.5 + (t - 0.5) * PI * spread + 0.22 + (hash(i * 8.31) - 0.5) * 0.34;
       dir = normalize(vec2(cos(theta), sin(theta)));
       float wind = max(uWind, 1.5);
       float wp = 0.13 * G / wind * TAU;
-      float wMin = wp * 0.45;
-      float wMax = wp * 6.2;
+      float wMin = wp * 0.50;
+      float wMax = wp * 3.50;
       omega = wMin * pow(wMax / wMin, t);
       k = omega * omega / G;
       float sigma = omega <= wp ? 0.07 : 0.09;
       float peak = exp(-pow(omega - wp, 2.0) / (2.0 * sigma * sigma * wp * wp));
       float spectrum = 0.0081 * G * G / pow(omega, 5.0) * exp(-1.25 * pow(wp / omega, 4.0)) * pow(3.3, peak);
-      amp = clamp(sqrt(2.0 * spectrum * ((wMax - wMin) / 14.0)) * 0.30 * wind * uChop, 0.004, 0.58);
+      amp = clamp(sqrt(2.0 * spectrum * ((wMax - wMin) / 32.0)) * 0.35 * wind / 12.0 * uChop, 0.0, 1.80);
       phase = hash(i * 19.19 + 3.7) * TAU;
     }
     float waveHeight(vec2 p) {
       float h = 0.0;
-      for (int i = 0; i < 14; i++) {
+      for (int i = 0; i < 32; i++) {
         vec2 dir; float k; float omega; float amp; float phase;
         waveComponent(float(i), dir, k, omega, amp, phase);
         float w = dot(dir, p) * k - omega * uTime + phase;
-        h += amp * (sin(w) + 0.16 * sin(w * 2.0 + phase));
+        h += amp * sin(w);
       }
       return h;
     }
@@ -456,6 +456,15 @@ function makeOceanPass(canvas) {
       vec3 macro = normalize(vec3(-(x - c) / e, 1.0, -(y - c) / e));
       vec2 ripple = vec2(fbm(p * 9.0 + uTime * .05), fbm(p * 15.0 - uTime * .07)) - 0.5;
       return normalize(macro + vec3(ripple.x, 0.0, ripple.y) * (0.11 + uWind * 0.008));
+    }
+    float laplacian(vec2 p) {
+      float e = 0.08;
+      float c = waveHeight(p);
+      float x1 = waveHeight(p + vec2(e, 0.0));
+      float x2 = waveHeight(p - vec2(e, 0.0));
+      float y1 = waveHeight(p + vec2(0.0, e));
+      float y2 = waveHeight(p - vec2(0.0, e));
+      return (x1 + x2 + y1 + y2 - 4.0 * c) / (e * e);
     }
     vec3 skyColor(vec2 uv, vec3 rd) {
       vec3 zenith = uSkyTint * 2.5 + vec3(0.035, 0.08, 0.15);
@@ -485,27 +494,29 @@ function makeOceanPass(canvas) {
         vec3 viewDir = normalize(vec3(q.x * .45, d * .38 + .18, 1.0));
         float fresnel = 0.02 + 0.98 * pow(1.0 - clamp(dot(n, viewDir), 0.0, 1.0), 5.0);
         vec3 refl = skyColor(vec2(uv.x + n.x * .05, horizon + d * .52 + n.z * .04), reflect(-viewDir, n));
-        vec3 deep = vec3(0.004, 0.045, 0.115);
-        vec3 mid = vec3(0.014, 0.175, 0.255);
-        vec3 shallow = vec3(0.050, 0.285, 0.350);
+        vec3 deep = vec3(0.006, 0.030, 0.105);
+        vec3 mid = vec3(0.020, 0.165, 0.250);
+        vec3 shallow = vec3(0.042, 0.230, 0.335);
         float nearShore = smoothstep(0.34, 1.0, d);
         float midDepth = smoothstep(0.05, 0.48, d) * (1.0 - nearShore * 0.35);
         vec3 body = mix(mid, shallow, nearShore);
         body = mix(body, deep, midDepth * 0.48);
         float h = waveHeight(p);
-        float slope = clamp((1.0 - n.y) * 2.9, 0.0, 1.0);
-        float crest = smoothstep(0.08, 0.31, abs(h)) * slope;
-        float shoreFoam = smoothstep(0.15, 0.0, abs(uv.y - 0.21)) * smoothstep(0.18, 0.72, fbm(vec2(q.x * 18.0, uTime * .55)));
+        float curvature = clamp(laplacian(p) * 0.15, 0.0, 1.0);
+        float slope = clamp((1.0 - n.y) * 3.4, 0.0, 1.0);
+        float crest = smoothstep(0.10, 0.30, abs(h)) * max(slope, curvature);
+        float shoreFoam = smoothstep(0.11, 0.0, abs(uv.y - 0.235)) * smoothstep(0.38, 0.78, fbm(vec2(q.x * 20.0, uTime * .55)));
         float foamGate = smoothstep(uFoamT * .72, uFoamT * 1.38, abs(h));
-        float foam = clamp(crest * foamGate * smoothstep(0.44, 0.84, fbm(p * 4.6)) + shoreFoam * .75, 0.0, 1.0);
+        float foam = clamp(crest * foamGate * smoothstep(0.42, 0.84, fbm(p * 5.4)) + shoreFoam * .30, 0.0, 0.72);
         float scatter = smoothstep(0.0, 0.75, d) * (0.38 + 0.24 * sin(p.x * .24 + uTime));
-        vec3 water = mix(body + vec3(0.0, 0.12, 0.11) * scatter, refl, fresnel * (0.22 + d * .25));
+        body += vec3(0.0, 0.46, 0.50) * curvature * 0.38;
+        vec3 water = mix(body + vec3(0.0, 0.12, 0.11) * scatter, refl, fresnel * (0.32 + d * .38));
         vec3 sunDir = normalize(vec3(-0.28, .84, .46));
         vec3 halfV = normalize(viewDir + sunDir);
         float glitter = pow(max(dot(n, halfV), 0.0), mix(48.0, 180.0, smoothstep(0.15, 1.0, d)));
         glitter *= smoothstep(0.54, 0.95, fbm(p * 22.0 + vec2(uTime * .34, -uTime * .18)));
         water += vec3(1.0, .82, .48) * glitter * (0.9 + uGold * 1.35);
-        water = mix(water, vec3(.74, .90, .92), foam * .34);
+        water = mix(water, vec3(.86, .94, .98), foam * .38);
         float haze = smoothstep(.56, .02, d) * .18;
         water = mix(water, vec3(.34, .50, .58), haze);
         float horizonBlend = smoothstep(0.006, 0.055, d);
@@ -822,29 +833,29 @@ const waterMat = new THREE.ShaderMaterial({
     const float gravity = 9.81;
     float hash1(float n) { return fract(sin(n) * 43758.5453123); }
     vec2 waveDir(float i) {
-      float t = i / 23.0;
+      float t = i / 31.0;
       float theta = (t - 0.5) * PI * 0.92 + 0.18 + (hash1(i * 9.17) - 0.5) * 0.34;
       return vec2(cos(theta), sin(theta));
     }
     void component(float i, out float freq, out float amp, out float phase) {
       float omegaP = 0.13 * gravity / max(uWind, 1.0) * TAU;
-      float t = i / 23.0;
-      float omegaMin = omegaP * 0.42;
-      float omegaMax = omegaP * 5.25;
+      float t = i / 31.0;
+      float omegaMin = omegaP * 0.50;
+      float omegaMax = omegaP * 3.50;
       freq = omegaMin * pow(omegaMax / omegaMin, t);
       float sigma = freq <= omegaP ? 0.07 : 0.09;
       float r = exp(-pow(freq - omegaP, 2.0) / (2.0 * sigma * sigma * omegaP * omegaP));
       float spectrum = 0.0081 * gravity * gravity / pow(freq, 5.0)
         * exp(-1.25 * pow(omegaP / freq, 4.0))
         * pow(3.3, r);
-      float dOmega = (omegaMax - omegaMin) / 24.0;
-      amp = sqrt(2.0 * spectrum * dOmega) * 0.33 * uWind / 12.0;
-      amp = clamp(amp, 0.0, 1.55);
+      float dOmega = (omegaMax - omegaMin) / 32.0;
+      amp = sqrt(2.0 * spectrum * dOmega) * 0.35 * uWind / 12.0;
+      amp = clamp(amp, 0.0, 1.8);
       phase = hash1(i * 17.31 + 0.73) * TAU;
     }
     float oceanHeight(vec2 pos) {
       float h = 0.0;
-      for (int j = 0; j < 24; j++) {
+      for (int j = 0; j < 32; j++) {
         float i = float(j);
         float freq;
         float amp;
@@ -852,7 +863,7 @@ const waterMat = new THREE.ShaderMaterial({
         component(i, freq, amp, phase);
         float k = freq * freq / gravity;
         float w = dot(waveDir(i), pos) * k - freq * uTime + phase;
-        h += amp * (sin(w) + 0.18 * sin(2.0 * w + phase));
+        h += amp * sin(w);
       }
       return h * uChop;
     }
@@ -863,7 +874,7 @@ const waterMat = new THREE.ShaderMaterial({
       vec2 pos = p.xz * 0.18 + vec2(uTime * 0.018, uTime * 0.011);
       float h = oceanHeight(pos);
       vec2 lateral = vec2(0.0);
-      for (int j = 0; j < 10; j++) {
+      for (int j = 0; j < 12; j++) {
         float i = float(j);
         float freq;
         float amp;
@@ -912,29 +923,29 @@ const waterMat = new THREE.ShaderMaterial({
       return v;
     }
     vec2 waveDir(float i) {
-      float t = i / 7.0;
+      float t = i / 31.0;
       float theta = (t - 0.5) * PI * 0.92 + 0.18 + (hash1(i * 9.17) - 0.5) * 0.34;
       return vec2(cos(theta), sin(theta));
     }
     void component(float i, out float freq, out float amp, out float phase) {
       float omegaP = 0.13 * gravity / max(uWind, 1.0) * TAU;
-      float t = i / 7.0;
-      float omegaMin = omegaP * 0.42;
-      float omegaMax = omegaP * 5.25;
+      float t = i / 31.0;
+      float omegaMin = omegaP * 0.50;
+      float omegaMax = omegaP * 3.50;
       freq = omegaMin * pow(omegaMax / omegaMin, t);
       float sigma = freq <= omegaP ? 0.07 : 0.09;
       float r = exp(-pow(freq - omegaP, 2.0) / (2.0 * sigma * sigma * omegaP * omegaP));
       float spectrum = 0.0081 * gravity * gravity / pow(freq, 5.0)
         * exp(-1.25 * pow(omegaP / freq, 4.0))
         * pow(3.3, r);
-      float dOmega = (omegaMax - omegaMin) / 8.0;
-      amp = sqrt(2.0 * spectrum * dOmega) * 0.38 * uWind / 12.0;
-      amp = clamp(amp, 0.0, 1.95);
+      float dOmega = (omegaMax - omegaMin) / 32.0;
+      amp = sqrt(2.0 * spectrum * dOmega) * 0.35 * uWind / 12.0;
+      amp = clamp(amp, 0.0, 1.8);
       phase = hash1(i * 17.31 + 0.73) * TAU;
     }
     float oceanHeight(vec2 pos) {
       float h = 0.0;
-      for (int j = 0; j < 8; j++) {
+      for (int j = 0; j < 32; j++) {
         float i = float(j);
         float freq;
         float amp;
@@ -942,7 +953,7 @@ const waterMat = new THREE.ShaderMaterial({
         component(i, freq, amp, phase);
         float k = freq * freq / gravity;
         float w = dot(waveDir(i), pos) * k - freq * uTime + phase;
-        h += amp * (sin(w) + 0.18 * sin(2.0 * w + phase));
+        h += amp * sin(w);
       }
       return h * uChop;
     }
@@ -993,9 +1004,9 @@ const waterMat = new THREE.ShaderMaterial({
       float depth = pow(vUv.y, 1.48);
       float h = oceanHeight(spectralPos);
       float hNorm = clamp(h * 0.40 + 0.5, 0.0, 1.0);
-      vec3 waterDeep = vec3(0.006, 0.025, 0.085);
-      vec3 waterShallow = vec3(0.028, 0.18, 0.26);
-      vec3 waterCrest = vec3(0.16, 0.43, 0.54);
+      vec3 waterDeep = vec3(0.006, 0.030, 0.105);
+      vec3 waterShallow = vec3(0.025, 0.145, 0.230);
+      vec3 waterCrest = vec3(0.14, 0.38, 0.50);
       vec3 waterBody = mix(waterDeep, waterShallow, depth);
       waterBody = mix(waterBody, waterCrest, pow(hNorm, 3.0) * 0.68);
       float curvature = clamp((1.0 - normal.y) * 2.2, 0.0, 1.0);
@@ -1019,7 +1030,7 @@ const waterMat = new THREE.ShaderMaterial({
       float shore = smoothstep(-7.8, -2.4, vWorld.z) * shoreComb;
       vec3 dispR = vec3(0.04, 0.0, 0.0) * curvature * foamDensity;
       vec3 dispB = vec3(0.0, 0.0, 0.06) * curvature * foamDensity;
-      water = mix(water, vec3(0.88, 0.95, 0.98), clamp(foamDensity * 0.58 + shore * 0.72, 0.0, 1.0));
+      water = mix(water, vec3(0.88, 0.96, 0.99), clamp(foamDensity * 0.34 + shore * 0.16, 0.0, 0.58));
       water += dispR + dispB + vec3(0.025, 0.0, 0.035) * foamDensity * noise(foamUv * 0.4);
       float fogT = clamp((1.0 - vUv.y) * 1.35, 0.0, 1.0);
       vec3 fogColor = uSkyTint + vec3(0.06, 0.10, 0.20);
@@ -1027,8 +1038,8 @@ const waterMat = new THREE.ShaderMaterial({
       water = water / (water + vec3(1.0));
       water = pow(water, vec3(1.0 / 2.2));
       float horizonFade = smoothstep(-92.0, -42.0, vWorld.z);
-      float alpha = mix(0.34, 0.50, smoothstep(0.08, 0.96, vUv.y)) * horizonFade;
-      alpha = max(alpha, clamp(foamDensity * 0.70 + shore * 0.34, 0.0, 0.78));
+      float alpha = mix(0.24, 0.44, smoothstep(0.08, 0.96, vUv.y)) * horizonFade;
+      alpha = max(alpha, clamp(foamDensity * 0.38 + shore * 0.08, 0.0, 0.50));
       gl_FragColor = vec4(water, alpha);
     }
   `,
@@ -1066,7 +1077,7 @@ const wetSand = new THREE.Mesh(
     roughness: .34,
     metalness: .05,
     transparent: true,
-    opacity: .42
+    opacity: .30
   })
 );
 wetSand.name = 'reflective-wet-sand-transition';
@@ -1076,7 +1087,7 @@ wetSand.receiveShadow = true;
 wetSand.visible = true;
 scene.add(wetSand);
 
-const shallowsMat = new THREE.MeshBasicMaterial({ color: 0xb7e7e1, transparent: true, opacity: .18, depthWrite: false });
+const shallowsMat = new THREE.MeshBasicMaterial({ color: 0xb7e7e1, transparent: true, opacity: .03, depthWrite: false });
 for (let i = 0; i < 4; i++) {
   const shallows = new THREE.Mesh(new THREE.PlaneGeometry(95 - i * 7, 1.2, 40, 1), shallowsMat);
   shallows.name = 'transparent-shallow-water-band';
@@ -1090,7 +1101,7 @@ const causticMat = new THREE.MeshBasicMaterial({
   map: causticTex,
   color: 0xdffff3,
   transparent: true,
-  opacity: .22,
+  opacity: .04,
   depthWrite: false,
   blending: THREE.AdditiveBlending
 });
@@ -1153,11 +1164,37 @@ function roof(name, x, z) {
 box('beach-house', [5.6, 2.4, 3.8], [-9.2, 1.08, 3.8], woodMat);
 roof('beach-house-roof', -9.2, 3.8);
 box('warm-window', [1.0, 1.25, .08], [-9.2, 1.15, 5.74], glassMat);
-box('bar-base', [7.2, 1.4, 1.35], [8.6, .64, 3.9], darkWoodMat);
-box('bar-counter', [7.8, .28, 1.75], [8.6, 1.48, 3.9], woodMat);
+box('bar-base', [5.8, 1.18, 1.18], [6.8, .54, 3.85], darkWoodMat);
+box('bar-counter', [6.35, .24, 1.55], [6.8, 1.26, 3.85], woodMat);
 contactShadow('house-contact-shadow', -9.2, 4.8, 3.8, 2.6, .22);
-contactShadow('bar-contact-shadow', 8.6, 4.2, 4.8, 1.7, .2);
-for (let i = 0; i < 12; i++) cyl('bar-bamboo-' + i, .09, 1.55, [5.2 + i * .62, .72, 3.13], [0,0,0], woodMat, 16);
+contactShadow('bar-contact-shadow', 6.8, 4.2, 3.8, 1.45, .2);
+for (let i = 0; i < 10; i++) cyl('bar-bamboo-' + i, .07, 1.36, [4.05 + i * .60, .58, 3.12], [0,0,0], woodMat, 16);
+for (const x of [3.65, 9.95]) {
+  cyl('bar-pergola-upright', .09, 2.25, [x, 1.16, 3.06], [0,0,0], darkWoodMat, 14);
+  cyl('bar-pergola-upright', .09, 2.25, [x, 1.16, 4.68], [0,0,0], darkWoodMat, 14);
+}
+const barCanopy = new THREE.Mesh(new THREE.BoxGeometry(6.9, .12, 2.0), new THREE.MeshStandardMaterial({ color: 0xcba667, roughness: .86 }));
+barCanopy.name = 'woven-palm-beach-bar-canopy';
+barCanopy.position.set(6.8, 2.25, 3.86);
+barCanopy.castShadow = true;
+barCanopy.receiveShadow = true;
+scene.add(barCanopy);
+const signTex = canvasTexture(512, (ctx, s) => {
+  ctx.fillStyle = '#2d1c12';
+  ctx.fillRect(0, 0, s, s);
+  ctx.strokeStyle = 'rgba(255,215,128,.58)';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(20, 20, s - 40, s - 40);
+  ctx.fillStyle = '#f1d184';
+  ctx.font = '700 92px Georgia';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('ALHENA', s / 2, s / 2 + 5);
+});
+const barSign = new THREE.Mesh(new THREE.BoxGeometry(1.58, .22, .055), new THREE.MeshStandardMaterial({ map: signTex, color: 0xffffff, roughness: .76 }));
+barSign.name = 'alhena-bar-front-sign';
+barSign.position.set(6.8, 1.46, 4.66);
+scene.add(barSign);
 for (let i = 0; i < 11; i++) {
   const plank = box('dock-plank-' + i, [1.9, .16, .42], [-6.9 + i * 1.25, .1, -.55 - i * .38], woodMat);
   plank.rotation.y = -.16;
@@ -1352,7 +1389,7 @@ addLantern(12.1, 1.88, 3.15);
 addLantern(-10.7, 2.2, 5.8);
 
 const bottleMat = new THREE.MeshPhysicalMaterial({ color: 0x98e0d6, roughness: .08, transmission: .22, transparent: true, opacity: .72 });
-for (const [x, z, h] of [[7.25,3.05,.55],[7.72,3.02,.42],[10.95,3.02,.62],[11.45,3.04,.5]]) {
+for (const [x, z, h] of [[5.45,3.05,.55],[5.92,3.02,.42],[8.95,3.02,.62],[9.25,3.04,.5]]) {
   cyl('bar-glass-bottle', .08, h, [x, 1.92 + h * .5, z], [0,0,0], bottleMat, 18);
 }
 
@@ -1415,8 +1452,9 @@ function makeSeaOats(x, z, scale = 1, count = 9) {
 function makeAlhena() {
   const group = new THREE.Group();
   group.name = 'alhena-modest-bartender-mesh-slot';
-  group.position.set(8.6, 1.68, 3.28);
+  group.position.set(6.8, 1.46, 3.25);
   group.rotation.y = 0;
+  group.scale.setScalar(.82);
   const torso = new THREE.Mesh(new THREE.CylinderGeometry(.42, .62, 1.25, 32), clothMat);
   torso.position.y = .15;
   const waist = new THREE.Mesh(new THREE.CylinderGeometry(.36, .56, .24, 32), clothMat);
@@ -1717,7 +1755,7 @@ const runtimeAssetSlots = {
   alhena_bartender_rig: {
     fallback: [alhena.group],
     place(model) {
-      model.position.set(8.6, 1.68, 3.28);
+      model.position.set(6.8, 1.46, 3.25);
       model.rotation.y = 0;
       model.scale.setScalar(1);
     }
@@ -1804,7 +1842,7 @@ const views = {
   water: { pos: [2.6, 1.28, 4.9], look: [1.0, .28, -42], note: 'Low shore-water view.' },
   dock: { pos: [-7.8, 2.35, 7.8], look: [-1.0, .78, -8.5], note: 'Dock and cast lane.' },
   dog: { pos: [5.1, 1.18, 7.1], look: [3.0, .62, 5.18], note: 'Black lab companion view; GLB rig slot replaces this fallback.' },
-  bar: { pos: [8.45, 2.55, 8.8], look: [8.6, 1.38, 3.22], note: 'Alhena bartender slot.' },
+  bar: { pos: [6.75, 2.35, 8.3], look: [6.8, 1.24, 3.22], note: 'Alhena bartender slot.' },
 };
 
 function setStatus(message) {
