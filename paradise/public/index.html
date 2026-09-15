@@ -387,7 +387,7 @@ body.started .hud { opacity: 1; transform: none; }
 }
 </style>
 </head>
-<body>
+<body data-water-system="pandorachat-jonswap-webgl-ocean-v4">
 <canvas id="water" aria-hidden="true"></canvas>
 <canvas id="world" aria-label="Paradise ocean fishing game"></canvas>
 <div class="veil"></div>
@@ -625,11 +625,6 @@ function initWaterShader() {
     uniform vec2 u_sun;
     uniform float u_light;
 
-    mat2 rot(float a) {
-      float s = sin(a), c = cos(a);
-      return mat2(c, -s, s, c);
-    }
-
     float hash(vec2 p) {
       p = fract(p * vec2(123.34, 456.21));
       p += dot(p, p + 45.32);
@@ -652,47 +647,87 @@ function initWaterShader() {
       float a = 0.5;
       for (int i = 0; i < 5; i++) {
         v += noise(p) * a;
-        p = rot(1.17) * p * 2.03 + 7.31;
+        p = mat2(1.63, -1.08, 1.08, 1.63) * p + 7.31;
         a *= 0.52;
       }
       return v;
     }
 
-    float jonswapEnergy(float f, float fp, float gamma) {
-      float sigma = mix(0.09, 0.07, step(f, fp));
-      float r = exp(-pow((f / fp - 1.0) / sigma, 2.0) * 0.5);
-      float peak = pow(gamma, r);
-      float tail = pow(f, -5.0) * exp(-1.25 * pow(fp / f, 4.0));
-      return tail * peak;
+    float jonswapSpectrum(float omega, float wp) {
+      float sigma = omega <= wp ? 0.07 : 0.09;
+      float peak = exp(-pow(omega - wp, 2.0) / (2.0 * sigma * sigma * wp * wp));
+      return 0.0081 * 9.81 * 9.81 / pow(omega, 5.0)
+        * exp(-1.25 * pow(wp / omega, 4.0))
+        * pow(3.3, peak);
     }
 
-    float waveComponent(vec2 p, float i, float wind, float chop) {
-      float idx = i / 31.0;
-      float fp = mix(0.052, 0.034, wind);
-      float f = mix(0.018, 0.18, idx);
-      float gamma = mix(2.2, 5.6, chop);
-      float e = jonswapEnergy(f, fp, gamma);
-      float ePeak = jonswapEnergy(fp, fp, gamma);
-      float amp = sqrt(max(e / ePeak, 0.0)) * (0.018 + 0.11 * wind);
-
-      float spread = mix(1.15, 0.38, smoothstep(0.0, 1.0, wind));
-      float angle = 0.62 + (hash(vec2(i, 2.7)) - 0.5) * spread + wind * 0.28;
-      vec2 dir = normalize(rot(angle) * vec2(1.0, 0.24 + sin(i * 2.1) * 0.16));
-
-      float dispersion = sqrt(9.81 * f) * 0.42;
-      float phase = u_time * dispersion + hash(vec2(i, 9.1)) * 6.2831853;
-      float k = f * (42.0 + wind * 24.0);
-      float crest = sin(dot(p, dir) * k + phase);
-      crest += sin(dot(p, dir.yx) * k * 1.84 - phase * 1.17) * 0.18 * chop;
-      return crest * amp * (0.75 + chop * 0.6);
+    void waveComponent(float i, float windSpeed, out vec2 dir, out float k, out float omega, out float amp, out float phase) {
+      float t = i / 39.0;
+      float wp = 0.13 * 9.81 / max(windSpeed, 1.5) * 6.28318530718;
+      float wMin = wp * 0.38;
+      float wMax = wp * 7.80;
+      omega = wMin * pow(wMax / wMin, t);
+      k = omega * omega / 9.81;
+      float spectrum = jonswapSpectrum(omega, wp);
+      float spread = mix(1.18, 0.12, smoothstep(0.0, 1.0, t));
+      float theta = -1.57079632679 + (t - 0.5) * 3.14159265359 * spread + 0.24 + (hash(vec2(i, 8.31)) - 0.5) * 0.34;
+      dir = normalize(vec2(cos(theta), sin(theta)));
+      float longSet = mix(1.26, 0.70, smoothstep(0.42, 1.0, t));
+      amp = clamp(sqrt(2.0 * spectrum * ((wMax - wMin) / 40.0)) * 0.74 * windSpeed / 12.0 * longSet, 0.0, 2.35);
+      phase = hash(vec2(i * 19.19, 3.7)) * 6.28318530718;
     }
 
-    float oceanHeight(vec2 p) {
+    float oceanHeight(vec2 p, float windSpeed) {
       float h = 0.0;
-      for (int i = 0; i < 32; i++) {
-        h += waveComponent(p, float(i), u_wind, u_chop);
+      for (int i = 0; i < 40; i++) {
+        vec2 dir;
+        float k;
+        float omega;
+        float amp;
+        float phase;
+        waveComponent(float(i), windSpeed, dir, k, omega, amp, phase);
+        float w = dot(dir, p) * k - omega * u_time + phase;
+        h += amp * sin(w);
       }
-      return h;
+      return h * (0.50 + u_chop * 0.78);
+    }
+
+    vec2 oceanGradient(vec2 p, float windSpeed) {
+      vec2 g = vec2(0.0);
+      for (int i = 0; i < 40; i++) {
+        vec2 dir;
+        float k;
+        float omega;
+        float amp;
+        float phase;
+        waveComponent(float(i), windSpeed, dir, k, omega, amp, phase);
+        float w = dot(dir, p) * k - omega * u_time + phase;
+        g += dir * (amp * k * cos(w));
+      }
+      return g * (0.50 + u_chop * 0.78);
+    }
+
+    float curvature(vec2 p, float windSpeed) {
+      float c = 0.0;
+      for (int i = 0; i < 40; i++) {
+        vec2 dir;
+        float k;
+        float omega;
+        float amp;
+        float phase;
+        waveComponent(float(i), windSpeed, dir, k, omega, amp, phase);
+        float w = dot(dir, p) * k - omega * u_time + phase;
+        c += -amp * k * k * sin(w);
+      }
+      return c * (0.50 + u_chop * 0.78);
+    }
+
+    float schlick(float cosTheta) {
+      return 0.0204 + 0.9796 * pow(1.0 - clamp(cosTheta, 0.0, 1.0), 5.0);
+    }
+
+    vec3 acesTone(vec3 x) {
+      return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
     }
 
     void main() {
@@ -706,54 +741,70 @@ function initWaterShader() {
       }
 
       float depth = clamp((y - waterTop) / (shore - waterTop), 0.0, 1.0);
-      float perspective = 0.18 + depth * depth * 2.8;
-      vec2 world = vec2((uv.x - 0.5) * (32.0 + depth * 105.0), perspective * 48.0);
-      world.y += u_time * (0.88 + u_wind * 1.15);
+      float windSpeed = mix(4.8, 19.5, clamp(u_wind, 0.0, 1.0));
+      float range = min(155.0, 1.0 / max(0.030, pow(1.0 - depth + 0.055, 1.75)));
+      vec2 q = (gl_FragCoord.xy * 2.0 - u_resolution) / min(u_resolution.x, u_resolution.y);
+      vec2 world = vec2(q.x * range * 2.75, range * 5.15 - u_time * (0.32 + windSpeed * 0.018));
+      world += vec2(
+        fbm(world * 0.045 + vec2(7.0, u_time * 0.02)),
+        fbm(world * 0.075 + vec2(-3.0, -u_time * 0.018))
+      ) * 0.35 * u_chop;
 
-      float h = oceanHeight(world);
-      float e = mix(0.19, 0.055, depth);
-      float hx = oceanHeight(world + vec2(e, 0.0)) - oceanHeight(world - vec2(e, 0.0));
-      float hy = oceanHeight(world + vec2(0.0, e)) - oceanHeight(world - vec2(0.0, e));
-      vec3 normal = normalize(vec3(-hx * 4.8, 0.62 + depth * 1.46, -hy * 4.8));
+      float h = oceanHeight(world, windSpeed);
+      vec2 grad = oceanGradient(world, windSpeed);
+      float curve = abs(curvature(world, windSpeed));
+      float slope = clamp(length(grad) * 1.05, 0.0, 1.0);
+      vec2 micro = vec2(
+        fbm(world * vec2(0.52, 2.4) + vec2(u_time * 0.11, -u_time * 0.06)),
+        fbm(world * vec2(1.8, 0.48) + vec2(-u_time * 0.16, u_time * 0.04))
+      ) - 0.5;
+      vec3 normal = normalize(vec3(-grad.x, 1.0, -grad.y) + vec3(micro.x, 0.0, micro.y) * (0.18 + u_chop * 0.18));
 
-      vec3 viewDir = normalize(vec3(0.0, 0.5 + depth * 1.25, 1.0));
-      float fresnel = pow(1.0 - clamp(dot(normal, viewDir), 0.0, 1.0), 3.0);
-      vec3 reflectedSky = mix(u_horizon, u_sky_top, clamp(0.3 + normal.z * 0.42 - depth * 0.15, 0.0, 1.0));
-      vec3 body = mix(u_sea_far, u_sea_near, depth);
-      body = mix(body, vec3(0.02, 0.52, 0.58), (1.0 - depth) * (0.18 + u_wind * 0.16));
+      vec3 viewDir = normalize(vec3(q.x * 0.42, 0.38 + depth * 0.92, 1.0));
+      float fresnel = schlick(dot(normal, viewDir));
+      vec3 reflectedSky = mix(u_horizon, u_sky_top, clamp(0.36 + normal.z * 0.36 - depth * 0.12, 0.0, 1.0));
+      vec3 deep = mix(u_sea_far * 0.34, vec3(0.002, 0.015, 0.050), 0.46);
+      vec3 middle = mix(u_sea_far, u_sea_near, 0.34);
+      vec3 shallow = mix(u_sea_near, vec3(0.035, 0.32, 0.34), 0.34);
+      vec3 body = mix(deep, middle, smoothstep(0.04, 0.68, depth));
+      body = mix(body, shallow, smoothstep(0.62, 1.0, depth));
+
+      float backScatter = pow(max(dot(normal, normalize(vec3(-0.22, 0.74, 0.62))), 0.0), 1.6);
+      float forwardScatter = pow(max(dot(viewDir, normalize(vec3(-0.15, 0.12, 0.96))), 0.0), 3.2);
+      float caustics = smoothstep(0.62, 0.92, fbm(world * vec2(0.42, 1.18) + micro * 0.7));
+      body += vec3(0.00, 0.34, 0.31) * backScatter * depth * 0.32;
+      body += vec3(0.10, 0.40, 0.34) * forwardScatter * smoothstep(0.34, 1.0, depth) * 0.22;
+      body += vec3(0.10, 0.58, 0.52) * caustics * smoothstep(0.70, 1.0, depth) * (1.0 - u_haze) * 0.13;
 
       vec2 sunUv = vec2(u_sun.x, 1.0 - u_sun.y);
       vec2 toSun = normalize((sunUv - uv) * vec2(u_resolution.x / u_resolution.y, 1.0));
-      vec2 slope = normalize(normal.xz + vec2(0.0001));
-      float glitter = pow(max(dot(slope, toSun), 0.0), 24.0) * (0.34 + u_chop * 1.08);
-      float sunPath = pow(max(0.0, 1.0 - abs(uv.x - u_sun.x) * 5.0), 3.0) * pow(1.0 - depth, 1.7);
-      float specular = glitter * sunPath * u_light;
+      vec2 slopeDir = normalize(normal.xz + vec2(0.0001));
+      float sunPath = pow(max(0.0, 1.0 - abs(uv.x - u_sun.x) * 5.2), 3.0) * pow(1.0 - abs(depth - 0.24), 2.4);
+      float glints = smoothstep(0.68, 0.96, fbm(world * vec2(4.8, 1.25) + vec2(u_time * 0.28, -u_time * 0.10)));
+      float specular = pow(max(dot(slopeDir, toSun), 0.0), 28.0) * glints * sunPath * (0.50 + u_chop * 1.20) * u_light;
 
-      float curvature = abs(hx) + abs(hy);
-      float scatter = smoothstep(0.1, 0.68, curvature) * (1.0 - depth) * (0.28 + u_light * 0.32);
-      float crest = smoothstep(0.13 + (1.0 - u_foam) * 0.16, 0.28, h + curvature * 0.34);
-      float shoreFoam = smoothstep(0.76, 0.92, depth) * (0.45 + 0.35 * sin(world.x * 0.31 + u_time * 2.0));
-      float foamNoise = fbm(world * vec2(0.82, 1.75) + vec2(u_time * 0.7, -u_time * 0.18));
-      float foamCells = smoothstep(0.47, 0.92, foamNoise) * smoothstep(0.18, 0.7, curvature + u_foam * 0.45);
-      float foam = clamp((crest * foamCells * u_foam + shoreFoam * (0.42 + foamCells * 0.5)) * (0.55 + u_chop * 0.55), 0.0, 1.0);
+      float crestEnergy = smoothstep(0.05, 0.42, abs(h)) * max(slope, curve * 0.14);
+      float streakField = smoothstep(0.48, 0.86, fbm(vec2(world.x * 0.09 - u_time * 0.035, world.y * 1.65 + u_time * 0.15)));
+      float foamNoise = fbm(world * vec2(0.86, 1.95) + vec2(u_time * 0.08, -u_time * 0.05));
+      float microFoam = smoothstep(0.36 + (1.0 - u_foam) * 0.22, 0.86, abs(h) + slope * 0.14) * smoothstep(0.42, 0.82, foamNoise);
+      float shoreLine = 0.82 + sin(world.x * 0.065 + u_time * 0.70) * 0.018;
+      float shoreFoam = smoothstep(0.045, 0.0, abs(depth - shoreLine)) * smoothstep(0.42, 0.82, fbm(vec2(world.x * 0.58, u_time * 0.42)));
+      float foam = clamp((crestEnergy * microFoam * (0.52 + streakField * 0.76) + shoreFoam * 0.72) * (0.45 + u_foam * 1.55), 0.0, 1.0);
 
-      vec3 color = mix(body, reflectedSky, fresnel * 0.58);
-      color += vec3(0.0, 0.27, 0.29) * scatter;
-      color *= 0.92 + smoothstep(0.02, 0.2, h + curvature * 0.18) * 0.18;
-      vec3 shimmer = vec3(
-        specular * (1.02 + 0.18 * sin((uv.x + normal.x) * 620.0 + u_time * 4.7)),
-        specular * 0.86,
-        specular * (0.74 + 0.24 * sin((uv.y + normal.z) * 530.0 - u_time * 5.2))
-      );
-      color += vec3(1.0, 0.83, 0.48) * specular + shimmer * vec3(0.24, 0.08, 0.3);
-      color = mix(color, vec3(0.92, 0.98, 1.0), foam * 0.72);
-      float horizonFog = pow(1.0 - depth, 2.3) * (0.34 + u_haze * 0.85);
-      color = mix(color, u_horizon, horizonFog);
-      color = mix(color, vec3(0.38, 0.43, 0.46), u_haze * 0.32);
-      color *= 0.72 + u_light * 0.48;
+      vec3 color = mix(body, reflectedSky, clamp(fresnel * 0.74 + slope * 0.055, 0.0, 0.72));
+      float swellShadow = smoothstep(0.40, 0.84, fbm(vec2(world.x * 0.025 - u_time * 0.012, world.y * 0.15 + u_time * 0.035)));
+      color = mix(color, color * vec3(0.58, 0.74, 0.80), swellShadow * smoothstep(0.04, 0.82, 1.0 - depth) * 0.32);
+      color += vec3(0.018, 0.19, 0.22) * streakField * smoothstep(0.02, 0.88, depth) * 1.45;
+      color += vec3(1.0, 0.84, 0.48) * specular;
+      color = mix(color, vec3(0.91, 0.975, 1.0), foam * 0.58);
+      color += vec3(0.05, 0.00, 0.08) * foam * curve * 0.018;
+      float horizonFog = pow(1.0 - depth, 2.65) * (0.30 + u_haze * 0.95);
+      color = mix(color, mix(u_horizon, vec3(0.55,0.66,0.69), u_haze), horizonFog);
+      color = mix(color, vec3(0.34, 0.39, 0.42), u_haze * 0.28);
+      color *= 0.78 + u_light * 0.48;
       float vignette = smoothstep(0.92, 0.22, length((uv - 0.5) * vec2(1.05, 0.88)));
       color *= 0.74 + vignette * 0.34;
-      color = color / (color + vec3(0.88));
+      color = acesTone(color * 1.18);
       color = pow(color, vec3(0.4545));
 
       gl_FragColor = vec4(color, 1.0);
