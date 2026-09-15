@@ -512,6 +512,80 @@ water.position.set(0, -0.62, -72);
 scene.add(water);
 water.visible = false;
 
+const nearWaterMat = new THREE.ShaderMaterial({
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  uniforms: {
+    uTime: { value: 0 },
+    uSun: { value: new THREE.Vector3(-0.42, 0.62, 0.2).normalize() },
+    uDeep: { value: new THREE.Color(0x07526f) },
+    uGlint: { value: new THREE.Color(0xdffcff) },
+    uGold: { value: new THREE.Color(0xffdc84) },
+  },
+  vertexShader: `
+    uniform float uTime;
+    varying vec2 vUv;
+    varying vec3 vWorld;
+    varying float vFoam;
+    float wave(vec2 p, vec2 d, float a, float f, float s) {
+      return sin(dot(p, normalize(d)) * f + uTime * s) * a;
+    }
+    void main() {
+      vUv = uv;
+      vec3 p = position;
+      vec2 q = p.xz;
+      float h =
+        wave(q, vec2(1.0, 0.28), 0.050, 0.34, 0.86) +
+        wave(q, vec2(-0.34, 1.0), 0.030, 0.62, 1.18) +
+        wave(q, vec2(0.72, -0.44), 0.018, 1.55, 1.74);
+      float shoreMask = smoothstep(0.0, 0.42, uv.y) * smoothstep(1.0, 0.50, uv.y);
+      p.y += h * shoreMask;
+      p.z += sin(p.x * 0.13 + uTime * 0.72) * 0.16 * shoreMask;
+      vFoam = shoreMask * smoothstep(0.34, 0.98, abs(h) * 7.0);
+      vec4 world = modelMatrix * vec4(p, 1.0);
+      vWorld = world.xyz;
+      gl_Position = projectionMatrix * viewMatrix * world;
+    }
+  `,
+  fragmentShader: `
+    precision highp float;
+    uniform float uTime;
+    uniform vec3 uSun;
+    uniform vec3 uDeep;
+    uniform vec3 uGlint;
+    uniform vec3 uGold;
+    varying vec2 vUv;
+    varying vec3 vWorld;
+    varying float vFoam;
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
+    float noise(vec2 p) {
+      vec2 i = floor(p), f = fract(p);
+      vec2 u = f * f * (3.0 - 2.0 * f);
+      return mix(mix(hash(i), hash(i + vec2(1.0,0.0)), u.x), mix(hash(i + vec2(0.0,1.0)), hash(i + vec2(1.0,1.0)), u.x), u.y);
+    }
+    void main() {
+      float shoreFade = smoothstep(0.03, 0.32, vUv.y) * smoothstep(1.0, 0.70, vUv.y);
+      float distortion = noise(vWorld.xz * vec2(0.42, 1.35) + vec2(uTime * 0.08, -uTime * 0.14)) - 0.5;
+      float lines = pow(1.0 - abs(sin(vWorld.z * 1.15 + vWorld.x * 0.08 + distortion * 1.8 - uTime * 1.45)), 13.0);
+      float cross = pow(1.0 - abs(sin(vWorld.x * 1.75 + vWorld.z * 0.22 + distortion * 2.4 + uTime * 0.62)), 30.0);
+      float stipple = smoothstep(0.45, 0.88, noise(vWorld.xz * vec2(1.8, 5.6) + vec2(uTime * 0.12, -uTime * 0.28)));
+      float fresnel = pow(1.0 - clamp(dot(normalize(cameraPosition - vWorld), normalize(vec3(0.0, 1.0, 0.18))), 0.0, 1.0), 3.0);
+      vec3 color = uDeep * 0.15;
+      color += uGlint * lines * shoreFade * 0.10;
+      color += uGlint * cross * stipple * shoreFade * 0.07;
+      color += uGold * fresnel * shoreFade * 0.06;
+      color = mix(color, vec3(0.92, 0.99, 1.0), vFoam * stipple * 0.42);
+      float alpha = shoreFade * (0.07 + lines * 0.075 + cross * 0.04 + vFoam * 0.07);
+      gl_FragColor = vec4(color, alpha);
+    }
+  `
+});
+const nearWater = new THREE.Mesh(new THREE.PlaneGeometry(52, 17, 160, 42), nearWaterMat);
+nearWater.rotation.x = -Math.PI / 2;
+nearWater.position.set(0, -0.38, 12.8);
+scene.add(nearWater);
+
 function makeSandTexture() {
   const c = document.createElement('canvas');
   c.width = 512;
@@ -1061,6 +1135,7 @@ const clock = new THREE.Clock();
 function animate() {
   const elapsed = clock.getElapsedTime();
   waterUniforms.uTime.value = elapsed;
+  nearWaterMat.uniforms.uTime.value = elapsed;
   foamMat.uniforms.uTime.value = elapsed;
   sandMat.uniforms.uTime.value = elapsed;
   for (const accent of shoreAccents) {
