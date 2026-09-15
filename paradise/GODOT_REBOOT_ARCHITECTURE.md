@@ -40,7 +40,7 @@ Target source:
 - `godotengine/tps-demo`
 - Godot Asset Library: Third Person Shooter Demo
 
-Verified 2026-09-15:
+Verified 2026-09-15 and refreshed after the PandoraChat water pass:
 
 - Godot Asset Library page for the Third Person Shooter Demo describes it as a
   complete TPS demo built for Godot Engine and suitable as an engine/sample
@@ -48,6 +48,11 @@ Verified 2026-09-15:
 - Godot's official documentation and site continue to describe web deployment as
   a supported target through HTML5/WebAssembly/WebGL-style export paths:
   https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_web.html
+- The current Mac does not expose a `godot` or `godot4` CLI in `PATH`, and no
+  Godot.app was found in `/Applications` during this pass. Install Godot 4.x
+  before treating the reboot as executable locally.
+- Current observed free disk is about 65 GiB, so disk space is no longer the
+  immediate blocker for Godot, Blender, GLB assets, or small reference projects.
 
 Fallback/reference sources:
 
@@ -71,6 +76,19 @@ The bar for satisfying water is not "blue shader plane." The better demos use:
 
 The most relevant product-level reference found quickly was EasyWaterscape for Unreal Engine: it uses FFT/Tessendorf/JONSWAP-style ocean simulation, shoreline foam, buoyancy, presets, and tile-free rendering. We should not copy the product, but we should copy the lesson: the tool/pipeline matters as much as the shader.
 
+Current live Paradise V2 water status:
+
+- `/game-v2/` now uses a dedicated full-screen WebGL ocean pass by default.
+- The shader is JONSWAP-inspired and includes analytical normals, Fresnel sky
+  reflection, subsurface scatter, foam, fog, caustic breakup, ACES-style tone
+  mapping, and weather/time preset inputs.
+- The older `/game/` water pass contributed useful reflection/folding/haze math;
+  those ideas have been ported back into V2 and verified live under marker
+  `v2-pandorachat-legacy-reflection-folding-haze-inheritance`.
+- The remaining visual failure is not the ocean pass itself. It is the lack of a
+  coherent authored 3D world around it: the current beach/bar/house/Alhena/dog
+  layer still mixes billboard cutouts and procedural stand-ins.
+
 ## Reboot Plan
 
 ### Phase 0: Stop Promoting Placeholder Art
@@ -83,7 +101,11 @@ Do not continue adding visual hacks to `/` unless they preserve the current work
 
 Install or locate Godot 4.x locally.
 
-If disk is constrained, do not clone LFS-heavy repositories until space is reclaimed. Current observed free disk during this pass was about 4.3 GiB.
+Use Godot 4.x with the Compatibility renderer for browser export. Godot's own
+web-export documentation says Godot 4 web export requires WebAssembly and
+WebGL 2.0, and that Forward+/Mobile renderers are not supported on the web. That
+means the Paradise web build must be designed for WebGL2 constraints from day
+one, not ported after the fact.
 
 ### Phase 2: Clone Seed Into Isolated Workspace
 
@@ -91,6 +113,7 @@ Create:
 
 - `paradise/godot/seed-tps/`
 - `paradise/godot/paradise-game/`
+- `paradise/public/game-v3/` for exported web artifacts only
 
 Keep the seed untouched. Build Paradise in the second folder by copying/adapting patterns.
 
@@ -130,9 +153,22 @@ Replace placeholders in this order:
 
 Deploy Godot web export under:
 
-- `https://paradise.alhena.cc/game/`
+- `https://paradise.alhena.cc/game-v3/`
 
-Keep `/` as a landing/launcher page until `/game/` visually beats it.
+Keep `/`, `/game/`, and `/game-v2/` as fallbacks until `/game-v3/` visually beats
+them. Promote only after screenshot and runtime verification.
+
+Web-export serving requirements:
+
+- Export file names must remain consistent with Godot's generated HTML/JS/WASM/PCK
+  bundle.
+- Serve `.wasm` as `application/wasm` and `.pck` as `application/octet-stream`.
+- Prefer single-threaded web export first for Safari/iOS compatibility.
+- If enabling threads later, configure cross-origin isolation headers:
+  `Cross-Origin-Opener-Policy: same-origin` and
+  `Cross-Origin-Embedder-Policy: require-corp`.
+- Expect browser input rules: fullscreen, pointer lock, audio, motion sensors,
+  and haptics must be entered through real user gestures.
 
 ## Promotion Gates
 
@@ -144,6 +180,7 @@ The Godot version may replace the current page only when:
 - Water visibly exceeds current 2D water.
 - Alhena and dog no longer read as placeholders.
 - Screenshot evidence is captured and committed.
+- Cloudflare Worker deployment verifies root, fallback, and candidate routes.
 
 ## Runtime Asset Contract
 
