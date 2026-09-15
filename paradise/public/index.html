@@ -1286,22 +1286,70 @@ function drawSurfFlecks(t, top, bottom, weather) {
 function drawFishShadows(t, top, bottom) {
   const w = state.w;
   ctx.save();
-  ctx.globalAlpha = 0.13;
   for (let i = 0; i < 7; i++) {
     const x = (w - ((t * (0.018 + i * 0.004) + i * 221) % (w + 260))) + 130;
     const y = top + ((i * 47) % 100) / 100 * (bottom - top) * 0.82;
     const s = 0.55 + ((i * 13) % 60) / 100;
-    ctx.fillStyle = i % 3 === 0 ? '#d8c378' : '#9fc3d3';
-    ctx.beginPath();
-    ctx.ellipse(x, y, 34 * s, 8 * s, Math.sin(i) * 0.1, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(x + 31 * s, y);
-    ctx.lineTo(x + 52 * s, y - 10 * s);
-    ctx.lineTo(x + 49 * s, y + 10 * s);
-    ctx.closePath();
-    ctx.fill();
+    const fish = FISH[i % FISH.length];
+    drawFishSprite(x, y, 58 * s, fish.color, i % 2 ? -1 : 1, 0.09 + (1 - s) * 0.04, t * 0.001 + i);
   }
+  ctx.restore();
+}
+
+function drawFishSprite(x, y, len, color, dir = 1, alpha = 1, phase = 0) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(dir, 1);
+  ctx.globalAlpha *= alpha;
+  const bodyH = len * 0.23;
+  const tail = len * 0.24;
+  const shimmer = Math.sin(phase * 6.283) * 0.08;
+  const grad = ctx.createLinearGradient(-len * 0.5, -bodyH, len * 0.5, bodyH);
+  grad.addColorStop(0, mix(color, '#0a1620', 0.42));
+  grad.addColorStop(0.34, mix(color, '#ffffff', 0.2 + shimmer));
+  grad.addColorStop(0.72, color);
+  grad.addColorStop(1, mix(color, '#031018', 0.52));
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, len * 0.46, bodyH, -0.02, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = mix(color, '#ffffff', 0.16);
+  ctx.beginPath();
+  ctx.moveTo(-len * 0.42, 0);
+  ctx.lineTo(-len * 0.42 - tail, -bodyH * 0.95);
+  ctx.quadraticCurveTo(-len * 0.52, 0, -len * 0.42 - tail, bodyH * 0.95);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = `rgba(255,255,255,${0.16 + alpha * 0.08})`;
+  ctx.beginPath();
+  ctx.ellipse(len * 0.08, -bodyH * 0.28, len * 0.18, bodyH * 0.2, -0.15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = `rgba(255,255,255,${0.14 + alpha * 0.08})`;
+  ctx.lineWidth = Math.max(0.7, len * 0.012);
+  for (let i = 0; i < 4; i++) {
+    const sx = -len * 0.16 + i * len * 0.11;
+    ctx.beginPath();
+    ctx.moveTo(sx, -bodyH * 0.72);
+    ctx.quadraticCurveTo(sx + len * 0.03, 0, sx - len * 0.02, bodyH * 0.74);
+    ctx.stroke();
+  }
+  ctx.fillStyle = mix(color, '#fff6cc', 0.22);
+  ctx.beginPath();
+  ctx.moveTo(-len * 0.06, -bodyH * 0.84);
+  ctx.lineTo(len * 0.12, -bodyH * 1.55);
+  ctx.lineTo(len * 0.2, -bodyH * 0.48);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(len * 0.04, bodyH * 0.78);
+  ctx.lineTo(len * 0.25, bodyH * 1.34);
+  ctx.lineTo(len * 0.2, bodyH * 0.28);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = 'rgba(5,12,16,0.75)';
+  ctx.beginPath();
+  ctx.arc(len * 0.31, -bodyH * 0.24, Math.max(1, len * 0.024), 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
