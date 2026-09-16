@@ -400,7 +400,7 @@ body.clean .cinematic-toggle:focus-visible {
 }
 </script>
 </head>
-<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v9-composite" data-character-system="lit-hybrid-articulated-volume-rig-v4" data-shoreline-system="wet-dry-sand-depth-v3" data-terrain-system="procedural-dune-depth-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-cinematic-toggle-v2" data-feedback-system="bite-tension-catch-burst-v2">
+<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v9-composite" data-character-system="lit-hybrid-articulated-volume-rig-v4" data-lighting-system="cinematic-practical-rim-contact-v1" data-shoreline-system="wet-dry-sand-depth-v3" data-terrain-system="procedural-dune-depth-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-cinematic-toggle-v2" data-feedback-system="bite-tension-catch-burst-v2">
 <iframe class="ocean-pass-frame" id="ocean-pass-frame" title="PandoraChat WebGL2 JONSWAP ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
 <div class="shoreline-atmosphere" aria-hidden="true"></div>
 <div class="cinematic-grade" aria-hidden="true"></div>
@@ -517,6 +517,21 @@ sun.shadow.camera.right = 28;
 sun.shadow.camera.top = 24;
 sun.shadow.camera.bottom = -24;
 scene.add(sun);
+
+const oceanRim = new THREE.DirectionalLight(0x7bdff0, 1.05);
+oceanRim.position.set(8, 4.5, -11);
+scene.add(oceanRim);
+
+const barPractical = new THREE.PointLight(0xffc06a, 2.4, 9.5, 2.0);
+barPractical.position.set(6.25, 2.10, 5.85);
+barPractical.castShadow = true;
+barPractical.shadow.mapSize.set(1024, 1024);
+barPractical.shadow.bias = -0.00035;
+scene.add(barPractical);
+
+const dogKeyLight = new THREE.PointLight(0x86e7ff, 0.86, 6.0, 2.4);
+dogKeyLight.position.set(-2.2, 1.52, 5.35);
+scene.add(dogKeyLight);
 
 const skyGeo = new THREE.SphereGeometry(360, 48, 24);
 const skyMat = new THREE.ShaderMaterial({
@@ -1433,6 +1448,36 @@ function makeContactShadow(x, z, sx, sz, opacity = 0.28) {
   return mesh;
 }
 
+function makeLightWrap(x, y, z, sx, sy, color, opacity = 0.20) {
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: makeGlowTexture('rgba(255,255,255,1)'),
+    color,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  }));
+  sprite.position.set(x, y, z);
+  sprite.scale.set(sx, sy, 1);
+  sprite.userData.baseOpacity = opacity;
+  sprite.renderOrder = 2;
+  scene.add(sprite);
+  return sprite;
+}
+
+function makeOcclusionPool(x, z, sx, sz, opacity = 0.20) {
+  const mesh = new THREE.Mesh(
+    new THREE.CircleGeometry(1, 64),
+    new THREE.MeshBasicMaterial({ color: 0x061017, transparent: true, opacity, depthWrite: false })
+  );
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.set(x, -0.402, z);
+  mesh.scale.set(sx, sz, 1);
+  mesh.renderOrder = 1;
+  scene.add(mesh);
+  return mesh;
+}
+
 const shoreAccents = [];
 const shoreAccentMat = new THREE.MeshStandardMaterial({
   color: 0xd0b16f,
@@ -2062,6 +2107,11 @@ person.traverse(node => {
 const houseShadow = makeContactShadow(-8.7, 7.9, 3.4, 0.72, 0.20);
 const labShadow = makeContactShadow(-2.8, 7.8, 1.3, 0.28, 0.24);
 const barShadow = makeContactShadow(6.6, 5.95, 3.0, 0.62, 0.22);
+const dogOcclusion = makeOcclusionPool(-2.8, 7.78, 1.55, 0.34, 0.18);
+const barOcclusion = makeOcclusionPool(6.55, 5.95, 3.20, 0.74, 0.16);
+const dogLightWrap = makeLightWrap(-2.75, 1.12, 7.05, 3.45, 2.05, 0x8ae9ff, 0.13);
+const alhenaLightWrap = makeLightWrap(6.18, 1.86, 4.75, 2.80, 3.05, 0xffc979, 0.18);
+const barLampGlow = makeLightWrap(6.58, 1.55, 5.30, 4.40, 2.05, 0xffb866, 0.15);
 
 makeIslandPad(-8.65, 7.92, 3.95, 0.86, -0.05);
 makeIslandPad(-2.8, 7.88, 1.65, 0.46, 0.08, true);
@@ -2384,6 +2434,7 @@ window.__paradiseDebug = {
   },
   getFeedback: () => ({
     system: document.body.dataset.feedbackSystem,
+    lighting: document.body.dataset.lightingSystem,
     burstActive: clock.getElapsedTime() < catchBurstState.activeUntil,
     burstOpacity: Number(catchBurstMaterial.opacity.toFixed(3)),
     attraction: playState.cast ? Number((playState.bite ? 1 : playState.castProgress).toFixed(3)) : 0,
@@ -2562,6 +2613,8 @@ function animate() {
   dog.position.x = -3.10 + Math.sin(elapsed * 0.55) * 0.42;
   dog.position.y = 0.42 + Math.sin(elapsed * 1.15) * 0.018;
   dog.rotation.y = Math.sin(elapsed * 0.55) * 0.12;
+  dogKeyLight.position.x = dog.position.x + 0.9;
+  dogKeyLight.position.y = 1.45 + Math.sin(elapsed * 1.15) * 0.035;
   dogBody.rotation.y = Math.sin(elapsed * 1.05) * 0.025;
   dogChest.rotation.y = dogBody.rotation.y * 0.72;
   dogHead.rotation.z = Math.sin(elapsed * 0.92 + 1.1) * 0.045;
@@ -2575,6 +2628,10 @@ function animate() {
   }
   labSprite.position.x = -2.8 + Math.sin(elapsed * 0.55) * 0.38;
   labSprite.material.rotation = Math.sin(elapsed * 1.1) * 0.015;
+  dogLightWrap.position.x = labSprite.position.x + 0.18;
+  dogLightWrap.material.opacity = dogLightWrap.userData.baseOpacity * (0.82 + Math.sin(elapsed * 0.8) * 0.08) * weatherProfiles[weatherKey].reflection;
+  dogOcclusion.position.x = labShadow.position.x;
+  dogOcclusion.material.opacity = 0.15 + Math.sin(elapsed * 1.15) * 0.012;
   if (articulatedLab.ready) {
     const gait = Math.sin(elapsed * 2.1);
     const sniff = Math.sin(elapsed * 0.92 + 1.2);
@@ -2590,6 +2647,7 @@ function animate() {
     articulatedLab.parts.collar.rotation.z = articulatedLab.parts.head.rotation.z * 0.55;
   }
   labShadow.position.x = articulatedLab.ready ? articulatedLab.group.position.x : labSprite.position.x;
+  dogOcclusion.position.x = labShadow.position.x;
   if (articulatedAlhena.ready) {
     const breath = Math.sin(elapsed * 1.12);
     const serve = Math.sin(elapsed * 0.74 + 0.8);
@@ -2607,6 +2665,10 @@ function animate() {
     alhenaSprite.position.y = 1.55 + Math.sin(elapsed * 1.2) * 0.025;
   }
   const alhenaBreath = Math.sin(elapsed * 1.08);
+  barPractical.intensity = (timeKey === 'night' ? 3.2 : 2.25) * weatherProfiles[weatherKey].reflection * (0.96 + Math.sin(elapsed * 1.35) * 0.035);
+  alhenaLightWrap.material.opacity = alhenaLightWrap.userData.baseOpacity * (0.86 + Math.sin(elapsed * 0.74 + 0.8) * 0.10);
+  barLampGlow.material.opacity = barLampGlow.userData.baseOpacity * (0.88 + Math.sin(elapsed * 1.35) * 0.08);
+  barOcclusion.material.opacity = 0.14 + Math.sin(elapsed * 0.42) * 0.008;
   person.rotation.y = Math.sin(elapsed * 0.38) * 0.08;
   person.position.y = 0.34 + alhenaBreath * 0.006;
   torso.rotation.z = alhenaBreath * 0.012;
