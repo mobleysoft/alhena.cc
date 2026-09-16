@@ -423,7 +423,7 @@ body.clean .cinematic-toggle:focus-visible {
 }
 </script>
 </head>
-<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v9-composite" data-character-system="lit-hybrid-articulated-volume-rig-v4" data-lighting-system="cinematic-practical-rim-contact-v1" data-camera-system="director-composition-v1" data-material-system="ribbed-wet-sand-parallax-v1" data-shoreline-system="wet-dry-sand-depth-v3" data-terrain-system="procedural-dune-depth-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-cinematic-toggle-v2" data-feedback-system="bite-tension-catch-burst-v2">
+<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v9-composite" data-character-system="procedural-3d-alhena-no-cutout-artifacts-v1" data-lighting-system="cinematic-practical-rim-contact-v1" data-camera-system="director-composition-v1" data-material-system="ribbed-wet-sand-parallax-v1" data-shoreline-system="wet-dry-sand-depth-v3" data-terrain-system="procedural-dune-depth-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-cinematic-toggle-v2" data-feedback-system="bite-tension-catch-burst-v2">
 <iframe class="ocean-pass-frame" id="ocean-pass-frame" title="PandoraChat WebGL2 JONSWAP ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
 <div class="shoreline-atmosphere" aria-hidden="true"></div>
 <div class="cinematic-grade" aria-hidden="true"></div>
@@ -1432,7 +1432,7 @@ function makeArticulatedAlhena(url) {
     ready: false,
     parts: {},
   };
-  const enabled = true;
+  const enabled = false;
   rig.group.visible = false;
   rig.group.position.set(5.82, 0.28, 5.62);
   rig.group.scale.setScalar(0.96);
@@ -1460,10 +1460,10 @@ function makeArticulatedAlhena(url) {
     for (const part of Object.values(rig.parts)) rig.group.add(part);
     rig.group.visible = enabled;
     rig.ready = true;
-    alhenaSprite.visible = !enabled;
-    alhenaSprite.material.opacity = enabled ? 0.0 : 0.16;
-    person.visible = false;
-    readout.textContent = 'shader ocean + procedural 3d characters';
+    alhenaSprite.visible = false;
+    alhenaSprite.material.opacity = 0.0;
+    person.visible = true;
+    readout.textContent = 'shader ocean + procedural 3d Alhena';
   };
   image.src = url;
   return rig;
@@ -1633,11 +1633,14 @@ function makeBar3D(x, z) {
   const counter = makeBoard(4.7, 0.92, 1.36, counterMat, 0, 0.42, 0);
   const top = makeBoard(5.1, 0.18, 1.62, counterMat, 0, 0.98, -0.03);
   group.add(counter, top);
-  const canopy = new THREE.Mesh(new THREE.ConeGeometry(3.22, 1.00, 4), new THREE.MeshStandardMaterial({ color: 0xd6a451, roughness: 0.82 }));
-  canopy.position.set(0, 2.22, -0.06);
-  canopy.rotation.y = Math.PI / 4;
-  canopy.scale.z = 0.56;
-  group.add(canopy);
+  const awningMat = new THREE.MeshStandardMaterial({ color: 0xc99a4f, roughness: 0.84, metalness: 0.0 });
+  const awning = makeBoard(5.25, 0.10, 1.28, awningMat, 0, 1.92, -0.18, -0.10, 0, 0.02);
+  awning.castShadow = true;
+  group.add(awning);
+  for (let i = 0; i < 7; i++) {
+    const slat = makeBoard(0.08, 0.06, 1.38, bambooMat, -2.20 + i * 0.73, 1.84, -0.17, -0.10, 0, 0.02);
+    group.add(slat);
+  }
   for (const sx of [-2.18, 2.18]) {
     for (const sz of [-0.64, 0.64]) {
       group.add(makeBoard(0.10, 1.55, 0.10, bambooMat, sx, 1.20, sz));
@@ -2075,10 +2078,24 @@ const person = new THREE.Group();
 const skinMat = new THREE.MeshStandardMaterial({ color: 0x8b5b42, roughness: 0.48 });
 const alhenaDressMat = new THREE.MeshStandardMaterial({ color: 0x2a9fc0, map: materialMaps.cloth, roughness: 0.58, metalness: 0.01 });
 const alhenaHairMat = new THREE.MeshStandardMaterial({ color: 0x1b130f, roughness: 0.70 });
+const alhenaApronMat = new THREE.MeshStandardMaterial({ color: 0xd7f2ee, roughness: 0.64, metalness: 0.0 });
+const alhenaGoldMat = new THREE.MeshStandardMaterial({ color: 0xd6ad55, roughness: 0.38, metalness: 0.28 });
+const alhenaGlassMat = new THREE.MeshPhysicalMaterial({ color: 0xbdefff, roughness: 0.08, metalness: 0.0, transmission: 0.28, transparent: true, opacity: 0.50, thickness: 0.12 });
 const dress = new THREE.Mesh(new THREE.ConeGeometry(0.58, 1.75, 28), alhenaDressMat);
 dress.position.y = 1.08;
 dress.castShadow = true;
 person.add(dress);
+const apron = new THREE.Mesh(new THREE.PlaneGeometry(0.50, 1.14, 1, 3), alhenaApronMat);
+apron.position.set(0, 1.12, 0.345);
+apron.rotation.x = -0.08;
+apron.castShadow = true;
+person.add(apron);
+const sash = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.025, 8, 32, Math.PI), alhenaGoldMat);
+sash.position.set(0, 1.50, 0.255);
+sash.rotation.set(Math.PI * 0.5, 0, 0);
+sash.scale.set(1.25, 0.16, 1);
+sash.castShadow = true;
+person.add(sash);
 const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.30, 0.82, 8, 16), alhenaDressMat);
 torso.position.y = 1.72;
 torso.scale.set(0.88, 1.0, 0.70);
@@ -2094,21 +2111,68 @@ head.scale.set(0.92, 1.08, 0.90);
 head.castShadow = true;
 person.add(head);
 const hair = new THREE.Mesh(new THREE.SphereGeometry(0.38, 22, 16), alhenaHairMat);
-hair.scale.set(1.08, 0.9, 1.05);
-hair.position.set(0, 2.22, -0.03);
+hair.scale.set(1.00, 0.82, 0.56);
+hair.position.set(0, 2.26, -0.18);
 hair.castShadow = true;
 person.add(hair);
+const hairBun = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 12), alhenaHairMat);
+hairBun.position.set(0.24, 2.32, -0.39);
+hairBun.scale.set(1.0, 0.84, 0.96);
+hairBun.castShadow = true;
+person.add(hairBun);
+const alhenaHairLocks = [];
+for (let i = 0; i < 8; i++) {
+  const lock = new THREE.Mesh(new THREE.CapsuleGeometry(0.026, 0.34 + (i % 3) * 0.06, 5, 8), alhenaHairMat);
+  const side = i < 4 ? -1 : 1;
+  lock.position.set(side * (0.18 + (i % 4) * 0.035), 2.08 - (i % 3) * 0.035, 0.23 + (i % 2) * 0.03);
+  lock.rotation.set(0.10, side * 0.20, side * (0.22 + (i % 4) * 0.06));
+  lock.castShadow = true;
+  person.add(lock);
+  alhenaHairLocks.push(lock);
+}
 const eyeMat = new THREE.MeshStandardMaterial({ color: 0x20140f, roughness: 0.30 });
 for (const x of [-0.10, 0.10]) {
   const eye = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 6), eyeMat);
   eye.position.set(x, 2.22, 0.30);
   person.add(eye);
 }
+const nose = new THREE.Mesh(new THREE.ConeGeometry(0.026, 0.09, 10), skinMat);
+nose.position.set(0, 2.17, 0.325);
+nose.rotation.x = Math.PI * 0.5;
+person.add(nose);
+const smile = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.007, 6, 20, Math.PI), new THREE.MeshStandardMaterial({ color: 0x522417, roughness: 0.42 }));
+smile.position.set(0, 2.08, 0.323);
+smile.rotation.set(0, 0, Math.PI);
+smile.scale.y = 0.36;
+person.add(smile);
+for (const x of [-0.20, 0.20]) {
+  const earring = new THREE.Mesh(new THREE.TorusGeometry(0.040, 0.006, 6, 14), alhenaGoldMat);
+  earring.position.set(x, 2.10, 0.18);
+  earring.rotation.y = Math.PI * 0.5;
+  person.add(earring);
+}
 const tray = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.035, 32), new THREE.MeshStandardMaterial({ color: 0x1d3f3d, roughness: 0.32, metalness: 0.10 }));
 tray.rotation.x = Math.PI / 2;
 tray.position.set(-0.50, 1.52, 0.28);
 tray.castShadow = true;
 person.add(tray);
+const trayItems = [];
+for (const spec of [
+  { x: -0.62, z: 0.30, c: 0xffb64f, h: 0.16 },
+  { x: -0.44, z: 0.40, c: 0x9be7ff, h: 0.19 },
+  { x: -0.30, z: 0.25, c: 0x86c75b, h: 0.12 },
+]) {
+  const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.052, spec.h, 12), alhenaGlassMat.clone());
+  cup.position.set(spec.x, 1.62 + spec.h * 0.5, spec.z);
+  cup.castShadow = true;
+  cup.userData.keepTransparent = true;
+  person.add(cup);
+  trayItems.push(cup);
+  const liquid = new THREE.Mesh(new THREE.CylinderGeometry(0.040, 0.044, 0.010, 12), new THREE.MeshStandardMaterial({ color: spec.c, roughness: 0.18, metalness: 0.0 }));
+  liquid.position.set(spec.x, 1.62 + spec.h + 0.005, spec.z);
+  person.add(liquid);
+  trayItems.push(liquid);
+}
 const alhenaArms = [];
 for (const spec of [
   { x: -0.42, y: 1.55, z: 0.10, rz: 0.78 },
@@ -2131,6 +2195,7 @@ const houseSprite = makeSprite('/assets/beach-house-billboard.png', -8.7, 1.2, 7
 const labSprite = makeSprite('/assets/alhena-black-lab.png', -2.8, 0.82, 7.2, 3.3, 2.2);
 const barSprite = makeSprite('/assets/beach-bar-billboard.png', 6.6, 1.05, 5.3, 5.1, 3.4);
 const alhenaSprite = makeSprite('/assets/alhena-bartender-billboard.png', 6.25, 2.05, 4.35, 2.25, 3.35);
+alhenaSprite.visible = false;
 const palmSprite = makeSprite('/assets/palm-cluster-billboard.png', -6.4, 1.7, 6.2, 3.1, 3.4);
 const waterReflections = [
   makeReflectionSprite('/assets/beach-house-billboard.png', -8.7, -0.30, 5.9, 4.6, 2.0, 0.095),
@@ -2164,9 +2229,15 @@ dog.traverse(node => {
 person.traverse(node => {
   if (node.isMesh) {
     node.material = node.material.clone();
-    node.material.transparent = true;
-    node.material.opacity = 0.30;
-    node.material.depthWrite = true;
+    if (node.userData.keepTransparent) {
+      node.material.transparent = true;
+      node.material.opacity = 0.50;
+      node.material.depthWrite = false;
+    } else {
+      node.material.transparent = false;
+      node.material.opacity = 1.0;
+      node.material.depthWrite = true;
+    }
   }
 });
 const houseShadow = makeContactShadow(-8.7, 7.9, 3.4, 0.72, 0.20);
