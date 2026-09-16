@@ -323,7 +323,7 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
 }
 </script>
 </head>
-<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v8-composite" data-character-system="hybrid-articulated-billboard-rig-v3" data-shoreline-system="wet-dry-sand-depth-v3" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-v1" data-feedback-system="fish-attraction-catch-burst-v1">
+<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v8-composite" data-character-system="lit-hybrid-articulated-volume-rig-v4" data-shoreline-system="wet-dry-sand-depth-v3" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-v1" data-feedback-system="fish-attraction-catch-burst-v1">
 <iframe class="ocean-pass-frame" id="ocean-pass-frame" title="PandoraChat WebGL ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
 <div class="shoreline-atmosphere" aria-hidden="true"></div>
 <div class="cinematic-grade" aria-hidden="true"></div>
@@ -1222,16 +1222,20 @@ function cropTextureFromImage(image, sx, sy, sw, sh) {
 function makeBillboardPart(texture, width, height, x, y, z, renderOrder = 10) {
   const mesh = new THREE.Mesh(
     new THREE.PlaneGeometry(width, height),
-    new THREE.MeshBasicMaterial({
+    new THREE.MeshStandardMaterial({
       map: texture,
       transparent: true,
+      opacity: 0.98,
+      roughness: 0.72,
+      metalness: 0.0,
       depthWrite: false,
-      alphaTest: 0.04,
+      alphaTest: 0.08,
       side: THREE.DoubleSide,
     })
   );
   mesh.position.set(x, y, z);
   mesh.renderOrder = renderOrder;
+  mesh.castShadow = true;
   return mesh;
 }
 
@@ -1311,7 +1315,7 @@ function makeArticulatedAlhena(url) {
     rig.ready = true;
     alhenaSprite.visible = !enabled;
     alhenaSprite.material.opacity = enabled ? 0.0 : 0.16;
-    person.visible = !enabled;
+    person.visible = false;
     readout.textContent = 'shader ocean + procedural 3d characters';
   };
   image.src = url;
@@ -1817,7 +1821,7 @@ for (let i = 0; i < 2; i++) {
 }
 dog.position.set(-2.95, 0.40, 6.82);
 dog.scale.setScalar(0.48);
-dog.visible = false;
+dog.visible = true;
 scene.add(dog);
 
 const person = new THREE.Group();
@@ -1902,6 +1906,22 @@ for (let i = 0; i < 18; i++) {
 }
 const articulatedLab = makeArticulatedLab('/assets/alhena-black-lab.png');
 const articulatedAlhena = makeArticulatedAlhena('/assets/alhena-bartender-billboard.png');
+dog.traverse(node => {
+  if (node.isMesh) {
+    node.material = node.material.clone();
+    node.material.transparent = true;
+    node.material.opacity = 0.18;
+    node.material.depthWrite = true;
+  }
+});
+person.traverse(node => {
+  if (node.isMesh) {
+    node.material = node.material.clone();
+    node.material.transparent = true;
+    node.material.opacity = 0.30;
+    node.material.depthWrite = true;
+  }
+});
 const houseShadow = makeContactShadow(-8.7, 7.9, 3.4, 0.72, 0.20);
 const labShadow = makeContactShadow(-2.8, 7.8, 1.3, 0.28, 0.24);
 const barShadow = makeContactShadow(6.6, 5.95, 3.0, 0.62, 0.22);
