@@ -323,7 +323,7 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
 }
 </script>
 </head>
-<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v7-composite" data-character-system="hybrid-articulated-billboard-rig-v3" data-shoreline-system="dry-wet-sand-separated-v2" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-v1" data-feedback-system="fish-attraction-catch-burst-v1">
+<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v7-composite" data-character-system="hybrid-articulated-billboard-rig-v3" data-shoreline-system="wet-dry-sand-depth-v3" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-v1" data-feedback-system="fish-attraction-catch-burst-v1">
 <iframe class="ocean-pass-frame" id="ocean-pass-frame" title="PandoraChat WebGL ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
 <div class="shoreline-atmosphere" aria-hidden="true"></div>
 <div class="cinematic-grade" aria-hidden="true"></div>
@@ -991,8 +991,8 @@ const sandMat = new THREE.ShaderMaterial({
   uniforms: {
     uTime: { value: 0 },
     uLight: { value: palette[timeKey].light },
-    uBase: { value: new THREE.Color(0xc9a768) },
-    uWet: { value: new THREE.Color(0x7b806e) },
+    uBase: { value: new THREE.Color(0xd3ad68) },
+    uWet: { value: new THREE.Color(0x5e7069) },
   },
   vertexShader: `
     varying vec2 vUv;
@@ -1027,12 +1027,16 @@ const sandMat = new THREE.ShaderMaterial({
       return mix(mix(hash(i), hash(i + vec2(1.0,0.0)), u.x), mix(hash(i + vec2(0.0,1.0)), hash(i + vec2(1.0,1.0)), u.x), u.y);
     }
     void main() {
-      float wet = smoothstep(0.08, 0.58, 1.0 - vUv.y);
+      float wet = smoothstep(0.08, 0.62, 1.0 - vUv.y);
+      float dry = smoothstep(0.30, 1.0, vUv.y);
+      float shoreDepth = smoothstep(0.0, 0.58, vUv.y);
       float contour = noise(vPos.xz * vec2(0.34, 1.15) + vec2(0.0, uTime * 0.01));
-      float grain = noise(vPos.xz * 8.0) * 0.08 + noise(vPos.xz * 28.0) * 0.035;
-      vec3 color = mix(uBase, uWet, wet * 0.44);
-      color *= 0.88 + grain + contour * wet * 0.06;
-      color += vec3(1.0, 0.82, 0.42) * smoothstep(0.66, 0.98, vUv.y) * 0.07 * uLight;
+      float grain = noise(vPos.xz * 8.0) * 0.12 + noise(vPos.xz * 31.0) * 0.055;
+      vec3 color = mix(uBase * 1.08, uWet, wet * 0.64);
+      color *= 0.76 + grain + contour * (0.08 + wet * 0.15) + dry * 0.18;
+      color = mix(color * vec3(0.72, 0.84, 0.88), color, shoreDepth);
+      color += vec3(1.0, 0.78, 0.36) * smoothstep(0.58, 0.98, vUv.y) * 0.11 * uLight;
+      color -= vec3(0.08, 0.05, 0.025) * smoothstep(0.0, 0.34, vUv.y) * (0.72 + wet * 0.45);
       gl_FragColor = vec4(color, 1.0);
     }
   `
