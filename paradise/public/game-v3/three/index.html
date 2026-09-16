@@ -423,7 +423,7 @@ body.clean .cinematic-toggle:focus-visible {
 }
 </script>
 </head>
-<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v9-composite" data-character-system="procedural-3d-alhena-no-cutout-artifacts-v1" data-animal-system="articulated-lab-grounded-paw-contact-v1" data-lighting-system="cinematic-practical-rim-contact-v1" data-camera-system="director-composition-v1" data-material-system="ribbed-wet-sand-parallax-v1" data-shoreline-system="wet-dry-sand-depth-v3" data-terrain-system="procedural-dune-depth-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-cinematic-toggle-v2" data-feedback-system="bite-tension-catch-burst-v2">
+<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v9-composite" data-character-system="procedural-3d-alhena-no-cutout-artifacts-v1" data-animal-system="articulated-lab-grounded-paw-contact-v1" data-lighting-system="cinematic-practical-rim-contact-v1" data-camera-system="director-composition-v1" data-material-system="ribbed-wet-sand-parallax-v1" data-shoreline-system="wet-dry-sand-depth-v3" data-terrain-system="procedural-dune-depth-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-motion-haptics-v3" data-feedback-system="bite-tension-catch-burst-v2">
 <iframe class="ocean-pass-frame" id="ocean-pass-frame" title="PandoraChat WebGL2 JONSWAP ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
 <div class="shoreline-atmosphere" aria-hidden="true"></div>
 <div class="cinematic-grade" aria-hidden="true"></div>
@@ -453,6 +453,7 @@ body.clean .cinematic-toggle:focus-visible {
   <div class="row play-row">
     <button id="cast-reel">Cast Line</button>
     <button id="view-cycle">View: Wide</button>
+    <button id="motion-toggle">Motion</button>
     <button id="reset-cast">Reset</button>
   </div>
   <div class="tension-panel" id="tension-panel" aria-label="line tension">
@@ -471,6 +472,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const readout = document.getElementById('readout');
 const castButton = document.getElementById('cast-reel');
 const viewButton = document.getElementById('view-cycle');
+const motionButton = document.getElementById('motion-toggle');
 const resetButton = document.getElementById('reset-cast');
 const catchLog = document.getElementById('catch-log');
 const tensionPanel = document.getElementById('tension-panel');
@@ -2362,6 +2364,12 @@ const controlState = {
   lastTapAt: 0,
   gestureStart: null,
   gestures: [],
+  motionEnabled: false,
+  motionSupported: 'DeviceMotionEvent' in window,
+  lastMotionAt: 0,
+  motionSamples: 0,
+  lastMotionMagnitude: 0,
+  lastMotionDelta: 0,
 };
 const fishSpecies = [
   'Glass Minnow',
@@ -2472,6 +2480,73 @@ function noteGesture(name) {
   controlState.gestures.unshift({ name, at: Date.now() });
   controlState.gestures = controlState.gestures.slice(0, 8);
 }
+function updateMotionButton() {
+  if (!motionButton) return;
+  motionButton.textContent = controlState.motionEnabled ? 'Motion On' : 'Motion';
+  motionButton.classList.toggle('active', controlState.motionEnabled);
+  motionButton.disabled = !controlState.motionSupported;
+  motionButton.title = controlState.motionSupported
+    ? 'Enable wrist-flick casting and reeling'
+    : 'Device motion is unavailable in this browser';
+}
+function handleMotionCast(delta, magnitude) {
+  const now = performance.now();
+  if (!controlState.motionEnabled || now - controlState.lastMotionAt < 900) return;
+  if (delta < 11.5 && magnitude < 20.0) return;
+  controlState.lastMotionAt = now;
+  toggleCast();
+  noteGesture(playState.cast ? 'motion-flick-cast' : 'motion-flick-reel');
+  readout.textContent = playState.cast ? 'wrist flick / line cast' : 'wrist flick / reel';
+  vibrate(playState.cast ? [16, 24, 16] : 18);
+}
+function onDeviceMotion(event) {
+  const a = event.accelerationIncludingGravity || event.acceleration;
+  if (!a) return;
+  const x = a.x || 0;
+  const y = a.y || 0;
+  const z = a.z || 0;
+  const magnitude = Math.sqrt(x * x + y * y + z * z);
+  const delta = Math.abs(magnitude - controlState.lastMotionMagnitude);
+  controlState.lastMotionMagnitude = magnitude;
+  controlState.lastMotionDelta = delta;
+  controlState.motionSamples += 1;
+  handleMotionCast(delta, magnitude);
+}
+async function enableMotionControls() {
+  if (!controlState.motionSupported) {
+    readout.textContent = 'motion controls unavailable';
+    updateMotionButton();
+    return false;
+  }
+  try {
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+      const result = await DeviceMotionEvent.requestPermission();
+      if (result !== 'granted') {
+        readout.textContent = 'motion permission denied';
+        return false;
+      }
+    }
+    if (!controlState.motionEnabled) {
+      window.addEventListener('devicemotion', onDeviceMotion, { passive: true });
+      controlState.motionEnabled = true;
+      noteGesture('motion-enabled');
+      readout.textContent = 'motion enabled / flick to cast or reel';
+      vibrate([12, 22, 12]);
+    }
+    updateMotionButton();
+    return true;
+  } catch (err) {
+    readout.textContent = `motion error / ${err?.message || 'unavailable'}`;
+    return false;
+  }
+}
+function disableMotionControls() {
+  window.removeEventListener('devicemotion', onDeviceMotion);
+  controlState.motionEnabled = false;
+  noteGesture('motion-disabled');
+  readout.textContent = 'motion disabled';
+  updateMotionButton();
+}
 function isControlTarget(target) {
   return !!target?.closest?.('.hud, button, a, .readout');
 }
@@ -2499,6 +2574,10 @@ function handleSwipe(dx, dy) {
 castButton.addEventListener('click', toggleCast);
 resetButton.addEventListener('click', resetCast);
 viewButton.addEventListener('click', cycleView);
+motionButton?.addEventListener('click', () => {
+  if (controlState.motionEnabled) disableMotionControls();
+  else enableMotionControls();
+});
 cinematicToggle?.addEventListener('click', () => {
   setCleanPresentation(!document.body.classList.contains('clean'), true);
   noteGesture(document.body.classList.contains('clean') ? 'hud-hidden' : 'hud-shown');
@@ -2544,6 +2623,7 @@ addEventListener('pointercancel', () => {
   controlState.gestureStart = null;
 });
 refreshPlayHud();
+updateMotionButton();
 renderCatchLog();
 window.__paradiseDebug = {
   playState,
@@ -2586,6 +2666,11 @@ window.__paradiseDebug = {
     system: document.body.dataset.controlSystem,
     recentGestures: controlState.gestures.map(g => g.name),
     lastTapAt: Math.round(controlState.lastTapAt),
+    motionSupported: controlState.motionSupported,
+    motionEnabled: controlState.motionEnabled,
+    motionSamples: controlState.motionSamples,
+    lastMotionMagnitude: Number(controlState.lastMotionMagnitude.toFixed(3)),
+    lastMotionDelta: Number(controlState.lastMotionDelta.toFixed(3)),
   }),
   getPresentation: () => ({
     clean: document.body.classList.contains('clean'),
