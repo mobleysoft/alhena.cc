@@ -192,6 +192,42 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
   background: linear-gradient(135deg, rgba(223,252,255,.92), rgba(240,207,122,.84));
   border-color: transparent;
 }
+.tension-panel {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  color: rgba(247,237,206,.64);
+  text-transform: uppercase;
+  letter-spacing: .13em;
+  font-size: 8px;
+  font-weight: 900;
+}
+.tension-track {
+  height: 7px;
+  overflow: hidden;
+  border: 1px solid rgba(247,237,206,.13);
+  border-radius: 999px;
+  background: rgba(4, 22, 34, .48);
+  box-shadow: inset 0 1px 8px rgba(0,0,0,.22);
+}
+.tension-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #78d8ed, #f0cf7a 60%, #ff675c);
+  box-shadow: 0 0 14px rgba(240,207,122,.36);
+  transition: width 160ms ease, filter 160ms ease;
+}
+.tension-panel.bite .tension-fill {
+  filter: saturate(1.45) brightness(1.18);
+  animation: tensionBite 380ms ease-in-out infinite alternate;
+}
+@keyframes tensionBite {
+  from { transform: scaleY(.78); }
+  to { transform: scaleY(1.18); }
+}
 @keyframes bitePulse {
   from { filter: drop-shadow(0 0 0 rgba(240,207,122,0)); transform: translateY(0); }
   to { filter: drop-shadow(0 0 16px rgba(240,207,122,.75)); transform: translateY(-1px); }
@@ -364,8 +400,8 @@ body.clean .cinematic-toggle:focus-visible {
 }
 </script>
 </head>
-<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v8-composite" data-character-system="lit-hybrid-articulated-volume-rig-v4" data-shoreline-system="wet-dry-sand-depth-v3" data-terrain-system="procedural-dune-depth-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-cinematic-toggle-v2" data-feedback-system="fish-attraction-catch-burst-v1">
-<iframe class="ocean-pass-frame" id="ocean-pass-frame" title="PandoraChat WebGL ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
+<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v9-composite" data-character-system="lit-hybrid-articulated-volume-rig-v4" data-shoreline-system="wet-dry-sand-depth-v3" data-terrain-system="procedural-dune-depth-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-cinematic-toggle-v2" data-feedback-system="bite-tension-catch-burst-v2">
+<iframe class="ocean-pass-frame" id="ocean-pass-frame" title="PandoraChat WebGL2 JONSWAP ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
 <div class="shoreline-atmosphere" aria-hidden="true"></div>
 <div class="cinematic-grade" aria-hidden="true"></div>
 <div class="depth-grade" aria-hidden="true"></div>
@@ -378,7 +414,7 @@ body.clean .cinematic-toggle:focus-visible {
 <aside class="hud">
   <div class="kicker">Paradise V3 / Shader Composite</div>
   <h1>Paradise Fishing.</h1>
-  <p>This route composes a standalone PandoraChat-style ocean shader behind the game foreground: JONSWAP-inspired wave spectra, analytical normals, Fresnel, scatter, foam, fog, and tone mapping.</p>
+  <p>This route composes a standalone PandoraChat-style WebGL2 ocean shader behind the game foreground: JONSWAP-inspired wave spectra, analytical normals, Fresnel sky reflection, subsurface scatter, foam, fog, and ACES tone mapping.</p>
   <div class="row">
     <button class="active" data-time="dawn">Dawn</button>
     <button data-time="noon">Noon</button>
@@ -395,6 +431,11 @@ body.clean .cinematic-toggle:focus-visible {
     <button id="view-cycle">View: Wide</button>
     <button id="reset-cast">Reset</button>
   </div>
+  <div class="tension-panel" id="tension-panel" aria-label="line tension">
+    <span>Line</span>
+    <div class="tension-track"><div class="tension-fill" id="tension-fill"></div></div>
+    <span id="tension-label">idle</span>
+  </div>
   <div class="catch-log" id="catch-log" aria-label="catch log"></div>
 </aside>
 <div class="readout" id="readout">loading mesh ocean</div>
@@ -408,6 +449,9 @@ const castButton = document.getElementById('cast-reel');
 const viewButton = document.getElementById('view-cycle');
 const resetButton = document.getElementById('reset-cast');
 const catchLog = document.getElementById('catch-log');
+const tensionPanel = document.getElementById('tension-panel');
+const tensionFill = document.getElementById('tension-fill');
+const tensionLabel = document.getElementById('tension-label');
 const hud = document.querySelector('.hud');
 const touchHelp = document.getElementById('touch-help');
 const cinematicToggle = document.getElementById('cinematic-toggle');
@@ -560,6 +604,7 @@ const sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({
 }));
 sunSprite.position.set(-22, 18, -120);
 sunSprite.scale.set(16, 16, 1);
+sunSprite.visible = false;
 scene.add(sunSprite);
 
 const rayMat = new THREE.MeshBasicMaterial({
@@ -577,6 +622,7 @@ for (let i = 0; i < 5; i++) {
   ray.position.set(-13 + i * 6, 7.2 - i * 0.34, -38 + i * 3);
   ray.rotation.set(-0.18, 0.1, -0.22 + i * 0.035);
   ray.userData.rayPhase = i;
+  ray.visible = false;
   scene.add(ray);
   atmosphereRays.push(ray);
 }
@@ -2140,6 +2186,14 @@ function refreshPlayHud() {
   castButton.textContent = playState.bite ? 'Reel Bite' : playState.cast ? 'Reel' : 'Cast Line';
   castButton.classList.toggle('alert', playState.bite);
   viewButton.textContent = `View: ${viewTargets[playState.view].label}`;
+  updateTensionHud();
+}
+function updateTensionHud() {
+  if (!tensionFill || !tensionLabel || !tensionPanel) return;
+  const value = playState.cast ? Math.max(playState.tension, playState.bite ? 0.86 : playState.castProgress * 0.34) : 0;
+  tensionFill.style.width = `${Math.round(Math.min(1, value) * 100)}%`;
+  tensionPanel.classList.toggle('bite', playState.bite);
+  tensionLabel.textContent = playState.bite ? 'bite' : playState.cast ? `${Math.round(value * 100)}%` : 'idle';
 }
 function renderCatchLog() {
   catchLog.replaceChildren();
@@ -2333,6 +2387,8 @@ window.__paradiseDebug = {
     burstActive: clock.getElapsedTime() < catchBurstState.activeUntil,
     burstOpacity: Number(catchBurstMaterial.opacity.toFixed(3)),
     attraction: playState.cast ? Number((playState.bite ? 1 : playState.castProgress).toFixed(3)) : 0,
+    tension: Number(playState.tension.toFixed(3)),
+    tensionLabel: tensionLabel?.textContent || null,
   }),
 };
 
@@ -2402,9 +2458,12 @@ function setTime(key) {
   waterUniforms.uShallow.value.set(...p.shallow);
   waterUniforms.uFogTint.value.setHex(p.fog);
   sandMat.uniforms.uLight.value = p.light;
-  sunSprite.material.opacity = key === 'night' ? 0.28 : 0.92;
+  sunSprite.material.opacity = key === 'night' ? 0.0 : 0.0;
   const rayOpacity = key === 'night' ? 0.015 : key === 'sunset' ? 0.16 : 0.10;
-  for (const ray of atmosphereRays) ray.material.opacity = rayOpacity;
+  for (const ray of atmosphereRays) {
+    ray.visible = false;
+    ray.material.opacity = 0.0;
+  }
   setGradeOpacity(p.grade * w.grade);
   document.body.dataset.time = key;
   for (const button of document.querySelectorAll('[data-time]')) button.classList.toggle('active', button.dataset.time === key);
@@ -2653,6 +2712,7 @@ function animate() {
       refreshPlayHud();
     }
   }
+  updateTensionHud();
   bobber.scale.setScalar(playState.bite ? 1.0 + Math.sin(elapsed * 18.0) * 0.16 : 1.0);
   const target = viewTargets[playState.view];
   camera.position.x += (target.pos.x + pointerX * 1.5 - camera.position.x) * 0.026;

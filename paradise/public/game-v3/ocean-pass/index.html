@@ -9,22 +9,22 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
 canvas { display: block; width: 100vw; height: 100vh; }
 </style>
 </head>
-<body data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v8">
+<body data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v9">
 <canvas id="ocean"></canvas>
 <script>
 const canvas = document.getElementById('ocean');
 const query = new URLSearchParams(location.search);
 const palettes = {
-  dawn: { skyTint: [0.060, 0.180, 0.300], zenith: [0.16,0.45,0.66], horizon: [1.00,0.70,0.32], sun: [1.00,0.86,0.52], waterDeep: [0.000,0.018,0.068], waterShallow: [0.000,0.320,0.440], waterCrest: [0.30,0.76,0.92], sunDir: [0.50,0.22,0.62], gold: 0.82, exposure: 1.10 },
-  noon: { skyTint: [0.080, 0.300, 0.520], zenith: [0.18,0.58,0.94], horizon: [0.80,0.96,1.00], sun: [1.00,0.96,0.80], waterDeep: [0.000,0.026,0.100], waterShallow: [0.018,0.440,0.580], waterCrest: [0.40,0.86,1.00], sunDir: [0.22,0.55,0.62], gold: 0.36, exposure: 1.14 },
-  sunset: { skyTint: [0.110, 0.075, 0.180], zenith: [0.18,0.10,0.28], horizon: [1.00,0.50,0.26], sun: [1.00,0.48,0.28], waterDeep: [0.004,0.014,0.050], waterShallow: [0.120,0.220,0.300], waterCrest: [0.64,0.52,0.45], sunDir: [0.60,0.12,0.56], gold: 1.10, exposure: 1.03 },
+  dawn: { skyTint: [0.052, 0.164, 0.292], zenith: [0.13,0.42,0.66], horizon: [1.00,0.70,0.35], sun: [1.00,0.86,0.52], waterDeep: [0.000,0.014,0.060], waterShallow: [0.000,0.360,0.500], waterCrest: [0.38,0.84,0.98], sunDir: [0.50,0.22,0.62], gold: 0.96, exposure: 1.16 },
+  noon: { skyTint: [0.065, 0.280, 0.520], zenith: [0.13,0.54,0.94], horizon: [0.80,0.96,1.00], sun: [1.00,0.96,0.80], waterDeep: [0.000,0.022,0.092], waterShallow: [0.012,0.480,0.640], waterCrest: [0.44,0.90,1.00], sunDir: [0.22,0.55,0.62], gold: 0.46, exposure: 1.18 },
+  sunset: { skyTint: [0.110, 0.065, 0.170], zenith: [0.16,0.085,0.26], horizon: [1.00,0.50,0.26], sun: [1.00,0.48,0.28], waterDeep: [0.003,0.012,0.046], waterShallow: [0.150,0.245,0.325], waterCrest: [0.72,0.58,0.48], sunDir: [0.60,0.12,0.56], gold: 1.22, exposure: 1.06 },
   night: { skyTint: [0.010, 0.026, 0.070], zenith: [0.015,0.035,0.095], horizon: [0.14,0.24,0.36], sun: [0.65,0.82,1.00], waterDeep: [0.000,0.006,0.025], waterShallow: [0.018,0.120,0.180], waterCrest: [0.18,0.36,0.48], sunDir: [0.56,0.18,0.60], gold: 0.12, exposure: 0.72 },
 };
 const weathers = {
-  calm: { wind: 4.8, chop: 1.18, foamT: 0.46, haze: 0.03, cloud: 0.04, scatter: 0.72 },
-  breeze: { wind: 9.6, chop: 1.72, foamT: 0.37, haze: 0.04, cloud: 0.10, scatter: 0.90 },
-  overcast: { wind: 7.0, chop: 1.34, foamT: 0.45, haze: 0.28, cloud: 0.66, scatter: 0.64 },
-  storm: { wind: 15.8, chop: 2.20, foamT: 0.32, haze: 0.38, cloud: 0.86, scatter: 1.08 },
+  calm: { wind: 4.8, chop: 1.08, foamT: 0.52, haze: 0.03, cloud: 0.04, scatter: 0.72 },
+  breeze: { wind: 9.8, chop: 1.92, foamT: 0.35, haze: 0.04, cloud: 0.10, scatter: 1.02 },
+  overcast: { wind: 7.0, chop: 1.48, foamT: 0.44, haze: 0.30, cloud: 0.68, scatter: 0.72 },
+  storm: { wind: 16.2, chop: 2.55, foamT: 0.29, haze: 0.40, cloud: 0.88, scatter: 1.18 },
 };
 const timeKey = palettes[query.get('time')] ? query.get('time') : 'dawn';
 const weatherKey = weathers[query.get('weather')] ? query.get('weather') : 'breeze';
@@ -85,7 +85,7 @@ uniform vec3 u_sunDir;
 
 #define PI 3.14159265359
 #define TAU 6.28318530718
-#define N 36
+#define N 48
 const float gravity = 9.81;
 
 float hash1(float n) { return fract(sin(n) * 43758.5453123); }
@@ -122,9 +122,10 @@ void waveParms(int i, float windSpeed, out float omega, out float amp, out float
   float r = exp(-pow(omega - omegaP, 2.0) / (2.0 * sigma * sigma * omegaP * omegaP));
   float S = 0.0081 * gravity * gravity / pow(omega, 5.0) * exp(-1.25 * pow(omegaP / omega, 4.0)) * pow(3.3, r);
   float dOmega = (omegaMax - omegaMin) / float(N);
-  float longSet = mix(1.20, 0.72, smoothstep(0.44, 1.0, t));
-  float spectralShelf = 0.72 + 0.38 * exp(-pow((omega / omegaP) - 1.0, 2.0) * 1.8);
-  amp = clamp(sqrt(2.0 * S * dOmega) * 0.62 * windSpeed / 10.0 * longSet * spectralShelf, 0.0, 2.40);
+  float longSet = mix(1.28, 0.64, smoothstep(0.44, 1.0, t));
+  float spectralShelf = 0.68 + 0.44 * exp(-pow((omega / omegaP) - 1.0, 2.0) * 1.7);
+  float gust = 0.92 + 0.16 * hash1(float(i) * 23.77 + 11.2);
+  amp = clamp(sqrt(2.0 * S * dOmega) * 0.76 * windSpeed / 10.0 * longSet * spectralShelf * gust, 0.0, 2.70);
   phase = hash1(float(i) * 17.31 + 0.73) * TAU;
 }
 float oceanHeight(vec2 pos, float t, float windSpeed, float chop) {
@@ -137,11 +138,11 @@ float oceanHeight(vec2 pos, float t, float windSpeed, float chop) {
     float w = dot(dir, pos) * k - omega * t + phase;
     h += amp * sin(w);
   }
-  float capillary = (fbm(pos * vec2(0.85, 2.40) + vec2(t * 0.11, -t * 0.05)) - 0.5) * 0.040 * chop;
-  float ripples = sin(pos.x * 19.0 + pos.y * 4.8 - t * 2.4) * 0.010;
-  ripples += sin(pos.x * -7.5 + pos.y * 23.0 + t * 1.9) * 0.008;
-  float organizedSwell = sin(pos.y * 0.82 - t * 0.42 + sin(pos.x * 0.11) * 0.9) * 0.060;
-  float crossSwell = sin(dot(pos, vec2(0.22, 0.58)) - t * 0.31 + sin(pos.x * 0.05) * 0.7) * 0.040;
+  float capillary = (fbm(pos * vec2(0.92, 2.70) + vec2(t * 0.12, -t * 0.055)) - 0.5) * 0.054 * chop;
+  float ripples = sin(pos.x * 22.0 + pos.y * 5.8 - t * 2.7) * 0.012;
+  ripples += sin(pos.x * -8.5 + pos.y * 26.0 + t * 2.2) * 0.009;
+  float organizedSwell = sin(pos.y * 0.80 - t * 0.40 + sin(pos.x * 0.10) * 0.9) * 0.075;
+  float crossSwell = sin(dot(pos, vec2(0.22, 0.58)) - t * 0.31 + sin(pos.x * 0.05) * 0.7) * 0.048;
   return h * chop + (organizedSwell + crossSwell) * smoothstep(0.4, 1.6, chop) + capillary + ripples * smoothstep(0.7, 2.2, chop);
 }
 vec3 oceanNormal(vec2 pos, float t, float windSpeed, float chop) {
@@ -217,11 +218,11 @@ void main() {
   }
 
   float waterT = clamp(-aboveHorizon / (1.0 - horizonY + 0.001), 0.0, 1.0);
-  float dist = mix(0.45, 135.0, pow(waterT, 1.86));
+  float dist = mix(0.35, 165.0, pow(waterT, 1.92));
   vec3 camPos = vec3(0.0, 2.15, 0.0);
   vec3 rayDir = normalize(vec3(ndc.x * 0.76, -0.28 - waterT * 0.82, -1.0));
   float planeT = -camPos.y / min(rayDir.y, -0.04);
-  vec2 worldPos = (camPos.xz + rayDir.xz * planeT) * 0.086;
+  vec2 worldPos = (camPos.xz + rayDir.xz * planeT) * 0.092;
   worldPos += vec2(u_time * 0.006, u_time * 0.010);
   worldPos += vec2(fbm(worldPos * 0.18 + vec2(5.0, u_time * 0.015)), fbm(worldPos * 0.15 + vec2(-4.0, -u_time * 0.012))) * 0.12;
 
@@ -235,29 +236,32 @@ void main() {
     (fbm(worldPos * vec2(1.2, 4.7) - u_time * 0.06) - 0.5) * 0.045
   ));
   vec3 reflected = skyFromDir(reflect(-viewDir, reflectionNormal));
-  float fresnel = fresnelSchlick(max(dot(nrm, viewDir), 0.0));
+  float viewFacing = max(dot(nrm, viewDir), 0.0);
+  float fresnel = fresnelSchlick(viewFacing);
+  float grazing = pow(clamp(1.0 - viewFacing, 0.0, 1.0), 2.2);
   float hNorm = clamp(h * 0.42 + 0.50, 0.0, 1.0);
   float depth = smoothstep(0.0, 1.0, waterT);
-  vec3 body = mix(u_waterDeep, u_waterShallow, smoothstep(0.06, 0.82, depth));
-  vec3 absorption = exp(-vec3(0.42, 0.16, 0.060) * (0.25 + depth * 3.1));
-  body *= mix(vec3(0.72, 0.94, 1.0), absorption, smoothstep(0.18, 1.0, depth));
-  vec3 sandScatter = vec3(0.82, 0.68, 0.38) * smoothstep(0.72, 1.0, depth) * (0.16 + u_scatter * 0.10);
+  vec3 body = mix(u_waterDeep * 0.84, u_waterShallow, smoothstep(0.045, 0.84, depth));
+  vec3 absorption = exp(-vec3(0.55, 0.20, 0.070) * (0.20 + depth * 3.6));
+  body *= mix(vec3(0.68, 0.94, 1.05), absorption, smoothstep(0.16, 1.0, depth));
+  vec3 sandScatter = vec3(0.86, 0.70, 0.38) * smoothstep(0.70, 1.0, depth) * (0.18 + u_scatter * 0.12);
   body += sandScatter;
   body = mix(body, u_waterCrest, pow(hNorm, 3.0) * 0.42);
   float sss = clamp(lap * 0.12, 0.0, 1.0);
   float backLight = pow(max(dot(nrm, normalize(vec3(-u_sunDir.x, 0.34, -u_sunDir.z))), 0.0), 1.7);
   float thickness = clamp(1.0 - depth + max(h, 0.0) * 0.18, 0.0, 1.0);
-  body += vec3(0.00, 0.46, 0.50) * sss * u_scatter * 0.30;
-  body += vec3(0.08, 0.48, 0.42) * backLight * depth * u_scatter * 0.14;
-  body += vec3(0.05, 0.34, 0.28) * thickness * pow(max(dot(normalize(u_sunDir), viewDir), 0.0), 2.2) * u_scatter * 0.18;
-  vec3 water = mix(body, reflected, clamp(fresnel * 1.12, 0.0, 0.88));
+  body += vec3(0.00, 0.50, 0.54) * sss * u_scatter * 0.38;
+  body += vec3(0.08, 0.52, 0.44) * backLight * depth * u_scatter * 0.18;
+  body += vec3(0.06, 0.38, 0.31) * thickness * pow(max(dot(normalize(u_sunDir), viewDir), 0.0), 2.0) * u_scatter * 0.24;
+  vec3 water = mix(body, reflected, clamp(fresnel * 1.26 + grazing * 0.12, 0.0, 0.92));
 
   vec3 sunDir = normalize(u_sunDir);
   vec3 halfV = normalize(viewDir + sunDir);
   float sparkleField = smoothstep(0.50, 0.92, fbm(worldPos * vec2(8.0, 1.7) + vec2(u_time * 0.35, -u_time * 0.10)));
   float sunPath = pow(max(0.0, 1.0 - abs(uv.x - (0.43 + u_sunDir.x * 0.17)) * 4.1), 3.2) * smoothstep(0.05, 0.75, waterT);
-  float spec = pow(max(dot(reflectionNormal, halfV), 0.0), 84.0) * sparkleField * sunPath * (2.0 + u_chop * 0.95);
-  water += u_sunColor * spec * (0.70 + u_goldHorizon);
+  float spec = pow(max(dot(reflectionNormal, halfV), 0.0), 94.0) * sparkleField * sunPath * (2.3 + u_chop * 1.15);
+  float broadSpec = pow(max(dot(reflectionNormal, halfV), 0.0), 18.0) * sunPath * (0.08 + u_goldHorizon * 0.11);
+  water += u_sunColor * (spec * (0.82 + u_goldHorizon) + broadSpec);
   float caustic = pow(0.5 + 0.5 * sin(worldPos.x * 12.0 + fbm(worldPos * 2.0) * 5.5 - u_time * 1.1), 9.0);
   caustic *= pow(0.5 + 0.5 * sin(worldPos.y * 10.5 - worldPos.x * 2.0 + u_time * 0.9), 5.0);
   water += vec3(0.52, 0.86, 0.78) * caustic * smoothstep(0.62, 1.0, waterT) * (0.035 + u_scatter * 0.035);
@@ -270,9 +274,10 @@ void main() {
   float shoreWave = 0.84 + sin(worldPos.x * 2.5 + u_time * 1.05) * 0.018 + fbm(vec2(worldPos.x * 1.1, u_time * 0.22)) * 0.018;
   float shoreFoam = smoothstep(0.044, 0.0, abs(waterT - shoreWave)) * smoothstep(0.28, 0.80, foamNoise);
   float lace = smoothstep(0.64, 0.92, fbm(worldPos * vec2(1.8, 11.5) + vec2(-u_time * 0.08, u_time * 0.18)));
-  float foam = clamp((crestFoam * (0.36 + lace * 0.52) + shoreFoam * 0.88 + breaking * 0.22) * (1.10 - u_foamT), 0.0, 1.0);
+  float shearFoam = smoothstep(0.60, 0.92, fbm(worldPos * vec2(2.8, 18.0) + vec2(u_time * -0.13, u_time * 0.22))) * breaking;
+  float foam = clamp((crestFoam * (0.42 + lace * 0.58) + shoreFoam * 1.02 + breaking * 0.28 + shearFoam * 0.30) * (1.16 - u_foamT), 0.0, 1.0);
   vec3 foamColor = vec3(0.90, 0.965, 0.985);
-  water = mix(water, foamColor, foam * 0.66);
+  water = mix(water, foamColor, foam * 0.72);
   float ridgePhase = worldPos.y * 5.8 + h * 2.2 - u_time * (0.55 + u_wind * 0.025);
   float ridge = pow(1.0 - abs(sin(ridgePhase)), 14.0);
   ridge *= smoothstep(0.08, 0.94, waterT) * (1.0 - smoothstep(0.94, 1.0, waterT));
@@ -285,8 +290,8 @@ void main() {
   float lowAngleShadow = smoothstep(0.10, 0.92, waterT) * smoothstep(0.92, 0.16, abs(ndc.x));
   water = mix(water, water * vec3(0.43, 0.64, 0.72), shadowBand * (0.18 + u_chop * 0.11));
   water = mix(water, water * vec3(0.56, 0.70, 0.78), lowAngleShadow * smoothstep(0.12, 0.78, -lap) * 0.20);
-  water += vec3(0.12, 0.34, 0.43) * ridge * (0.24 + u_chop * 0.18);
-  water += vec3(0.72, 0.95, 0.98) * perspectiveRidge * perspectiveMask * (0.025 + u_chop * 0.035);
+  water += vec3(0.13, 0.38, 0.47) * ridge * (0.28 + u_chop * 0.20);
+  water += vec3(0.74, 0.97, 1.0) * perspectiveRidge * perspectiveMask * (0.030 + u_chop * 0.044);
   float swellShadow = smoothstep(0.2, 1.0, sin(worldPos.y * 1.6 + h * 1.4 - u_time * 0.42) * 0.5 + 0.5);
   water = mix(water, water * vec3(0.58, 0.72, 0.82), swellShadow * perspectiveMask * (0.10 + u_chop * 0.06));
   water += vec3(0.90, 0.97, 0.99) * ridge * crossRidge * (0.11 + u_chop * 0.10);
@@ -295,9 +300,9 @@ void main() {
 
   float trough = smoothstep(0.62, 0.94, fbm(vec2(worldPos.x * 0.36 - u_time * 0.02, worldPos.y * 2.2 + u_time * 0.11)));
   water = mix(water, water * vec3(0.56,0.78,0.88), trough * smoothstep(0.05, 0.88, 1.0 - waterT) * 0.26);
-  float fogT = clamp((dist - 6.0) / 92.0, 0.0, 1.0);
+  float fogT = clamp((dist - 5.0) / 112.0, 0.0, 1.0);
   vec3 fogColor = mix(u_horizon, u_skyTint + vec3(0.06,0.10,0.16), 0.38 + u_haze * 0.28);
-  water = mix(water, fogColor, pow(fogT, 1.25) * (0.12 + u_haze * 0.34));
+  water = mix(water, fogColor, pow(fogT, 1.18) * (0.13 + u_haze * 0.36));
   float seam = 1.0 - clamp(-aboveHorizon * 18.0, 0.0, 1.0);
   water = mix(water, mix(fogColor, u_horizon, 0.52), seam * 0.52);
   emit(water);
