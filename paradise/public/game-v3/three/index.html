@@ -323,7 +323,7 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
 }
 </script>
 </head>
-<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v7-composite" data-character-system="procedural-3d-rig-v2" data-shoreline-system="authored-glb-visible-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-v1">
+<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v7-composite" data-character-system="procedural-3d-rig-v2" data-shoreline-system="authored-glb-visible-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-v1" data-feedback-system="fish-attraction-catch-burst-v1">
 <iframe class="ocean-pass-frame" id="ocean-pass-frame" title="PandoraChat WebGL ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
 <div class="shoreline-atmosphere" aria-hidden="true"></div>
 <div class="cinematic-grade" aria-hidden="true"></div>
@@ -892,6 +892,37 @@ bobberRipple.rotation.x = -Math.PI / 2;
 bobberRipple.position.set(0.4, -0.12, -11.0);
 bobberRipple.renderOrder = 3;
 scene.add(bobberRipple);
+
+const catchBurstCount = 48;
+const catchBurstPositions = new Float32Array(catchBurstCount * 3);
+const catchBurstSeeds = new Float32Array(catchBurstCount * 3);
+for (let i = 0; i < catchBurstCount; i++) {
+  const j = i * 3;
+  const angle = (i / catchBurstCount) * Math.PI * 2 + (i % 5) * 0.17;
+  catchBurstSeeds[j] = Math.cos(angle);
+  catchBurstSeeds[j + 1] = Math.sin(angle);
+  catchBurstSeeds[j + 2] = 0.42 + (i % 7) * 0.10;
+}
+const catchBurstGeometry = new THREE.BufferGeometry();
+catchBurstGeometry.setAttribute('position', new THREE.BufferAttribute(catchBurstPositions, 3));
+const catchBurstMaterial = new THREE.PointsMaterial({
+  map: makeSparkTexture(),
+  color: 0xdffcff,
+  size: 0.18,
+  transparent: true,
+  opacity: 0,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  sizeAttenuation: true,
+});
+const catchBurst = new THREE.Points(catchBurstGeometry, catchBurstMaterial);
+catchBurst.renderOrder = 4;
+scene.add(catchBurst);
+const catchBurstState = {
+  activeUntil: 0,
+  startedAt: 0,
+  origin: new THREE.Vector3(0.4, -0.06, -11.0),
+};
 
 function makeSandTexture() {
   const c = document.createElement('canvas');
@@ -1996,12 +2027,18 @@ function renderCatchLog() {
     catchLog.appendChild(slot);
   }
 }
+function triggerCatchBurst(origin = bobber.position) {
+  catchBurstState.startedAt = clock.getElapsedTime();
+  catchBurstState.activeUntil = catchBurstState.startedAt + 1.35;
+  catchBurstState.origin.copy(origin);
+}
 function recordCatch(forceIndex = null) {
   const speciesIndex = forceIndex ?? Math.floor((performance.now() * 0.013 + playState.catches.length * 2.7) % fishSpecies.length);
   const name = fishSpecies[speciesIndex % fishSpecies.length];
   const catchItem = { name, time: timeKey, weather: weatherKey, at: Date.now() };
   playState.catches.unshift(catchItem);
   playState.catches = playState.catches.slice(0, 8);
+  triggerCatchBurst();
   renderCatchLog();
   return catchItem;
 }
@@ -2151,6 +2188,12 @@ window.__paradiseDebug = {
     system: document.body.dataset.controlSystem,
     recentGestures: controlState.gestures.map(g => g.name),
     lastTapAt: Math.round(controlState.lastTapAt),
+  }),
+  getFeedback: () => ({
+    system: document.body.dataset.feedbackSystem,
+    burstActive: clock.getElapsedTime() < catchBurstState.activeUntil,
+    burstOpacity: Number(catchBurstMaterial.opacity.toFixed(3)),
+    attraction: playState.cast ? Number((playState.bite ? 1 : playState.castProgress).toFixed(3)) : 0,
   }),
 };
 
@@ -2384,7 +2427,10 @@ function animate() {
     reflection.position.y = reflection.userData.baseY + Math.sin(elapsed * 0.9 + reflection.userData.phase) * 0.012;
     reflection.scale.x = reflection.userData.baseScaleX + Math.sin(elapsed * 0.45 + reflection.userData.phase) * 0.018;
   }
-  for (const fish of fishShoal) {
+  const baitPull = playState.cast ? (playState.bite ? 1 : Math.min(1, playState.castProgress * 0.65)) : 0;
+  const bobberInfluence = playState.cast ? 0.18 + baitPull * 0.42 : 0;
+  for (let fishIndex = 0; fishIndex < fishShoal.length; fishIndex++) {
+    const fish = fishShoal[fishIndex];
     const d = fish.userData;
     const lane = Math.sin(elapsed * 0.18 + d.phase);
     let x = d.x + Math.sin(elapsed * d.speed + d.phase) * (2.8 + d.scale * 1.8) + lane * 0.8;
@@ -2393,8 +2439,16 @@ function animate() {
     fish.position.x = x;
     fish.position.y = d.y + Math.sin(elapsed * (0.9 + d.speed * 0.25) + d.phase) * 0.055;
     fish.position.z = d.z + Math.cos(elapsed * 0.34 + d.phase) * 0.32;
+    const attraction = Math.max(0, 1 - fishIndex / Math.max(1, fishShoal.length - 1)) * bobberInfluence;
+    if (attraction > 0.001) {
+      const orbitX = bobber.position.x + Math.sin(elapsed * 0.9 + d.phase) * (0.72 + d.scale * 0.45);
+      const orbitZ = bobber.position.z + Math.cos(elapsed * 0.7 + d.phase) * (0.54 + d.scale * 0.32);
+      fish.position.x += (orbitX - fish.position.x) * attraction * 0.045;
+      fish.position.z += (orbitZ - fish.position.z) * attraction * 0.045;
+      fish.position.y += (bobber.position.y - 0.34 - fish.position.y) * attraction * 0.018;
+    }
     fish.material.rotation = Math.sin(elapsed * 1.4 + d.phase) * 0.055;
-    fish.material.opacity = (0.10 + d.scale * 0.07) * weatherProfiles[weatherKey].reflection * (timeKey === 'night' ? 0.42 : 1);
+    fish.material.opacity = (0.10 + d.scale * 0.07 + attraction * 0.18 + (playState.bite ? attraction * 0.16 : 0)) * weatherProfiles[weatherKey].reflection * (timeKey === 'night' ? 0.42 : 1);
     fish.scale.x = Math.sign(Math.cos(elapsed * d.speed * 0.33 + d.phase)) * Math.abs(d.scale * 1.25);
   }
   const progressTarget = playState.cast ? 1 : 0;
@@ -2412,6 +2466,25 @@ function animate() {
   bobberRipple.position.set(bobber.position.x, -0.115, bobber.position.z);
   const rippleScale = 1.8 + easedCast * 2.35 + Math.sin(elapsed * (playState.bite ? 11.0 : 2.4)) * (playState.bite ? 0.34 : 0.08);
   bobberRipple.scale.set(rippleScale, rippleScale, 1);
+  const burstAge = elapsed - catchBurstState.startedAt;
+  const burstLive = burstAge >= 0 && elapsed < catchBurstState.activeUntil;
+  catchBurstMaterial.opacity = burstLive ? Math.max(0, 1 - burstAge / 1.35) * 0.72 : 0;
+  catchBurst.visible = catchBurstMaterial.opacity > 0.01;
+  if (catchBurst.visible) {
+    const burstAttr = catchBurst.geometry.attributes.position;
+    const pos = burstAttr.array;
+    for (let i = 0; i < catchBurstCount; i++) {
+      const j = i * 3;
+      const dirX = catchBurstSeeds[j];
+      const dirZ = catchBurstSeeds[j + 1];
+      const speed = catchBurstSeeds[j + 2];
+      const radius = burstAge * (0.9 + speed) + Math.sin(burstAge * 9 + i) * 0.04;
+      pos[j] = catchBurstState.origin.x + dirX * radius;
+      pos[j + 1] = catchBurstState.origin.y + Math.sin(Math.min(1, burstAge) * Math.PI) * (0.18 + speed * 0.22) - burstAge * 0.10;
+      pos[j + 2] = catchBurstState.origin.z + dirZ * radius;
+    }
+    burstAttr.needsUpdate = true;
+  }
   lineMidA.lerpVectors(rodTip, bobber.position, 0.34);
   lineMidB.lerpVectors(rodTip, bobber.position, 0.68);
   const sag = playState.cast ? 0.55 : 0.18;
