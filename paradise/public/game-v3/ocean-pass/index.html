@@ -9,7 +9,7 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
 canvas { display: block; width: 100vw; height: 100vh; }
 </style>
 </head>
-<body data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v7">
+<body data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v8">
 <canvas id="ocean"></canvas>
 <script>
 const canvas = document.getElementById('ocean');
@@ -137,11 +137,12 @@ float oceanHeight(vec2 pos, float t, float windSpeed, float chop) {
     float w = dot(dir, pos) * k - omega * t + phase;
     h += amp * sin(w);
   }
-  float capillary = (fbm(pos * vec2(0.85, 2.40) + vec2(t * 0.11, -t * 0.05)) - 0.5) * 0.045 * chop;
-  float ripples = sin(pos.x * 19.0 + pos.y * 4.8 - t * 2.4) * 0.012;
-  ripples += sin(pos.x * -7.5 + pos.y * 23.0 + t * 1.9) * 0.009;
-  float organizedSwell = sin(pos.y * 0.82 - t * 0.42 + sin(pos.x * 0.11) * 0.9) * 0.055;
-  return h * chop + organizedSwell * smoothstep(0.4, 1.6, chop) + capillary + ripples * smoothstep(0.7, 2.2, chop);
+  float capillary = (fbm(pos * vec2(0.85, 2.40) + vec2(t * 0.11, -t * 0.05)) - 0.5) * 0.040 * chop;
+  float ripples = sin(pos.x * 19.0 + pos.y * 4.8 - t * 2.4) * 0.010;
+  ripples += sin(pos.x * -7.5 + pos.y * 23.0 + t * 1.9) * 0.008;
+  float organizedSwell = sin(pos.y * 0.82 - t * 0.42 + sin(pos.x * 0.11) * 0.9) * 0.060;
+  float crossSwell = sin(dot(pos, vec2(0.22, 0.58)) - t * 0.31 + sin(pos.x * 0.05) * 0.7) * 0.040;
+  return h * chop + (organizedSwell + crossSwell) * smoothstep(0.4, 1.6, chop) + capillary + ripples * smoothstep(0.7, 2.2, chop);
 }
 vec3 oceanNormal(vec2 pos, float t, float windSpeed, float chop) {
   float eps = 0.035;
@@ -228,7 +229,12 @@ void main() {
   vec3 nrm = oceanNormal(worldPos, u_time, u_wind, u_chop);
   float lap = laplacian(worldPos, u_time, u_wind, u_chop);
   vec3 viewDir = normalize(-rayDir);
-  vec3 reflected = skyFromDir(reflect(-viewDir, nrm));
+  vec3 reflectionNormal = normalize(nrm + vec3(
+    (fbm(worldPos * vec2(4.2, 1.1) + u_time * 0.08) - 0.5) * 0.045,
+    0.0,
+    (fbm(worldPos * vec2(1.2, 4.7) - u_time * 0.06) - 0.5) * 0.045
+  ));
+  vec3 reflected = skyFromDir(reflect(-viewDir, reflectionNormal));
   float fresnel = fresnelSchlick(max(dot(nrm, viewDir), 0.0));
   float hNorm = clamp(h * 0.42 + 0.50, 0.0, 1.0);
   float depth = smoothstep(0.0, 1.0, waterT);
@@ -240,15 +246,17 @@ void main() {
   body = mix(body, u_waterCrest, pow(hNorm, 3.0) * 0.42);
   float sss = clamp(lap * 0.12, 0.0, 1.0);
   float backLight = pow(max(dot(nrm, normalize(vec3(-u_sunDir.x, 0.34, -u_sunDir.z))), 0.0), 1.7);
-  body += vec3(0.00, 0.52, 0.54) * sss * u_scatter * 0.36;
-  body += vec3(0.08, 0.52, 0.48) * backLight * depth * u_scatter * 0.16;
+  float thickness = clamp(1.0 - depth + max(h, 0.0) * 0.18, 0.0, 1.0);
+  body += vec3(0.00, 0.46, 0.50) * sss * u_scatter * 0.30;
+  body += vec3(0.08, 0.48, 0.42) * backLight * depth * u_scatter * 0.14;
+  body += vec3(0.05, 0.34, 0.28) * thickness * pow(max(dot(normalize(u_sunDir), viewDir), 0.0), 2.2) * u_scatter * 0.18;
   vec3 water = mix(body, reflected, clamp(fresnel * 1.12, 0.0, 0.88));
 
   vec3 sunDir = normalize(u_sunDir);
   vec3 halfV = normalize(viewDir + sunDir);
   float sparkleField = smoothstep(0.50, 0.92, fbm(worldPos * vec2(8.0, 1.7) + vec2(u_time * 0.35, -u_time * 0.10)));
   float sunPath = pow(max(0.0, 1.0 - abs(uv.x - (0.43 + u_sunDir.x * 0.17)) * 4.1), 3.2) * smoothstep(0.05, 0.75, waterT);
-  float spec = pow(max(dot(nrm, halfV), 0.0), 72.0) * sparkleField * sunPath * (2.2 + u_chop * 1.1);
+  float spec = pow(max(dot(reflectionNormal, halfV), 0.0), 84.0) * sparkleField * sunPath * (2.0 + u_chop * 0.95);
   water += u_sunColor * spec * (0.70 + u_goldHorizon);
   float caustic = pow(0.5 + 0.5 * sin(worldPos.x * 12.0 + fbm(worldPos * 2.0) * 5.5 - u_time * 1.1), 9.0);
   caustic *= pow(0.5 + 0.5 * sin(worldPos.y * 10.5 - worldPos.x * 2.0 + u_time * 0.9), 5.0);
@@ -256,32 +264,34 @@ void main() {
 
   float slope = clamp(length(nrm.xz) / max(nrm.y, 0.08), 0.0, 2.0);
   float breaking = smoothstep(0.08, 0.72, lap) * smoothstep(0.20, 1.22, slope);
-  float foamBase = smoothstep(u_foamT * 0.78, u_foamT * 1.20, abs(h) + breaking * 0.36);
+  float foamBase = smoothstep(u_foamT * 0.82, u_foamT * 1.26, abs(h) + breaking * 0.32);
   float foamNoise = smoothstep(0.34, 0.76, fbm(worldPos * vec2(10.0, 4.2) + vec2(u_time * 0.06, -u_time * 0.045)));
   float crestFoam = foamBase * foamNoise * smoothstep(0.08, 0.96, waterT);
   float shoreWave = 0.84 + sin(worldPos.x * 2.5 + u_time * 1.05) * 0.018 + fbm(vec2(worldPos.x * 1.1, u_time * 0.22)) * 0.018;
   float shoreFoam = smoothstep(0.044, 0.0, abs(waterT - shoreWave)) * smoothstep(0.28, 0.80, foamNoise);
   float lace = smoothstep(0.64, 0.92, fbm(worldPos * vec2(1.8, 11.5) + vec2(-u_time * 0.08, u_time * 0.18)));
-  float foam = clamp((crestFoam * (0.42 + lace * 0.58) + shoreFoam * 0.92 + breaking * 0.28) * (1.15 - u_foamT), 0.0, 1.0);
-  vec3 foamColor = vec3(0.88, 0.96, 1.0);
-  water = mix(water, foamColor, foam * 0.78);
+  float foam = clamp((crestFoam * (0.36 + lace * 0.52) + shoreFoam * 0.88 + breaking * 0.22) * (1.10 - u_foamT), 0.0, 1.0);
+  vec3 foamColor = vec3(0.90, 0.965, 0.985);
+  water = mix(water, foamColor, foam * 0.66);
   float ridgePhase = worldPos.y * 5.8 + h * 2.2 - u_time * (0.55 + u_wind * 0.025);
   float ridge = pow(1.0 - abs(sin(ridgePhase)), 14.0);
   ridge *= smoothstep(0.08, 0.94, waterT) * (1.0 - smoothstep(0.94, 1.0, waterT));
   float crossRidge = pow(1.0 - abs(sin(worldPos.x * 7.2 + worldPos.y * 1.1 + u_time * 0.22)), 20.0);
-  float perspectivePhase = pow(waterT, 1.38) * 78.0 + ndc.x * 2.2 + h * 3.1 - u_time * (0.52 + u_wind * 0.018);
-  float perspectiveRidge = pow(1.0 - abs(sin(perspectivePhase)), 9.0);
+  float ridgeWarp = fbm(worldPos * vec2(0.68, 1.55) + vec2(u_time * 0.018, -u_time * 0.035));
+  float perspectivePhase = pow(waterT, 1.34) * 54.0 + ndc.x * (1.45 + ridgeWarp * 0.85) + h * 2.15 - u_time * (0.42 + u_wind * 0.014);
+  float perspectiveRidge = pow(1.0 - abs(sin(perspectivePhase + ridgeWarp * 2.7)), 13.0);
   float perspectiveMask = smoothstep(0.05, 0.80, waterT) * (1.0 - smoothstep(0.96, 1.0, waterT));
   float shadowBand = smoothstep(0.14, 0.88, sin(perspectivePhase - 0.82) * 0.5 + 0.5) * perspectiveMask;
-  water = mix(water, water * vec3(0.48, 0.68, 0.76), shadowBand * (0.16 + u_chop * 0.10));
-  water += vec3(0.14, 0.38, 0.48) * ridge * (0.28 + u_chop * 0.22);
-  water += vec3(0.70, 0.96, 1.0) * perspectiveRidge * perspectiveMask * (0.08 + u_chop * 0.08);
+  float lowAngleShadow = smoothstep(0.10, 0.92, waterT) * smoothstep(0.92, 0.16, abs(ndc.x));
+  water = mix(water, water * vec3(0.43, 0.64, 0.72), shadowBand * (0.18 + u_chop * 0.11));
+  water = mix(water, water * vec3(0.56, 0.70, 0.78), lowAngleShadow * smoothstep(0.12, 0.78, -lap) * 0.20);
+  water += vec3(0.12, 0.34, 0.43) * ridge * (0.24 + u_chop * 0.18);
+  water += vec3(0.72, 0.95, 0.98) * perspectiveRidge * perspectiveMask * (0.025 + u_chop * 0.035);
   float swellShadow = smoothstep(0.2, 1.0, sin(worldPos.y * 1.6 + h * 1.4 - u_time * 0.42) * 0.5 + 0.5);
   water = mix(water, water * vec3(0.58, 0.72, 0.82), swellShadow * perspectiveMask * (0.10 + u_chop * 0.06));
-  water += vec3(0.94, 0.99, 1.0) * ridge * crossRidge * (0.16 + u_chop * 0.15);
+  water += vec3(0.90, 0.97, 0.99) * ridge * crossRidge * (0.11 + u_chop * 0.10);
   float foamEdge = abs(foam - crestFoam);
-  water += vec3(0.04,0.0,0.0) * foamEdge * abs(h - oceanHeight(worldPos + vec2(0.002,0.0), u_time, u_wind, u_chop)) * 9.0;
-  water += vec3(0.0,0.0,0.055) * foamEdge * abs(h - oceanHeight(worldPos - vec2(0.002,0.0), u_time, u_wind, u_chop)) * 9.0;
+  water += vec3(0.012,0.018,0.022) * foamEdge * abs(h - oceanHeight(worldPos + vec2(0.002,0.0), u_time, u_wind, u_chop)) * 5.0;
 
   float trough = smoothstep(0.62, 0.94, fbm(vec2(worldPos.x * 0.36 - u_time * 0.02, worldPos.y * 2.2 + u_time * 0.11)));
   water = mix(water, water * vec3(0.56,0.78,0.88), trough * smoothstep(0.05, 0.88, 1.0 - waterT) * 0.26);
