@@ -104,7 +104,8 @@ body > canvas {
   opacity: 0.48;
 }
 body.clean .hud,
-body.clean .readout {
+body.clean .readout,
+body.clean .touch-help {
   opacity: 0;
   pointer-events: none;
 }
@@ -210,6 +211,38 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
   letter-spacing: .14em;
   font-size: 10px;
 }
+.cinematic-toggle {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  top: max(16px, env(safe-area-inset-top));
+  z-index: 4;
+  min-height: 34px;
+  padding: 8px 12px;
+  border: 1px solid rgba(247,237,206,.20);
+  border-radius: 999px;
+  background: rgba(5,15,26,.36);
+  color: rgba(247,237,206,.72);
+  backdrop-filter: blur(14px);
+  text-transform: uppercase;
+  letter-spacing: .14em;
+  font-size: 9px;
+  font-weight: 900;
+  box-shadow: 0 10px 28px rgba(0,0,0,.18);
+  transition: opacity 180ms ease, transform 180ms ease, background 180ms ease;
+}
+.cinematic-toggle:hover,
+.cinematic-toggle:focus-visible {
+  opacity: .96;
+  transform: translateY(-1px);
+  background: rgba(5,15,26,.58);
+}
+body.clean .cinematic-toggle {
+  opacity: .46;
+}
+body.clean .cinematic-toggle:hover,
+body.clean .cinematic-toggle:focus-visible {
+  opacity: .92;
+}
 .touch-help {
   position: fixed;
   left: 50%;
@@ -301,6 +334,14 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .cinematic-toggle {
+    right: max(10px, env(safe-area-inset-right));
+    top: max(10px, env(safe-area-inset-top));
+    min-height: 30px;
+    padding: 7px 10px;
+    font-size: 8px;
+    letter-spacing: .11em;
+  }
   .touch-help {
     left: auto;
     right: max(10px, env(safe-area-inset-right));
@@ -323,7 +364,7 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
 }
 </script>
 </head>
-<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v8-composite" data-character-system="lit-hybrid-articulated-volume-rig-v4" data-shoreline-system="wet-dry-sand-depth-v3" data-terrain-system="procedural-dune-depth-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-v1" data-feedback-system="fish-attraction-catch-burst-v1">
+<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v8-composite" data-character-system="lit-hybrid-articulated-volume-rig-v4" data-shoreline-system="wet-dry-sand-depth-v3" data-terrain-system="procedural-dune-depth-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-cinematic-toggle-v2" data-feedback-system="fish-attraction-catch-burst-v1">
 <iframe class="ocean-pass-frame" id="ocean-pass-frame" title="PandoraChat WebGL ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
 <div class="shoreline-atmosphere" aria-hidden="true"></div>
 <div class="cinematic-grade" aria-hidden="true"></div>
@@ -333,6 +374,7 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
   <span>double tap: quick action</span>
   <span>swipe: view</span>
 </div>
+<button class="cinematic-toggle" id="cinematic-toggle" type="button" aria-pressed="false" title="Toggle cinematic HUD">Frame</button>
 <aside class="hud">
   <div class="kicker">Paradise V3 / Shader Composite</div>
   <h1>Paradise Fishing.</h1>
@@ -368,6 +410,7 @@ const resetButton = document.getElementById('reset-cast');
 const catchLog = document.getElementById('catch-log');
 const hud = document.querySelector('.hud');
 const touchHelp = document.getElementById('touch-help');
+const cinematicToggle = document.getElementById('cinematic-toggle');
 const palette = {
   dawn: { sky: 0x8fcde0, horizon: 0xffd89a, sun: 0xffefb4, deep: [0.00, 0.04, 0.10], mid: [0.00, 0.19, 0.28], shallow: [0.05, 0.42, 0.44], fog: 0xaad0d4, light: 1.15, gold: 1.0, wind: 8.4, chop: 0.92, foam: 0.72, exposure: 1.03, hemi: 1.22, sunPower: 2.55, fogDensity: 0.018, grade: 0.92 },
   noon: { sky: 0x55aeea, horizon: 0xd7eff7, sun: 0xfff5cf, deep: [0.00, 0.05, 0.16], mid: [0.00, 0.23, 0.38], shallow: [0.06, 0.54, 0.56], fog: 0xbfe4ea, light: 1.35, gold: 0.62, wind: 7.6, chop: 0.86, foam: 0.58, exposure: 1.10, hemi: 1.42, sunPower: 2.95, fogDensity: 0.013, grade: 0.74 },
@@ -384,7 +427,17 @@ if (!palette[timeKey]) timeKey = 'dawn';
 let weatherKey = new URLSearchParams(location.search).get('weather') || 'breeze';
 if (!['calm', 'breeze', 'storm'].includes(weatherKey)) weatherKey = 'breeze';
 const cleanPresentation = new URLSearchParams(location.search).get('clean') === '1';
-document.body.classList.toggle('clean', cleanPresentation);
+function setCleanPresentation(enabled, announce = false) {
+  document.body.classList.toggle('clean', enabled);
+  if (cinematicToggle) {
+    cinematicToggle.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+    cinematicToggle.textContent = enabled ? 'HUD' : 'Frame';
+  }
+  if (announce && readout) {
+    readout.textContent = enabled ? 'cinematic frame / h restores hud' : 'hud restored / h hides hud';
+  }
+}
+setCleanPresentation(cleanPresentation);
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(palette[timeKey].fog, 0.018);
@@ -2184,6 +2237,10 @@ function handleSwipe(dx, dy) {
 castButton.addEventListener('click', toggleCast);
 resetButton.addEventListener('click', resetCast);
 viewButton.addEventListener('click', cycleView);
+cinematicToggle?.addEventListener('click', () => {
+  setCleanPresentation(!document.body.classList.contains('clean'), true);
+  noteGesture(document.body.classList.contains('clean') ? 'hud-hidden' : 'hud-shown');
+});
 addEventListener('keydown', event => {
   if (event.repeat) return;
   const tag = event.target?.tagName?.toLowerCase();
@@ -2195,6 +2252,9 @@ addEventListener('keydown', event => {
     resetCast();
   } else if (event.key.toLowerCase() === 'v') {
     cycleView();
+  } else if (event.key.toLowerCase() === 'h') {
+    setCleanPresentation(!document.body.classList.contains('clean'), true);
+    noteGesture(document.body.classList.contains('clean') ? 'hud-hidden-key' : 'hud-shown-key');
   }
 });
 addEventListener('pointerdown', event => {
@@ -2259,6 +2319,15 @@ window.__paradiseDebug = {
     recentGestures: controlState.gestures.map(g => g.name),
     lastTapAt: Math.round(controlState.lastTapAt),
   }),
+  getPresentation: () => ({
+    clean: document.body.classList.contains('clean'),
+    toggle: cinematicToggle?.textContent || null,
+    ariaPressed: cinematicToggle?.getAttribute('aria-pressed') || null,
+  }),
+  togglePresentation: () => {
+    setCleanPresentation(!document.body.classList.contains('clean'), true);
+    return window.__paradiseDebug.getPresentation();
+  },
   getFeedback: () => ({
     system: document.body.dataset.feedbackSystem,
     burstActive: clock.getElapsedTime() < catchBurstState.activeUntil,
