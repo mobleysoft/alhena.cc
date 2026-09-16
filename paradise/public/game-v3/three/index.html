@@ -103,6 +103,18 @@ body > canvas {
   mix-blend-mode: screen;
   opacity: 0.48;
 }
+.tilt-shift-grade {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(220,244,255,.20), transparent 20%, transparent 74%, rgba(6,16,24,.20)),
+    radial-gradient(ellipse at 50% 56%, transparent 0 34%, rgba(244,232,190,.10) 50%, rgba(4,13,20,.26) 100%);
+  backdrop-filter: blur(1.4px) saturate(1.12);
+  mask-image: linear-gradient(180deg, black 0%, transparent 24%, transparent 72%, black 100%);
+  opacity: .74;
+}
 .director-matte {
   position: fixed;
   inset: 0;
@@ -423,11 +435,12 @@ body.clean .cinematic-toggle:focus-visible {
 }
 </script>
 </head>
-<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v9-composite" data-character-system="procedural-3d-alhena-no-cutout-artifacts-v1" data-animal-system="procedural-cel-lab-no-photo-cutout-v1" data-art-direction="cohesive-cel-shaded-diorama-v1" data-lighting-system="cinematic-practical-rim-contact-v1" data-camera-system="director-composition-v1" data-material-system="ribbed-wet-sand-parallax-v1" data-shoreline-system="wet-dry-sand-depth-v3" data-terrain-system="procedural-dune-depth-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-motion-haptics-v3" data-feedback-system="bite-tension-bobber-dive-catch-burst-v3">
+<body data-paradise-v3="premium-hybrid-fishing-v1" data-water-system="evan-wallace-inspired-interactive-caustic-water-v1" data-character-system="vinyl-clay-miniature-diorama-v1" data-animal-system="procedural-cel-lab-no-photo-cutout-v1" data-art-direction="premium-tactile-diorama-realistic-water-v1" data-lighting-system="tilt-shift-cinematic-diorama-v1" data-camera-system="three-phase-hunt-strike-fight-camera-v1" data-material-system="vinyl-clay-toon-materials-v1" data-shoreline-system="wet-dry-sand-depth-v3" data-terrain-system="procedural-dune-depth-v1" data-interaction-system="physical-bobber-ripples-caustics-v1" data-control-system="touch-gesture-motion-haptics-v3" data-feedback-system="diegetic-line-tension-fight-v1" data-monetization-system="deep-water-license-diegetic-billboard-v1">
 <iframe class="ocean-pass-frame" id="ocean-pass-frame" title="PandoraChat WebGL2 JONSWAP ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
 <div class="shoreline-atmosphere" aria-hidden="true"></div>
 <div class="cinematic-grade" aria-hidden="true"></div>
 <div class="depth-grade" aria-hidden="true"></div>
+<div class="tilt-shift-grade" aria-hidden="true"></div>
 <div class="director-matte" aria-hidden="true"></div>
 <div class="touch-help" id="touch-help" aria-hidden="true">
   <span>tap water: cast / reel</span>
@@ -436,9 +449,9 @@ body.clean .cinematic-toggle:focus-visible {
 </div>
 <button class="cinematic-toggle" id="cinematic-toggle" type="button" aria-pressed="false" title="Toggle cinematic HUD">Frame</button>
 <aside class="hud">
-  <div class="kicker">Paradise V3 / Shader Composite</div>
+  <div class="kicker">Paradise / Deep Water Prototype</div>
   <h1>Paradise Fishing.</h1>
-  <p>This route composes a standalone PandoraChat-style WebGL2 ocean shader behind the game foreground: JONSWAP-inspired wave spectra, analytical normals, Fresnel sky reflection, subsurface scatter, foam, fog, and ACES tone mapping.</p>
+  <p>Hunt silhouettes, survive the strike, and feather line tension through the fight. Deep Water License unlocks midnight storms and legendary boss fish.</p>
   <div class="row">
     <button class="active" data-time="dawn">Dawn</button>
     <button data-time="noon">Noon</button>
@@ -1033,6 +1046,86 @@ bobberRipple.position.set(0.4, -0.12, -11.0);
 bobberRipple.renderOrder = 3;
 scene.add(bobberRipple);
 
+const causticWaterMat = new THREE.ShaderMaterial({
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  uniforms: {
+    uTime: { value: 0 },
+    uRippleOrigin: { value: new THREE.Vector2(0.4, -11.0) },
+    uRippleAge: { value: 9 },
+    uRippleEnergy: { value: 0 },
+    uStrike: { value: 0 },
+    uWaterTint: { value: new THREE.Color(0x64e4f0) },
+    uSunGold: { value: new THREE.Color(0xffe0a3) },
+  },
+  vertexShader: `
+    uniform float uTime;
+    uniform vec2 uRippleOrigin;
+    uniform float uRippleAge;
+    uniform float uRippleEnergy;
+    uniform float uStrike;
+    varying vec2 vUv;
+    varying vec3 vWorld;
+    varying float vWave;
+    float ring(vec2 p, float radius, float width) {
+      return 1.0 - smoothstep(0.0, width, abs(length(p) - radius));
+    }
+    void main() {
+      vUv = uv;
+      vec3 p = position;
+      vec4 world0 = modelMatrix * vec4(p, 1.0);
+      vec2 rel = world0.xz - uRippleOrigin;
+      float radius = uRippleAge * (2.2 + uStrike * 1.8);
+      float wave = ring(rel, radius, 0.22 + uStrike * 0.12) * exp(-uRippleAge * 0.50) * uRippleEnergy;
+      wave += ring(rel, max(0.0, radius - 1.25), 0.18) * exp(-uRippleAge * 0.64) * uRippleEnergy * 0.48;
+      p.y += wave * (0.26 + uStrike * 0.42);
+      p.y += sin(p.x * 0.55 + uTime * 1.6) * 0.018 + sin(p.z * 0.88 - uTime * 1.25) * 0.016;
+      vec4 world = modelMatrix * vec4(p, 1.0);
+      vWorld = world.xyz;
+      vWave = wave;
+      gl_Position = projectionMatrix * viewMatrix * world;
+    }
+  `,
+  fragmentShader: `
+    precision highp float;
+    uniform float uTime;
+    uniform vec2 uRippleOrigin;
+    uniform float uRippleAge;
+    uniform float uRippleEnergy;
+    uniform float uStrike;
+    uniform vec3 uWaterTint;
+    uniform vec3 uSunGold;
+    varying vec2 vUv;
+    varying vec3 vWorld;
+    varying float vWave;
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
+    float noise(vec2 p) {
+      vec2 i = floor(p), f = fract(p);
+      vec2 u = f * f * (3.0 - 2.0 * f);
+      return mix(mix(hash(i), hash(i + vec2(1.0,0.0)), u.x), mix(hash(i + vec2(0.0,1.0)), hash(i + vec2(1.0,1.0)), u.x), u.y);
+    }
+    void main() {
+      vec2 p = vWorld.xz - uRippleOrigin;
+      float d = length(p);
+      float ripple = sin(d * 5.2 - uRippleAge * 13.0) * exp(-d * 0.055) * exp(-uRippleAge * 0.58) * uRippleEnergy;
+      float causticA = pow(abs(sin(vWorld.x * 1.55 + noise(vWorld.xz * .38 + uTime * .06) * 2.8 + uTime * .55)), 18.0);
+      float causticB = pow(abs(sin(vWorld.z * 2.25 - vWorld.x * .34 - uTime * .72)), 22.0);
+      float caustics = (causticA + causticB) * (0.12 + uRippleEnergy * 0.26 + uStrike * 0.32);
+      float ring = smoothstep(0.14, 0.92, abs(ripple) + abs(vWave) * 2.0);
+      float foam = smoothstep(0.72, 1.0, ring + uStrike * 0.28) * exp(-uRippleAge * 0.36);
+      vec3 color = uWaterTint * caustics + uSunGold * foam * 0.65 + vec3(0.84, 0.98, 1.0) * ring * 0.16;
+      float alpha = clamp(caustics * 0.15 + ring * 0.22 + foam * 0.30, 0.0, 0.72);
+      gl_FragColor = vec4(color, alpha);
+    }
+  `,
+});
+const causticWater = new THREE.Mesh(new THREE.PlaneGeometry(18, 12, 120, 80), causticWaterMat);
+causticWater.rotation.x = -Math.PI / 2;
+causticWater.position.set(0.4, -0.118, -11.0);
+causticWater.renderOrder = 2;
+scene.add(causticWater);
+
 const catchBurstCount = 48;
 const catchBurstPositions = new Float32Array(catchBurstCount * 3);
 const catchBurstSeeds = new Float32Array(catchBurstCount * 3);
@@ -1129,14 +1222,14 @@ const materialMaps = {
 
 const toonRamp = new THREE.DataTexture(
   new Uint8Array([
-    72, 72, 68,
-    148, 146, 132,
-    232, 218, 174,
-    255, 246, 206,
+    72, 72, 68, 255,
+    148, 146, 132, 255,
+    232, 218, 174, 255,
+    255, 246, 206, 255,
   ]),
   4,
   1,
-  THREE.RGBFormat
+  THREE.RGBAFormat
 );
 toonRamp.needsUpdate = true;
 toonRamp.magFilter = THREE.NearestFilter;
@@ -1640,6 +1733,71 @@ function makeBoard(width, height, depth, material, x, y, z, rx = 0, ry = 0, rz =
   board.castShadow = true;
   board.receiveShadow = true;
   return board;
+}
+
+function makeSignTexture() {
+  const c = document.createElement('canvas');
+  c.width = 1024;
+  c.height = 512;
+  const x = c.getContext('2d');
+  const grain = x.createLinearGradient(0, 0, 1024, 512);
+  grain.addColorStop(0, '#3a2213');
+  grain.addColorStop(0.46, '#70401f');
+  grain.addColorStop(1, '#24150c');
+  x.fillStyle = grain;
+  x.fillRect(0, 0, 1024, 512);
+  for (let i = 0; i < 24; i++) {
+    x.strokeStyle = `rgba(255, 218, 150, ${0.035 + (i % 4) * 0.012})`;
+    x.lineWidth = 2 + (i % 3);
+    x.beginPath();
+    x.moveTo(0, 40 + i * 19 + Math.sin(i) * 8);
+    x.bezierCurveTo(260, 22 + i * 17, 680, 78 + i * 15, 1024, 38 + i * 19);
+    x.stroke();
+  }
+  x.strokeStyle = 'rgba(255, 222, 150, .62)';
+  x.lineWidth = 12;
+  x.strokeRect(36, 34, 952, 444);
+  x.fillStyle = '#ffdf8a';
+  x.font = '900 58px Georgia, serif';
+  x.fillText('DEEP WATER LICENSE', 78, 118);
+  x.font = '800 32px system-ui, sans-serif';
+  x.fillStyle = '#dffcff';
+  x.fillText('No ads  -  Midnight + Storm  -  Legendary boss fish', 78, 190);
+  x.fillStyle = 'rgba(255,255,255,.78)';
+  x.font = '700 27px system-ui, sans-serif';
+  x.fillText('Upgrade at the bar. The water gets stranger after dark.', 78, 246);
+  x.fillStyle = '#f0cf7a';
+  x.font = '900 42px system-ui, sans-serif';
+  x.fillText('$4.99 / MONTH', 78, 342);
+  x.fillStyle = 'rgba(4, 16, 24, .72)';
+  x.fillRect(660, 292, 260, 76);
+  x.fillStyle = '#fff3bd';
+  x.font = '900 30px system-ui, sans-serif';
+  x.fillText('TRY FIGHT', 704, 341);
+  const texture = new THREE.CanvasTexture(c);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  return texture;
+}
+
+function makeLicenseBillboard(x, z) {
+  const group = new THREE.Group();
+  const postMat = new THREE.MeshStandardMaterial({ color: 0x4a2a18, map: materialMaps.wood, roughness: 0.88 });
+  const signMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: makeSignTexture(),
+    roughness: 0.58,
+    metalness: 0.0,
+  });
+  group.add(makeBoard(0.18, 1.70, 0.18, postMat, -1.82, 0.74, 0));
+  group.add(makeBoard(0.18, 1.70, 0.18, postMat, 1.82, 0.74, 0));
+  group.add(makeBoard(4.25, 1.55, 0.12, signMat, 0, 1.58, 0.02, -0.035, 0, 0));
+  group.add(makeBoard(4.55, 0.18, 0.18, postMat, 0, 2.44, -0.04));
+  group.position.set(x, -0.24, z);
+  group.rotation.y = -0.34;
+  group.scale.setScalar(0.58);
+  scene.add(group);
+  return markSceneMesh(group);
 }
 
 function makeBeachHouse3D(x, z) {
@@ -2380,12 +2538,14 @@ for (let i = 0; i < 7; i++) {
 }
 const house3D = makeBeachHouse3D(-8.55, 7.92);
 const bar3D = makeBar3D(6.55, 4.94);
+const licenseBillboard = makeLicenseBillboard(-4.45, 5.72);
 const pier3D = makePerspectivePier();
 const reedWall = makeReedWall();
 const causticSheet = makeCausticSheet();
 reedWall.visible = false;
 stylizeObjectMaterials(house3D);
 stylizeObjectMaterials(bar3D);
+stylizeObjectMaterials(licenseBillboard);
 stylizeObjectMaterials(pier3D);
 houseSprite.material.opacity = 0;
 barSprite.material.opacity = 0;
@@ -2413,6 +2573,15 @@ const bobberTarget = new THREE.Vector3();
 const playState = {
   cast: true,
   castProgress: 1,
+  phase: 'hunt',
+  phaseStartedAt: 0,
+  nibbles: 0,
+  nextNibbleAt: 2.2,
+  strikeWindowUntil: 0,
+  fightUntil: 0,
+  jumpUntil: 0,
+  lastRippleAt: -9,
+  lineSnapped: false,
   bite: false,
   biteUntil: 0,
   tension: 0,
@@ -2458,8 +2627,13 @@ function setGradeOpacity(value) {
   document.documentElement.style.setProperty('--grade-opacity', Math.min(1, Math.max(0.35, value)).toFixed(2));
 }
 function refreshPlayHud() {
-  castButton.textContent = playState.bite ? 'Reel Bite' : playState.cast ? 'Reel' : 'Cast Line';
-  castButton.classList.toggle('alert', playState.bite);
+  const label = playState.phase === 'strike'
+    ? 'Hook Now'
+    : playState.phase === 'fight'
+      ? 'Feather Reel'
+      : playState.cast ? 'Twitch Lure' : 'Cast Line';
+  castButton.textContent = label;
+  castButton.classList.toggle('alert', playState.phase === 'strike' || playState.bite);
   viewButton.textContent = `View: ${viewTargets[playState.view].label}`;
   updateTensionHud();
 }
@@ -2467,8 +2641,14 @@ function updateTensionHud() {
   if (!tensionFill || !tensionLabel || !tensionPanel) return;
   const value = playState.cast ? Math.max(playState.tension, playState.bite ? 0.86 : playState.castProgress * 0.34) : 0;
   tensionFill.style.width = `${Math.round(Math.min(1, value) * 100)}%`;
-  tensionPanel.classList.toggle('bite', playState.bite);
-  tensionLabel.textContent = playState.bite ? 'bite' : playState.cast ? `${Math.round(value * 100)}%` : 'idle';
+  tensionPanel.classList.toggle('bite', playState.phase === 'strike' || playState.phase === 'fight');
+  tensionLabel.textContent = playState.lineSnapped
+    ? 'snap'
+    : playState.phase === 'strike'
+      ? 'strike'
+      : playState.phase === 'fight'
+        ? `${Math.round(value * 100)}%`
+        : playState.cast ? 'hunt' : 'idle';
 }
 function renderCatchLog() {
   catchLog.replaceChildren();
@@ -2484,14 +2664,47 @@ function triggerCatchBurst(origin = bobber.position) {
   catchBurstState.activeUntil = catchBurstState.startedAt + 1.35;
   catchBurstState.origin.copy(origin);
 }
-function triggerBite(source = 'bite') {
-  playState.bite = true;
-  playState.biteUntil = clock.getElapsedTime() + 3.2;
-  playState.tension = Math.max(playState.tension, 0.64);
-  triggerCatchBurst(bobber.position);
-  readout.textContent = `${source} / reel now`;
-  vibrate([24, 40, 24]);
+function triggerWaterImpulse(strength = 0.65, strike = 0) {
+  const now = clock.getElapsedTime();
+  playState.lastRippleAt = now;
+  causticWaterMat.uniforms.uRippleOrigin.value.set(bobber.position.x, bobber.position.z);
+  causticWaterMat.uniforms.uRippleAge.value = 0;
+  causticWaterMat.uniforms.uRippleEnergy.value = Math.max(causticWaterMat.uniforms.uRippleEnergy.value, strength);
+  causticWaterMat.uniforms.uStrike.value = Math.max(causticWaterMat.uniforms.uStrike.value, strike);
+}
+function setPhase(phase, message) {
+  const now = clock.getElapsedTime();
+  playState.phase = phase;
+  playState.phaseStartedAt = now;
+  if (phase === 'hunt') {
+    playState.bite = false;
+    playState.strikeWindowUntil = 0;
+    playState.fightUntil = 0;
+    playState.jumpUntil = 0;
+    playState.nibbles = 0;
+    playState.nextNibbleAt = now + 2.4 + Math.random() * 2.7;
+  }
+  if (phase === 'strike') {
+    playState.bite = true;
+    playState.strikeWindowUntil = now + 1.16;
+    playState.biteUntil = playState.strikeWindowUntil;
+    playState.tension = Math.max(playState.tension, 0.72);
+    triggerCatchBurst(bobber.position);
+    triggerWaterImpulse(1.0, 1.0);
+    vibrate([18, 26, 18, 60, 24]);
+  }
+  if (phase === 'fight') {
+    playState.bite = false;
+    playState.fightUntil = now + 8.0;
+    playState.jumpUntil = now + 2.2 + Math.random() * 2.2;
+    playState.tension = 0.58;
+    triggerWaterImpulse(0.70, 0.34);
+  }
+  if (message) readout.textContent = message;
   refreshPlayHud();
+}
+function triggerBite(source = 'bite') {
+  setPhase('strike', `${source} / hook now`);
 }
 function recordCatch(forceIndex = null) {
   const speciesIndex = forceIndex ?? Math.floor((performance.now() * 0.013 + playState.catches.length * 2.7) % fishSpecies.length);
@@ -2500,6 +2713,8 @@ function recordCatch(forceIndex = null) {
   playState.catches.unshift(catchItem);
   playState.catches = playState.catches.slice(0, 8);
   triggerCatchBurst();
+  triggerWaterImpulse(0.82, 0.48);
+  setPhase('hunt', 'landed / cast again');
   renderCatchLog();
   return catchItem;
 }
@@ -2509,6 +2724,11 @@ function resetCast() {
   playState.bite = false;
   playState.biteUntil = 0;
   playState.tension = 0;
+  playState.lineSnapped = false;
+  playState.phase = 'hunt';
+  playState.strikeWindowUntil = 0;
+  playState.fightUntil = 0;
+  playState.jumpUntil = 0;
   readout.textContent = 'line reset / space casts';
   refreshPlayHud();
 }
@@ -2516,17 +2736,40 @@ function castLine() {
   playState.cast = true;
   playState.bite = false;
   playState.tension = 0;
-  readout.textContent = 'line out / wait for bite';
+  playState.lineSnapped = false;
+  setPhase('hunt', 'hunt / twitch lure near silhouettes');
+  triggerWaterImpulse(0.52, 0.0);
   vibrate(18);
   refreshPlayHud();
 }
 function reelLine() {
+  const now = clock.getElapsedTime();
+  if (playState.phase === 'strike' && now <= playState.strikeWindowUntil) {
+    setPhase('fight', 'hooked / feather the reel');
+    vibrate([22, 20, 22]);
+    return;
+  }
+  if (playState.phase === 'fight') {
+    playState.tension = Math.max(0, playState.tension - 0.18);
+    readout.textContent = playState.jumpUntil > now ? 'jump / release!' : 'feather reel / keep yellow';
+    triggerWaterImpulse(0.22, 0.0);
+    refreshPlayHud();
+    return;
+  }
   if (playState.bite) {
     const catchItem = recordCatch();
     readout.textContent = `landed ${catchItem.name}`;
     vibrate([28, 35, 28]);
   } else {
-    readout.textContent = 'reeling line back';
+    readout.textContent = playState.cast ? 'lure twitch / silhouettes turn' : 'reeling line back';
+    if (playState.cast) {
+      playState.nextNibbleAt = Math.min(playState.nextNibbleAt, now + 0.9);
+      playState.tension = Math.min(0.58, playState.tension + 0.08);
+      triggerWaterImpulse(0.28, 0.0);
+      refreshPlayHud();
+      vibrate(10);
+      return;
+    }
     vibrate(12);
   }
   playState.cast = false;
@@ -2729,6 +2972,8 @@ window.__paradiseDebug = {
   }),
   getArtDirection: () => ({
     system: document.body.dataset.artDirection,
+    water: document.body.dataset.waterSystem,
+    monetization: document.body.dataset.monetizationSystem,
     animal: document.body.dataset.animalSystem,
     visiblePhotoBillboards: photoBillboards.filter(sprite => sprite.visible && sprite.material.opacity > 0.01).length,
     dogVisible: dog.visible,
@@ -2773,6 +3018,8 @@ window.__paradiseDebug = {
     system: document.body.dataset.feedbackSystem,
     lighting: document.body.dataset.lightingSystem,
     animal: document.body.dataset.animalSystem,
+    phase: playState.phase,
+    lineSnapped: playState.lineSnapped,
     burstActive: catchBurstMaterial.opacity > 0.01,
     burstOpacity: Number(catchBurstMaterial.opacity.toFixed(3)),
     attraction: playState.cast ? Number((playState.bite ? 1 : playState.castProgress).toFixed(3)) : 0,
@@ -3086,6 +3333,12 @@ function animate() {
   bobberRipple.position.set(bobber.position.x, -0.115, bobber.position.z);
   const rippleScale = 1.8 + easedCast * 2.35 + Math.sin(elapsed * (playState.bite ? 11.0 : 2.4)) * (playState.bite ? 0.34 : 0.08);
   bobberRipple.scale.set(rippleScale, rippleScale, 1);
+  causticWater.position.x += (bobber.position.x - causticWater.position.x) * 0.08;
+  causticWater.position.z += (bobber.position.z - causticWater.position.z) * 0.08;
+  causticWaterMat.uniforms.uTime.value = elapsed;
+  causticWaterMat.uniforms.uRippleAge.value = Math.max(0, elapsed - playState.lastRippleAt);
+  causticWaterMat.uniforms.uRippleEnergy.value *= 0.965;
+  causticWaterMat.uniforms.uStrike.value *= 0.94;
   const burstAge = elapsed - catchBurstState.startedAt;
   const burstLive = burstAge >= 0 && elapsed < catchBurstState.activeUntil;
   catchBurstMaterial.opacity = burstLive ? Math.max(0, 1 - burstAge / 1.35) * 0.72 : 0;
@@ -3123,28 +3376,70 @@ function animate() {
     lineAttr.setXYZ(i, p.x, p.y, p.z);
   }
   lineAttr.needsUpdate = true;
-  rodLineMaterial.opacity = playState.cast ? (playState.bite ? 0.98 : 0.70 + tensionPull * 0.20) : 0.38;
-  rodLineMaterial.color.setHex(playState.bite ? 0xfff0a8 : playState.tension > 0.62 ? 0xbffcff : 0xe8f7f4);
+  rodLineMaterial.opacity = playState.cast ? (playState.phase === 'fight' ? 1.0 : playState.bite ? 0.98 : 0.70 + tensionPull * 0.20) : 0.38;
+  const lineHex = playState.tension > 0.86
+    ? 0xff5148
+    : playState.tension > 0.44
+      ? 0xffe16b
+      : 0xf4ffff;
+  rodLineMaterial.color.setHex(playState.phase === 'strike' ? 0xfff0a8 : lineHex);
   if (playState.cast && playState.castProgress > 0.96) {
-    playState.tension = Math.max(0, playState.tension + (playState.bite ? 0.010 : -0.003));
-    const biteSignal = Math.sin(elapsed * 1.7 + 0.8) > 0.985 || Math.sin(elapsed * 0.63) > 0.994;
-    if (!playState.bite && biteSignal) {
-      triggerBite('bite');
-    }
-    if (playState.bite && elapsed > playState.biteUntil) {
-      playState.bite = false;
-      playState.tension = 0;
-      readout.textContent = 'bite missed / line still out';
-      refreshPlayHud();
+    if (playState.phase === 'hunt') {
+      playState.tension = Math.max(0, playState.tension - 0.004);
+      if (elapsed > playState.nextNibbleAt) {
+        playState.nibbles += 1;
+        playState.tension = Math.min(0.54, playState.tension + 0.16);
+        triggerWaterImpulse(0.30 + playState.nibbles * 0.08, 0.06);
+        readout.textContent = playState.nibbles < 3 ? 'tap / fake nibble' : 'deep shadow rising';
+        vibrate(playState.nibbles < 3 ? 12 : [10, 18, 10]);
+        playState.nextNibbleAt = elapsed + (playState.nibbles < 3 ? 0.78 + Math.random() * 0.64 : 0.34);
+      }
+      if (playState.nibbles >= 3 && elapsed > playState.nextNibbleAt) {
+        triggerBite('PLOOP');
+      }
+    } else if (playState.phase === 'strike') {
+      playState.tension = Math.min(1, playState.tension + 0.014);
+      if (elapsed > playState.strikeWindowUntil) {
+        setPhase('hunt', 'strike missed / hunt again');
+      }
+    } else if (playState.phase === 'fight') {
+      const jumping = elapsed < playState.jumpUntil;
+      playState.tension += jumping ? 0.028 : 0.011;
+      if (jumping && Math.sin(elapsed * 18.0) > 0.82) {
+        triggerWaterImpulse(0.32, 0.22);
+        readout.textContent = 'fish jump / release reel';
+      }
+      if (playState.tension > 0.98) {
+        playState.lineSnapped = true;
+        playState.cast = false;
+        playState.bite = false;
+        playState.tension = 0;
+        triggerWaterImpulse(0.76, 0.55);
+        readout.textContent = 'line snapped / cast again';
+        vibrate([60, 40, 60]);
+        refreshPlayHud();
+      } else if (elapsed > playState.fightUntil && playState.tension > 0.30 && playState.tension < 0.90) {
+        const catchItem = recordCatch();
+        readout.textContent = `landed ${catchItem.name}`;
+        playState.cast = false;
+        playState.tension = 0;
+        refreshPlayHud();
+      }
     }
   }
   updateTensionHud();
   bobber.scale.setScalar(playState.bite ? 1.0 + Math.sin(elapsed * 18.0) * 0.16 : 1.0);
   const target = viewTargets[playState.view];
-  camera.position.x += (target.pos.x + pointerX * 1.5 - camera.position.x) * 0.026;
-  camera.position.y += (target.pos.y - pointerY * 0.62 - camera.position.y) * 0.026;
-  camera.position.z += (target.pos.z - camera.position.z) * 0.026;
-  camera.lookAt(target.look);
+  const phaseCamera = playState.phase === 'strike'
+    ? { pos: new THREE.Vector3(bobber.position.x + 1.25, 1.25, bobber.position.z + 5.0), look: bobber.position }
+    : playState.phase === 'fight'
+      ? { pos: new THREE.Vector3(bobber.position.x + 2.6, 2.15, bobber.position.z + 8.0), look: bobber.position }
+      : target;
+  const cameraEase = playState.phase === 'strike' ? 0.088 : playState.phase === 'fight' ? 0.052 : 0.026;
+  camera.position.x += (phaseCamera.pos.x + pointerX * 1.5 - camera.position.x) * cameraEase;
+  camera.position.y += (phaseCamera.pos.y - pointerY * 0.62 - camera.position.y) * cameraEase;
+  camera.position.z += (phaseCamera.pos.z - camera.position.z) * cameraEase;
+  camera.lookAt(phaseCamera.look);
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
 }
