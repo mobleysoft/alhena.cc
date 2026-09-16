@@ -210,10 +210,35 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
   letter-spacing: .14em;
   font-size: 10px;
 }
+.touch-help {
+  position: fixed;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 3;
+  display: none;
+  gap: 6px;
+  transform: translateX(-50%);
+  padding: 8px 10px;
+  border: 1px solid rgba(247,237,206,.14);
+  border-radius: 999px;
+  background: rgba(5,15,26,.38);
+  color: rgba(247,237,206,.60);
+  backdrop-filter: blur(12px);
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  font-size: 8px;
+  pointer-events: none;
+}
+.touch-help span + span::before {
+  content: "/";
+  margin-right: 6px;
+  color: rgba(247,237,206,.28);
+}
 @media (max-width: 760px) {
   .hud { padding: 14px; }
   .hud p { display: none; }
   .row { margin-top: 10px; }
+  .touch-help { display: flex; }
 }
 @media (orientation: landscape) and (max-height: 520px) {
   .hud {
@@ -276,6 +301,17 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .touch-help {
+    left: auto;
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(48px, calc(env(safe-area-inset-bottom) + 48px));
+    max-width: 36vw;
+    transform: none;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    text-align: right;
+    opacity: .76;
+  }
 }
 </style>
 <script type="importmap">
@@ -287,11 +323,16 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
 }
 </script>
 </head>
-<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v7-composite" data-character-system="procedural-3d-rig-v2" data-shoreline-system="authored-glb-visible-v1" data-interaction-system="bobber-ripples-v1">
+<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v7-composite" data-character-system="procedural-3d-rig-v2" data-shoreline-system="authored-glb-visible-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-v1">
 <iframe class="ocean-pass-frame" id="ocean-pass-frame" title="PandoraChat WebGL ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
 <div class="shoreline-atmosphere" aria-hidden="true"></div>
 <div class="cinematic-grade" aria-hidden="true"></div>
 <div class="depth-grade" aria-hidden="true"></div>
+<div class="touch-help" id="touch-help" aria-hidden="true">
+  <span>tap water: cast / reel</span>
+  <span>double tap: quick action</span>
+  <span>swipe: view</span>
+</div>
 <aside class="hud">
   <div class="kicker">Paradise V3 / Shader Composite</div>
   <h1>Paradise Fishing.</h1>
@@ -325,6 +366,8 @@ const castButton = document.getElementById('cast-reel');
 const viewButton = document.getElementById('view-cycle');
 const resetButton = document.getElementById('reset-cast');
 const catchLog = document.getElementById('catch-log');
+const hud = document.querySelector('.hud');
+const touchHelp = document.getElementById('touch-help');
 const palette = {
   dawn: { sky: 0x8fcde0, horizon: 0xffd89a, sun: 0xffefb4, deep: [0.00, 0.04, 0.10], mid: [0.00, 0.19, 0.28], shallow: [0.05, 0.42, 0.44], fog: 0xaad0d4, light: 1.15, gold: 1.0, wind: 8.4, chop: 0.92, foam: 0.72, exposure: 1.03, hemi: 1.22, sunPower: 2.55, fogDensity: 0.018, grade: 0.92 },
   noon: { sky: 0x55aeea, horizon: 0xd7eff7, sun: 0xfff5cf, deep: [0.00, 0.05, 0.16], mid: [0.00, 0.23, 0.38], shallow: [0.06, 0.54, 0.56], fog: 0xbfe4ea, light: 1.35, gold: 0.62, wind: 7.6, chop: 0.86, foam: 0.58, exposure: 1.10, hemi: 1.42, sunPower: 2.95, fogDensity: 0.013, grade: 0.74 },
@@ -1908,6 +1951,11 @@ const playState = {
   view: 0,
   catches: [],
 };
+const controlState = {
+  lastTapAt: 0,
+  gestureStart: null,
+  gestures: [],
+};
 const fishSpecies = [
   'Glass Minnow',
   'Blue Runner',
@@ -1998,6 +2046,34 @@ function cycleView() {
   readout.textContent = `camera / ${viewTargets[playState.view].label.toLowerCase()}`;
   refreshPlayHud();
 }
+function noteGesture(name) {
+  controlState.gestures.unshift({ name, at: Date.now() });
+  controlState.gestures = controlState.gestures.slice(0, 8);
+}
+function isControlTarget(target) {
+  return !!target?.closest?.('.hud, button, a, .readout');
+}
+function handleWorldTap(now) {
+  const doubleTap = now - controlState.lastTapAt < 310;
+  controlState.lastTapAt = now;
+  toggleCast();
+  noteGesture(doubleTap ? 'double-tap-action' : 'tap-action');
+  readout.textContent = doubleTap ? 'double tap / quick line action' : readout.textContent;
+  if (touchHelp) touchHelp.style.opacity = '0.42';
+}
+function handleSwipe(dx, dy) {
+  if (Math.abs(dx) > 72 && Math.abs(dx) > Math.abs(dy) * 1.25) {
+    cycleView();
+    noteGesture(dx > 0 ? 'swipe-right-view' : 'swipe-left-view');
+    return true;
+  }
+  if (dy > 86 && Math.abs(dy) > Math.abs(dx) * 1.15) {
+    resetCast();
+    noteGesture('swipe-down-reset');
+    return true;
+  }
+  return false;
+}
 castButton.addEventListener('click', toggleCast);
 resetButton.addEventListener('click', resetCast);
 viewButton.addEventListener('click', cycleView);
@@ -2013,6 +2089,30 @@ addEventListener('keydown', event => {
   } else if (event.key.toLowerCase() === 'v') {
     cycleView();
   }
+});
+addEventListener('pointerdown', event => {
+  if (isControlTarget(event.target)) return;
+  controlState.gestureStart = {
+    x: event.clientX,
+    y: event.clientY,
+    at: performance.now(),
+    pointerId: event.pointerId,
+  };
+});
+addEventListener('pointerup', event => {
+  const start = controlState.gestureStart;
+  controlState.gestureStart = null;
+  if (!start || isControlTarget(event.target)) return;
+  const dx = event.clientX - start.x;
+  const dy = event.clientY - start.y;
+  const dist = Math.hypot(dx, dy);
+  if (handleSwipe(dx, dy)) return;
+  if (dist < 28 && performance.now() - start.at < 420) {
+    handleWorldTap(performance.now());
+  }
+});
+addEventListener('pointercancel', () => {
+  controlState.gestureStart = null;
 });
 refreshPlayHud();
 renderCatchLog();
@@ -2046,6 +2146,11 @@ window.__paradiseDebug = {
     ripplePosition: bobberRipple.position.toArray(),
     cast: playState.cast,
     bite: playState.bite,
+  }),
+  getControls: () => ({
+    system: document.body.dataset.controlSystem,
+    recentGestures: controlState.gestures.map(g => g.name),
+    lastTapAt: Math.round(controlState.lastTapAt),
   }),
 };
 
