@@ -323,7 +323,7 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
 }
 </script>
 </head>
-<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v7-composite" data-character-system="hybrid-articulated-billboard-rig-v3" data-shoreline-system="authored-glb-visible-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-v1" data-feedback-system="fish-attraction-catch-burst-v1">
+<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v7-composite" data-character-system="hybrid-articulated-billboard-rig-v3" data-shoreline-system="dry-wet-sand-separated-v2" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-v1" data-feedback-system="fish-attraction-catch-burst-v1">
 <iframe class="ocean-pass-frame" id="ocean-pass-frame" title="PandoraChat WebGL ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
 <div class="shoreline-atmosphere" aria-hidden="true"></div>
 <div class="cinematic-grade" aria-hidden="true"></div>
@@ -848,9 +848,9 @@ const nearWaterMat = new THREE.ShaderMaterial({
     }
   `
 });
-const nearWater = new THREE.Mesh(new THREE.PlaneGeometry(58, 20, 190, 54), nearWaterMat);
+const nearWater = new THREE.Mesh(new THREE.PlaneGeometry(58, 10.5, 190, 36), nearWaterMat);
 nearWater.rotation.x = -Math.PI / 2;
-nearWater.position.set(0, -0.42, 11.9);
+nearWater.position.set(0, -0.42, 6.85);
 scene.add(nearWater);
 
 const rippleMat = new THREE.ShaderMaterial({
