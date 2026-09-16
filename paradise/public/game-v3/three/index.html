@@ -103,6 +103,29 @@ body > canvas {
   mix-blend-mode: screen;
   opacity: 0.48;
 }
+.director-matte {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 380ms ease;
+}
+.director-matte::before,
+.director-matte::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 7.5vh;
+  background: linear-gradient(180deg, rgba(2,8,14,.54), rgba(2,8,14,0));
+}
+.director-matte::before { top: 0; }
+.director-matte::after {
+  bottom: 0;
+  transform: rotate(180deg);
+}
+body.clean .director-matte { opacity: 1; }
 body.clean .hud,
 body.clean .readout,
 body.clean .touch-help {
@@ -400,11 +423,12 @@ body.clean .cinematic-toggle:focus-visible {
 }
 </script>
 </head>
-<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v9-composite" data-character-system="lit-hybrid-articulated-volume-rig-v4" data-lighting-system="cinematic-practical-rim-contact-v1" data-shoreline-system="wet-dry-sand-depth-v3" data-terrain-system="procedural-dune-depth-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-cinematic-toggle-v2" data-feedback-system="bite-tension-catch-burst-v2">
+<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v9-composite" data-character-system="lit-hybrid-articulated-volume-rig-v4" data-lighting-system="cinematic-practical-rim-contact-v1" data-camera-system="director-composition-v1" data-shoreline-system="wet-dry-sand-depth-v3" data-terrain-system="procedural-dune-depth-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-cinematic-toggle-v2" data-feedback-system="bite-tension-catch-burst-v2">
 <iframe class="ocean-pass-frame" id="ocean-pass-frame" title="PandoraChat WebGL2 JONSWAP ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
 <div class="shoreline-atmosphere" aria-hidden="true"></div>
 <div class="cinematic-grade" aria-hidden="true"></div>
 <div class="depth-grade" aria-hidden="true"></div>
+<div class="director-matte" aria-hidden="true"></div>
 <div class="touch-help" id="touch-help" aria-hidden="true">
   <span>tap water: cast / reel</span>
   <span>double tap: quick action</span>
@@ -486,9 +510,9 @@ setCleanPresentation(cleanPresentation);
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(palette[timeKey].fog, 0.018);
 
-const camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.1, 900);
-camera.position.set(0, 3.85, 19.5);
-camera.lookAt(0, 0.45, -34);
+const camera = new THREE.PerspectiveCamera(54, innerWidth / innerHeight, 0.1, 900);
+camera.position.set(0.8, 3.35, 15.0);
+camera.lookAt(2.2, 0.72, 4.5);
 
 const oceanFrame = document.getElementById('ocean-pass-frame');
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
@@ -2217,6 +2241,7 @@ const fishSpecies = [
   'Alhena Ray',
 ];
 const viewTargets = [
+  { label: 'Director', pos: new THREE.Vector3(0.8, 3.35, 15.0), look: new THREE.Vector3(2.2, 0.72, 4.5) },
   { label: 'Wide', pos: new THREE.Vector3(0, 5.1, 19.5), look: new THREE.Vector3(0, 0.85, -24) },
   { label: 'Water', pos: new THREE.Vector3(-1.4, 3.25, 12.8), look: new THREE.Vector3(0.2, 0.1, -11.5) },
   { label: 'Bar', pos: new THREE.Vector3(5.4, 3.6, 12.5), look: new THREE.Vector3(5.7, 0.9, 3.6) },
@@ -2390,7 +2415,12 @@ renderCatchLog();
 window.__paradiseDebug = {
   playState,
   getBobber: () => bobber.position.toArray(),
-  getCamera: () => camera.position.toArray(),
+  getCamera: () => ({
+    system: document.body.dataset.cameraSystem,
+    label: viewTargets[playState.view]?.label || null,
+    position: camera.position.toArray(),
+    fov: camera.fov,
+  }),
   getOceanSrc: () => oceanFrame?.src,
   getFishCount: () => fishShoal.length,
   getCatchLog: () => playState.catches.map(c => c.name),
