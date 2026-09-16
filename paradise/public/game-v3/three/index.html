@@ -245,12 +245,12 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
     left: max(10px, env(safe-area-inset-left));
     top: auto;
     bottom: max(10px, env(safe-area-inset-bottom));
-    width: min(680px, calc(100vw - 20px));
-    padding: 10px;
-    border-radius: 18px;
+    width: min(560px, calc(100vw - 20px));
+    padding: 8px;
+    border-radius: 16px;
     display: grid;
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: 6px;
   }
   .kicker {
     font-size: 8px;
@@ -262,13 +262,13 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
   }
   .row {
     margin-top: 0;
-    gap: 6px;
+    gap: 5px;
   }
   button,
   a.button {
-    min-height: 34px;
-    padding: 8px 10px;
-    font-size: 9px;
+    min-height: 29px;
+    padding: 7px 9px;
+    font-size: 8px;
     letter-spacing: .11em;
   }
   .play-row {
@@ -281,8 +281,8 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
     margin-top: 0;
   }
   .catch-slot {
-    min-height: 22px;
-    padding: 5px 6px;
+    min-height: 18px;
+    padding: 4px 5px;
     font-size: 7px;
     letter-spacing: .06em;
   }
@@ -323,7 +323,7 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
 }
 </script>
 </head>
-<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v7-composite" data-character-system="procedural-3d-rig-v2" data-shoreline-system="authored-glb-visible-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-v1" data-feedback-system="fish-attraction-catch-burst-v1">
+<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v7-composite" data-character-system="hybrid-articulated-billboard-rig-v3" data-shoreline-system="authored-glb-visible-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-v1" data-feedback-system="fish-attraction-catch-burst-v1">
 <iframe class="ocean-pass-frame" id="ocean-pass-frame" title="PandoraChat WebGL ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
 <div class="shoreline-atmosphere" aria-hidden="true"></div>
 <div class="cinematic-grade" aria-hidden="true"></div>
@@ -1277,10 +1277,10 @@ function makeArticulatedAlhena(url) {
     ready: false,
     parts: {},
   };
-  const enabled = false;
+  const enabled = true;
   rig.group.visible = false;
-  rig.group.position.set(6.25, 0.12, 4.06);
-  rig.group.scale.setScalar(0.86);
+  rig.group.position.set(5.82, 0.28, 5.62);
+  rig.group.scale.setScalar(0.96);
   scene.add(rig.group);
 
   const image = new Image();
@@ -1305,8 +1305,9 @@ function makeArticulatedAlhena(url) {
     for (const part of Object.values(rig.parts)) rig.group.add(part);
     rig.group.visible = enabled;
     rig.ready = true;
-    alhenaSprite.visible = false;
-    alhenaSprite.material.opacity = 0.0;
+    alhenaSprite.visible = !enabled;
+    alhenaSprite.material.opacity = enabled ? 0.0 : 0.16;
+    person.visible = !enabled;
     readout.textContent = 'shader ocean + procedural 3d characters';
   };
   image.src = url;
