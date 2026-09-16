@@ -19,13 +19,17 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
 canvas { display: block; }
 .ocean-pass-frame {
   position: fixed;
-  inset: 0;
+  left: -54vw;
+  top: -60vh;
   z-index: 0;
-  width: 100vw;
-  height: 100vh;
+  width: 208vw;
+  height: 208vh;
   border: 0;
   pointer-events: none;
   background: #07131b;
+  transform: scale(1.82);
+  transform-origin: 50% 48%;
+  filter: saturate(1.16) brightness(1.10) contrast(1.08);
 }
 body > canvas {
   position: fixed;
@@ -435,8 +439,8 @@ body.clean .cinematic-toggle:focus-visible {
 }
 </script>
 </head>
-<body data-paradise-v3="premium-hybrid-fishing-v1" data-water-system="evan-wallace-inspired-interactive-caustic-water-v1" data-character-system="vinyl-clay-miniature-diorama-v1" data-animal-system="procedural-cel-lab-no-photo-cutout-v1" data-art-direction="premium-tactile-diorama-realistic-water-v1" data-lighting-system="tilt-shift-cinematic-diorama-v1" data-camera-system="three-phase-hunt-strike-fight-camera-v1" data-material-system="vinyl-clay-toon-materials-v1" data-shoreline-system="wet-dry-sand-depth-v3" data-terrain-system="procedural-dune-depth-v1" data-interaction-system="physical-bobber-ripples-caustics-v1" data-control-system="touch-gesture-motion-haptics-v3" data-feedback-system="diegetic-line-tension-fight-v1" data-monetization-system="deep-water-license-diegetic-billboard-v1">
-<iframe class="ocean-pass-frame" id="ocean-pass-frame" title="PandoraChat WebGL2 JONSWAP ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
+<body data-paradise-v3="premium-hybrid-fishing-v1" data-water-system="will-eastcott-playcanvas-webgpu-water-ca42439" data-character-system="vinyl-clay-miniature-diorama-v1" data-animal-system="procedural-cel-lab-no-photo-cutout-v1" data-art-direction="premium-tactile-diorama-realistic-water-v1" data-lighting-system="tilt-shift-cinematic-diorama-v1" data-camera-system="three-phase-hunt-strike-fight-camera-v1" data-material-system="vinyl-clay-toon-materials-v1" data-shoreline-system="wet-dry-sand-depth-v3" data-terrain-system="procedural-dune-depth-v1" data-interaction-system="physical-bobber-ripples-caustics-v1" data-control-system="touch-gesture-motion-haptics-v3" data-feedback-system="diegetic-line-tension-fight-v1" data-monetization-system="deep-water-license-diegetic-billboard-v1">
+<iframe class="ocean-pass-frame" id="ocean-pass-frame" title="Will Eastcott PlayCanvas WebGPU water, ported from Evan Wallace WebGL Water" src="/game-v3/playcanvas-water/?embed=1"></iframe>
 <div class="shoreline-atmosphere" aria-hidden="true"></div>
 <div class="cinematic-grade" aria-hidden="true"></div>
 <div class="depth-grade" aria-hidden="true"></div>
@@ -2973,6 +2977,7 @@ window.__paradiseDebug = {
   getArtDirection: () => ({
     system: document.body.dataset.artDirection,
     water: document.body.dataset.waterSystem,
+    waterRoute: oceanFrame?.src || null,
     monetization: document.body.dataset.monetizationSystem,
     animal: document.body.dataset.animalSystem,
     visiblePhotoBillboards: photoBillboards.filter(sprite => sprite.visible && sprite.material.opacity > 0.01).length,
@@ -3123,7 +3128,7 @@ function setWeather(key) {
 }
 function updateOceanFrame() {
   if (!oceanFrame) return;
-  oceanFrame.src = `/game-v3/ocean-pass/?time=${encodeURIComponent(timeKey)}&weather=${encodeURIComponent(weatherKey)}`;
+  oceanFrame.src = `/game-v3/playcanvas-water/?embed=1&time=${encodeURIComponent(timeKey)}&weather=${encodeURIComponent(weatherKey)}`;
 }
 document.querySelectorAll('[data-time]').forEach(button => button.addEventListener('click', () => setTime(button.dataset.time)));
 document.querySelectorAll('[data-weather]').forEach(button => button.addEventListener('click', () => setWeather(button.dataset.weather)));
