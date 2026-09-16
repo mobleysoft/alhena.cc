@@ -423,7 +423,7 @@ body.clean .cinematic-toggle:focus-visible {
 }
 </script>
 </head>
-<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v9-composite" data-character-system="lit-hybrid-articulated-volume-rig-v4" data-lighting-system="cinematic-practical-rim-contact-v1" data-camera-system="director-composition-v1" data-shoreline-system="wet-dry-sand-depth-v3" data-terrain-system="procedural-dune-depth-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-cinematic-toggle-v2" data-feedback-system="bite-tension-catch-burst-v2">
+<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v9-composite" data-character-system="lit-hybrid-articulated-volume-rig-v4" data-lighting-system="cinematic-practical-rim-contact-v1" data-camera-system="director-composition-v1" data-material-system="ribbed-wet-sand-parallax-v1" data-shoreline-system="wet-dry-sand-depth-v3" data-terrain-system="procedural-dune-depth-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-cinematic-toggle-v2" data-feedback-system="bite-tension-catch-burst-v2">
 <iframe class="ocean-pass-frame" id="ocean-pass-frame" title="PandoraChat WebGL2 JONSWAP ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
 <div class="shoreline-atmosphere" aria-hidden="true"></div>
 <div class="cinematic-grade" aria-hidden="true"></div>
@@ -1133,6 +1133,7 @@ const sandMat = new THREE.ShaderMaterial({
     uWet: { value: new THREE.Color(0x5e7069) },
   },
   vertexShader: `
+    uniform float uTime;
     varying vec2 vUv;
     varying vec3 vPos;
     float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -1144,8 +1145,11 @@ const sandMat = new THREE.ShaderMaterial({
     void main() {
       vUv = uv;
       vec3 p = position;
+      float broad = noise(p.xz * vec2(0.18, 0.52));
       float grain = noise(p.xz * 1.7) * 0.045 + noise(p.xz * 8.0) * 0.012;
-      p.y += grain + smoothstep(0.0, 1.0, uv.y) * 0.10;
+      float ribs = sin(p.x * 1.45 + p.z * 0.34 + noise(p.xz * 0.52) * 2.8) * 0.014;
+      float wetRibs = sin(p.x * 3.2 + p.z * 0.82 + uTime * 0.04) * 0.009 * smoothstep(0.0, 0.42, 1.0 - uv.y);
+      p.y += grain + broad * 0.035 + ribs + wetRibs + smoothstep(0.0, 1.0, uv.y) * 0.10;
       vPos = p;
       gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
     }
@@ -1169,10 +1173,15 @@ const sandMat = new THREE.ShaderMaterial({
       float dry = smoothstep(0.30, 1.0, vUv.y);
       float shoreDepth = smoothstep(0.0, 0.58, vUv.y);
       float contour = noise(vPos.xz * vec2(0.34, 1.15) + vec2(0.0, uTime * 0.01));
+      float rib = pow(0.5 + 0.5 * sin(vPos.x * 3.3 + vPos.z * 0.78 + contour * 2.2), 7.0);
+      float wetSheen = smoothstep(0.16, 0.76, rib) * wet;
+      float microShell = smoothstep(0.985, 1.0, noise(vPos.xz * 18.0 + vec2(4.0, 9.0)));
       float grain = noise(vPos.xz * 8.0) * 0.12 + noise(vPos.xz * 31.0) * 0.055;
       vec3 color = mix(uBase * 1.08, uWet, wet * 0.64);
-      color *= 0.76 + grain + contour * (0.08 + wet * 0.15) + dry * 0.18;
+      color *= 0.74 + grain + contour * (0.08 + wet * 0.15) + dry * 0.18 + rib * (0.035 + wet * 0.055);
       color = mix(color * vec3(0.72, 0.84, 0.88), color, shoreDepth);
+      color += vec3(0.48, 0.78, 0.84) * wetSheen * 0.10;
+      color += vec3(1.0, 0.92, 0.72) * microShell * (0.10 + dry * 0.16);
       color += vec3(1.0, 0.78, 0.36) * smoothstep(0.58, 0.98, vUv.y) * 0.11 * uLight;
       color -= vec3(0.08, 0.05, 0.025) * smoothstep(0.0, 0.34, vUv.y) * (0.72 + wet * 0.45);
       gl_FragColor = vec4(color, 1.0);
@@ -1847,6 +1856,38 @@ function makeDuneRidge(zNear, zFar, yBase, opacity = 0.28, tint = 0xd8bd78) {
   return ridge;
 }
 
+function makeSandRippleField(zBase, count = 7, opacity = 0.18) {
+  const group = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xffe8aa,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  for (let i = 0; i < count; i++) {
+    const points = [];
+    const width = 18 + i * 1.6;
+    const z = zBase + i * 0.38;
+    for (let j = 0; j < 72; j++) {
+      const p = j / 71;
+      const x = (p - 0.5) * width;
+      const wave = Math.sin(p * Math.PI * 3.4 + i * 0.7) * 0.045 + Math.sin(p * Math.PI * 8.2) * 0.015;
+      points.push(new THREE.Vector3(x, -0.386 + i * 0.002, z + wave));
+    }
+    const line = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(points),
+      mat.clone()
+    );
+    line.material.opacity = opacity * (1.0 - i / (count * 1.35));
+    line.userData.phase = i * 0.41;
+    group.add(line);
+  }
+  scene.add(group);
+  shoreAccents.push(group);
+  return group;
+}
+
 function makeIslandPad(x, z, sx, sz, rotation = 0, wet = false) {
   const geometry = new THREE.CircleGeometry(1, 96);
   const material = wet ? wetSandMat.clone() : shoreAccentMat.clone();
@@ -2142,6 +2183,7 @@ makeIslandPad(-2.8, 7.88, 1.65, 0.46, 0.08, true);
 makeIslandPad(6.55, 5.92, 3.72, 0.78, 0.07);
 makeShoreShelf();
 makeDuneRidge(8.85, 10.65, -0.54, 0.24, 0xd9bd73);
+const foregroundSandRipples = makeSandRippleField(8.85, 9, 0.20);
 makeFoamDecal(-8.2, 6.92, 4.2, 0.26, -0.03, 0.13);
 makeFoamDecal(-2.8, 7.15, 2.4, 0.18, 0.06, 0.16);
 makeFoamDecal(6.6, 4.98, 4.0, 0.24, 0.08, 0.14);
@@ -2435,6 +2477,7 @@ window.__paradiseDebug = {
   getEnvironment: () => ({
     time: timeKey,
     weather: weatherKey,
+    material: document.body.dataset.materialSystem,
     exposure: renderer.toneMappingExposure,
     hemi: hemi.intensity,
     sun: sun.intensity,
