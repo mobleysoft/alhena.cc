@@ -423,7 +423,7 @@ body.clean .cinematic-toggle:focus-visible {
 }
 </script>
 </head>
-<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v9-composite" data-character-system="procedural-3d-alhena-no-cutout-artifacts-v1" data-animal-system="articulated-lab-grounded-paw-contact-v1" data-lighting-system="cinematic-practical-rim-contact-v1" data-camera-system="director-composition-v1" data-material-system="ribbed-wet-sand-parallax-v1" data-shoreline-system="wet-dry-sand-depth-v3" data-terrain-system="procedural-dune-depth-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-motion-haptics-v3" data-feedback-system="bite-tension-bobber-dive-catch-burst-v3">
+<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v9-composite" data-character-system="procedural-3d-alhena-no-cutout-artifacts-v1" data-animal-system="procedural-cel-lab-no-photo-cutout-v1" data-art-direction="cohesive-cel-shaded-diorama-v1" data-lighting-system="cinematic-practical-rim-contact-v1" data-camera-system="director-composition-v1" data-material-system="ribbed-wet-sand-parallax-v1" data-shoreline-system="wet-dry-sand-depth-v3" data-terrain-system="procedural-dune-depth-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-motion-haptics-v3" data-feedback-system="bite-tension-bobber-dive-catch-burst-v3">
 <iframe class="ocean-pass-frame" id="ocean-pass-frame" title="PandoraChat WebGL2 JONSWAP ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
 <div class="shoreline-atmosphere" aria-hidden="true"></div>
 <div class="cinematic-grade" aria-hidden="true"></div>
@@ -1127,6 +1127,52 @@ const materialMaps = {
   cloth: makeMaterialTexture({ base: '#249bbb', fleck: 'rgba(245,255,255,ALPHA)', line: { color: '#0e6072', alpha: 0.14, gap: 14, width: 1 }, count: 500, repeat: [2, 2] }),
 };
 
+const toonRamp = new THREE.DataTexture(
+  new Uint8Array([
+    72, 72, 68,
+    148, 146, 132,
+    232, 218, 174,
+    255, 246, 206,
+  ]),
+  4,
+  1,
+  THREE.RGBFormat
+);
+toonRamp.needsUpdate = true;
+toonRamp.magFilter = THREE.NearestFilter;
+toonRamp.minFilter = THREE.NearestFilter;
+
+function stylizeMaterial(material) {
+  if (!material || material.isShaderMaterial || material.isSpriteMaterial || material.isPointsMaterial || material.userData?.keepOriginal) return material;
+  const toon = new THREE.MeshToonMaterial({
+    color: material.color ? material.color.clone() : new THREE.Color(0xffffff),
+    map: material.map || null,
+    gradientMap: toonRamp,
+    side: material.side ?? THREE.FrontSide,
+    transparent: material.transparent,
+    opacity: material.opacity ?? 1,
+  });
+  toon.alphaTest = material.alphaTest || 0;
+  toon.depthWrite = material.depthWrite;
+  toon.name = `cel:${material.name || material.type}`;
+  return toon;
+}
+
+function stylizeObjectMaterials(root) {
+  root.traverse(node => {
+    if (!node.isMesh || !node.material) return;
+    node.material = Array.isArray(node.material)
+      ? node.material.map(stylizeMaterial)
+      : stylizeMaterial(node.material);
+    if (node.material) {
+      const materials = Array.isArray(node.material) ? node.material : [node.material];
+      for (const material of materials) {
+        material.needsUpdate = true;
+      }
+    }
+  });
+}
+
 const sandMat = new THREE.ShaderMaterial({
   uniforms: {
     uTime: { value: 0 },
@@ -1394,7 +1440,7 @@ function makeArticulatedLab(url) {
     ready: false,
     parts: {},
   };
-  const enabled = true;
+  const enabled = false;
   rig.group.visible = false;
   rig.group.position.set(-2.8, 0.10, 7.08);
   rig.group.scale.setScalar(1.0);
@@ -1420,9 +1466,10 @@ function makeArticulatedLab(url) {
     for (const part of Object.values(rig.parts)) rig.group.add(part);
     rig.group.visible = enabled;
     rig.ready = true;
-    labSprite.visible = !enabled;
-    labSprite.material.opacity = 0.08;
-    readout.textContent = 'shader ocean + procedural 3d lab';
+    rig.group.visible = false;
+    labSprite.visible = false;
+    labSprite.material.opacity = 0;
+    readout.textContent = 'shader ocean + cohesive cel diorama';
   };
   image.src = url;
   return rig;
@@ -2023,9 +2070,10 @@ function makeDriftwood(x, z, scale = 1, rotation = 0) {
 }
 
 const dog = new THREE.Group();
-const dogMat = new THREE.MeshStandardMaterial({ color: 0x0b0b0a, map: materialMaps.fur, roughness: 0.66, metalness: 0.0, transparent: true, opacity: 0.96 });
-const dogNoseMat = new THREE.MeshStandardMaterial({ color: 0x050504, roughness: 0.34, metalness: 0.0 });
-const dogEyeMat = new THREE.MeshStandardMaterial({ color: 0x140f09, roughness: 0.22, metalness: 0.0 });
+const dogMat = new THREE.MeshStandardMaterial({ color: 0x26231d, map: materialMaps.fur, roughness: 0.76, metalness: 0.0, transparent: false, opacity: 1.0 });
+const dogHighlightMat = new THREE.MeshStandardMaterial({ color: 0x4a4438, roughness: 0.82, metalness: 0.0 });
+const dogNoseMat = new THREE.MeshStandardMaterial({ color: 0x070604, roughness: 0.42, metalness: 0.0 });
+const dogEyeMat = new THREE.MeshStandardMaterial({ color: 0xf1d87c, roughness: 0.22, metalness: 0.0 });
 const dogTongueMat = new THREE.MeshStandardMaterial({ color: 0xe17678, roughness: 0.46 });
 const dogCollarMat = new THREE.MeshStandardMaterial({ color: 0x2a87c9, roughness: 0.38, metalness: 0.04 });
 const dogBody = new THREE.Mesh(new THREE.CapsuleGeometry(0.55, 1.55, 6, 12), dogMat);
@@ -2037,6 +2085,11 @@ dogChest.position.set(0.58, -0.01, 0.18);
 dogChest.scale.set(0.92, 0.78, 0.84);
 dogChest.castShadow = true;
 dog.add(dogChest);
+const dogChestPatch = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 8), dogHighlightMat);
+dogChestPatch.position.set(0.74, -0.10, 0.50);
+dogChestPatch.scale.set(0.78, 0.44, 0.14);
+dogChestPatch.rotation.x = -0.18;
+dog.add(dogChestPatch);
 const dogHead = new THREE.Mesh(new THREE.SphereGeometry(0.45, 18, 12), dogMat);
 dogHead.position.set(1.03, 0.13, 0.18);
 dogHead.scale.set(1.06, 0.86, 0.92);
@@ -2086,7 +2139,7 @@ for (let i = 0; i < 2; i++) {
   dog.add(eye);
 }
 dog.position.set(-2.95, 0.40, 6.82);
-dog.scale.setScalar(0.48);
+dog.scale.setScalar(0.54);
 dog.visible = true;
 scene.add(dog);
 
@@ -2219,6 +2272,11 @@ const waterReflections = [
   makeReflectionSprite('/assets/beach-bar-billboard.png', 6.6, -0.25, 4.35, 4.4, 1.45, 0.12),
   makeReflectionSprite('/assets/alhena-bartender-billboard.png', 6.25, -0.06, 3.85, 1.35, 1.28, 0.09),
 ];
+const photoBillboards = [houseSprite, labSprite, barSprite, alhenaSprite, palmSprite, ...waterReflections];
+for (const sprite of photoBillboards) {
+  sprite.visible = false;
+  sprite.material.opacity = 0;
+}
 for (let i = 0; i < 18; i++) {
   const band = i % 6;
   const depth = band / 5;
@@ -2237,8 +2295,8 @@ const articulatedAlhena = makeArticulatedAlhena('/assets/alhena-bartender-billbo
 dog.traverse(node => {
   if (node.isMesh) {
     node.material = node.material.clone();
-    node.material.transparent = true;
-    node.material.opacity = 0.18;
+    node.material.transparent = false;
+    node.material.opacity = 1.0;
     node.material.depthWrite = true;
   }
 });
@@ -2256,6 +2314,8 @@ person.traverse(node => {
     }
   }
 });
+stylizeObjectMaterials(dog);
+stylizeObjectMaterials(person);
 const houseShadow = makeContactShadow(-8.7, 7.9, 3.4, 0.72, 0.20);
 const labShadow = makeContactShadow(-2.8, 7.8, 1.3, 0.28, 0.24);
 const barShadow = makeContactShadow(6.6, 5.95, 3.0, 0.62, 0.22);
@@ -2324,9 +2384,12 @@ const pier3D = makePerspectivePier();
 const reedWall = makeReedWall();
 const causticSheet = makeCausticSheet();
 reedWall.visible = false;
-houseSprite.material.opacity = 0.05;
-barSprite.material.opacity = 0.04;
-palmSprite.material.opacity = 0.64;
+stylizeObjectMaterials(house3D);
+stylizeObjectMaterials(bar3D);
+stylizeObjectMaterials(pier3D);
+houseSprite.material.opacity = 0;
+barSprite.material.opacity = 0;
+palmSprite.material.opacity = 0;
 houseSprite.scale.multiplyScalar(0.92);
 barSprite.scale.multiplyScalar(0.92);
 houseSprite.position.z += 0.16;
@@ -2664,6 +2727,22 @@ window.__paradiseDebug = {
     fog: scene.fog.density,
     grade: getComputedStyle(document.documentElement).getPropertyValue('--grade-opacity').trim(),
   }),
+  getArtDirection: () => ({
+    system: document.body.dataset.artDirection,
+    animal: document.body.dataset.animalSystem,
+    visiblePhotoBillboards: photoBillboards.filter(sprite => sprite.visible && sprite.material.opacity > 0.01).length,
+    dogVisible: dog.visible,
+    articulatedPhotoDogVisible: articulatedLab.group.visible || labSprite.visible,
+    toonMeshes: [dog, person, house3D, bar3D, pier3D].reduce((count, root) => {
+      root.traverse(node => {
+        if (node.isMesh) {
+          const materials = Array.isArray(node.material) ? node.material : [node.material];
+          if (materials.some(material => material?.type === 'MeshToonMaterial')) count += 1;
+        }
+      });
+      return count;
+    }, 0),
+  }),
   getInteraction: () => ({
     system: document.body.dataset.interactionSystem,
     rippleEnergy: Number(rippleMat.uniforms.uEnergy.value.toFixed(3)),
@@ -2907,17 +2986,18 @@ function animate() {
     articulatedLab.parts.rearLegs.rotation.z = gait * 0.045;
     articulatedLab.parts.frontLegs.rotation.z = -gait * 0.052;
     articulatedLab.parts.collar.rotation.z = articulatedLab.parts.head.rotation.z * 0.55;
-    dog.visible = false;
+    articulatedLab.group.visible = false;
+    dog.visible = true;
     labSprite.visible = false;
   } else {
     dog.visible = true;
   }
-  labShadow.position.x = articulatedLab.ready ? articulatedLab.group.position.x : labSprite.position.x;
+  labShadow.position.x = dog.position.x;
   dogOcclusion.position.x = labShadow.position.x;
   for (let i = 0; i < labPawContacts.length; i++) {
     const paw = labPawContacts[i];
     const stride = Math.sin(elapsed * 2.1 + i * Math.PI * 0.72);
-    const dogX = articulatedLab.ready ? articulatedLab.group.position.x : labSprite.position.x;
+    const dogX = dog.position.x;
     paw.position.x = dogX + paw.userData.baseX + 2.80 + stride * 0.035;
     paw.position.z = paw.userData.baseZ + Math.max(0, stride) * 0.040;
     paw.material.opacity = paw.userData.baseOpacity * (0.76 + Math.max(0, -stride) * 0.34);
