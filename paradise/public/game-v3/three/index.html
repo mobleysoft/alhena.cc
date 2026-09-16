@@ -423,7 +423,7 @@ body.clean .cinematic-toggle:focus-visible {
 }
 </script>
 </head>
-<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v9-composite" data-character-system="procedural-3d-alhena-no-cutout-artifacts-v1" data-animal-system="articulated-lab-grounded-paw-contact-v1" data-lighting-system="cinematic-practical-rim-contact-v1" data-camera-system="director-composition-v1" data-material-system="ribbed-wet-sand-parallax-v1" data-shoreline-system="wet-dry-sand-depth-v3" data-terrain-system="procedural-dune-depth-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-motion-haptics-v3" data-feedback-system="bite-tension-catch-burst-v2">
+<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v9-composite" data-character-system="procedural-3d-alhena-no-cutout-artifacts-v1" data-animal-system="articulated-lab-grounded-paw-contact-v1" data-lighting-system="cinematic-practical-rim-contact-v1" data-camera-system="director-composition-v1" data-material-system="ribbed-wet-sand-parallax-v1" data-shoreline-system="wet-dry-sand-depth-v3" data-terrain-system="procedural-dune-depth-v1" data-interaction-system="bobber-ripples-v1" data-control-system="touch-gesture-motion-haptics-v3" data-feedback-system="bite-tension-bobber-dive-catch-burst-v3">
 <iframe class="ocean-pass-frame" id="ocean-pass-frame" title="PandoraChat WebGL2 JONSWAP ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
 <div class="shoreline-atmosphere" aria-hidden="true"></div>
 <div class="cinematic-grade" aria-hidden="true"></div>
@@ -2331,16 +2331,12 @@ houseSprite.scale.multiplyScalar(0.92);
 barSprite.scale.multiplyScalar(0.92);
 houseSprite.position.z += 0.16;
 barSprite.position.z += 0.16;
-const rodCurve = new THREE.CatmullRomCurve3([
-  new THREE.Vector3(9.3, 0.9, 6.0),
-  new THREE.Vector3(7.8, 2.2, 1.5),
-  new THREE.Vector3(3.2, 2.5, -5.0),
-  new THREE.Vector3(0.4, 0.5, -11.0),
-]);
-const rodLine = new THREE.Line(
-  new THREE.BufferGeometry().setFromPoints(rodCurve.getPoints(56)),
-  new THREE.LineBasicMaterial({ color: 0xe8f7f4, transparent: true, opacity: 0.72 })
-);
+const rodLineSegments = 42;
+const rodLinePositions = new Float32Array(rodLineSegments * 3);
+const rodLineGeometry = new THREE.BufferGeometry();
+rodLineGeometry.setAttribute('position', new THREE.BufferAttribute(rodLinePositions, 3));
+const rodLineMaterial = new THREE.LineBasicMaterial({ color: 0xe8f7f4, transparent: true, opacity: 0.72 });
+const rodLine = new THREE.Line(rodLineGeometry, rodLineMaterial);
 scene.add(rodLine);
 const bobber = new THREE.Mesh(new THREE.SphereGeometry(0.18, 18, 12), new THREE.MeshStandardMaterial({ color: 0xff5546, roughness: 0.32 }));
 bobber.position.set(0.4, -0.05, -11.0);
@@ -2424,6 +2420,15 @@ function triggerCatchBurst(origin = bobber.position) {
   catchBurstState.startedAt = clock.getElapsedTime();
   catchBurstState.activeUntil = catchBurstState.startedAt + 1.35;
   catchBurstState.origin.copy(origin);
+}
+function triggerBite(source = 'bite') {
+  playState.bite = true;
+  playState.biteUntil = clock.getElapsedTime() + 3.2;
+  playState.tension = Math.max(playState.tension, 0.64);
+  triggerCatchBurst(bobber.position);
+  readout.textContent = `${source} / reel now`;
+  vibrate([24, 40, 24]);
+  refreshPlayHud();
 }
 function recordCatch(forceIndex = null) {
   const speciesIndex = forceIndex ?? Math.floor((performance.now() * 0.013 + playState.catches.length * 2.7) % fishSpecies.length);
@@ -2638,12 +2643,16 @@ window.__paradiseDebug = {
   getFishCount: () => fishShoal.length,
   getCatchLog: () => playState.catches.map(c => c.name),
   forceCatch: (index = 0) => {
-    playState.bite = true;
+    triggerBite('debug bite');
     const catchItem = recordCatch(index);
     playState.bite = false;
     readout.textContent = `landed ${catchItem.name}`;
     refreshPlayHud();
     return catchItem;
+  },
+  forceBite: () => {
+    triggerBite('debug bite');
+    return window.__paradiseDebug.getFeedback();
   },
   getEnvironment: () => ({
     time: timeKey,
@@ -2685,11 +2694,14 @@ window.__paradiseDebug = {
     system: document.body.dataset.feedbackSystem,
     lighting: document.body.dataset.lightingSystem,
     animal: document.body.dataset.animalSystem,
-    burstActive: clock.getElapsedTime() < catchBurstState.activeUntil,
+    burstActive: catchBurstMaterial.opacity > 0.01,
     burstOpacity: Number(catchBurstMaterial.opacity.toFixed(3)),
     attraction: playState.cast ? Number((playState.bite ? 1 : playState.castProgress).toFixed(3)) : 0,
     tension: Number(playState.tension.toFixed(3)),
     tensionLabel: tensionLabel?.textContent || null,
+    bobberY: Number(bobber.position.y.toFixed(3)),
+    lineOpacity: Number(rodLineMaterial.opacity.toFixed(3)),
+    lineColor: `#${rodLineMaterial.color.getHexString()}`,
   }),
 };
 
@@ -2977,8 +2989,13 @@ function animate() {
   const progressTarget = playState.cast ? 1 : 0;
   playState.castProgress += (progressTarget - playState.castProgress) * 0.055;
   const easedCast = easeInOut(playState.castProgress);
+  const bitePulse = playState.bite ? Math.sin(elapsed * 18.0) : 0;
+  const tensionPull = playState.cast ? Math.min(1, playState.tension + (playState.bite ? 0.38 : 0)) : 0;
   bobberTarget.lerpVectors(dockBobber, waterBobber, easedCast);
   bobberTarget.y += Math.sin(elapsed * 2.2) * (0.025 + easedCast * 0.095);
+  bobberTarget.y -= tensionPull * 0.12 + (playState.bite ? 0.12 + Math.max(0, bitePulse) * 0.10 : 0);
+  bobberTarget.x += playState.bite ? Math.sin(elapsed * 12.0) * 0.045 : 0;
+  bobberTarget.z += playState.bite ? Math.cos(elapsed * 10.5) * 0.035 : 0;
   bobber.position.copy(bobberTarget);
   const rippleEnergy = playState.cast
     ? (0.16 + easedCast * 0.34 + (playState.bite ? 0.48 : 0.0)) * weatherProfiles[weatherKey].reflection
@@ -3011,24 +3028,28 @@ function animate() {
   lineMidA.lerpVectors(rodTip, bobber.position, 0.34);
   lineMidB.lerpVectors(rodTip, bobber.position, 0.68);
   const sag = playState.cast ? 0.55 : 0.18;
-  lineMidA.y += 1.05 - sag * easedCast;
-  lineMidB.y += 0.62 - sag * 1.15 * easedCast;
-  rodLine.geometry.dispose();
-  rodLine.geometry = new THREE.BufferGeometry().setFromPoints(new THREE.CatmullRomCurve3([
+  const tautness = playState.bite ? 0.82 : Math.min(0.55, playState.tension);
+  lineMidA.y += 1.05 - sag * easedCast + tautness * 0.26;
+  lineMidB.y += 0.62 - sag * 1.15 * easedCast + tautness * 0.16;
+  const lineCurve = new THREE.CatmullRomCurve3([
     rodTip,
-    lineMidA.clone(),
-    lineMidB.clone(),
-    bobber.position.clone(),
-  ]).getPoints(56));
+    lineMidA,
+    lineMidB,
+    bobber.position,
+  ]);
+  const lineAttr = rodLine.geometry.attributes.position;
+  for (let i = 0; i < rodLineSegments; i++) {
+    const p = lineCurve.getPoint(i / (rodLineSegments - 1));
+    lineAttr.setXYZ(i, p.x, p.y, p.z);
+  }
+  lineAttr.needsUpdate = true;
+  rodLineMaterial.opacity = playState.cast ? (playState.bite ? 0.98 : 0.70 + tensionPull * 0.20) : 0.38;
+  rodLineMaterial.color.setHex(playState.bite ? 0xfff0a8 : playState.tension > 0.62 ? 0xbffcff : 0xe8f7f4);
   if (playState.cast && playState.castProgress > 0.96) {
     playState.tension = Math.max(0, playState.tension + (playState.bite ? 0.010 : -0.003));
     const biteSignal = Math.sin(elapsed * 1.7 + 0.8) > 0.985 || Math.sin(elapsed * 0.63) > 0.994;
     if (!playState.bite && biteSignal) {
-      playState.bite = true;
-      playState.biteUntil = elapsed + 3.2;
-      readout.textContent = 'bite / space reels';
-      vibrate([24, 40, 24]);
-      refreshPlayHud();
+      triggerBite('bite');
     }
     if (playState.bite && elapsed > playState.biteUntil) {
       playState.bite = false;
