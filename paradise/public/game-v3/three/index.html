@@ -287,7 +287,7 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
 }
 </script>
 </head>
-<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v7-composite">
+<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v7-composite" data-character-system="procedural-3d-rig-v2">
 <iframe class="ocean-pass-frame" id="ocean-pass-frame" title="PandoraChat WebGL ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
 <div class="shoreline-atmosphere" aria-hidden="true"></div>
 <div class="cinematic-grade" aria-hidden="true"></div>
@@ -1123,6 +1123,7 @@ function makeArticulatedLab(url) {
     ready: false,
     parts: {},
   };
+  const enabled = true;
   rig.group.visible = false;
   rig.group.position.set(-2.8, 0.10, 7.08);
   rig.group.scale.setScalar(1.0);
@@ -1146,10 +1147,11 @@ function makeArticulatedLab(url) {
     rig.parts.frontLegs = makeBillboardPart(crops.frontLegs, 0.96, 1.22, 0.82, 0.04, 0.04, 14);
     rig.parts.collar = makeBillboardPart(crops.collar, 0.62, 0.38, 0.70, 0.94, 0.08, 17);
     for (const part of Object.values(rig.parts)) rig.group.add(part);
-    rig.group.visible = true;
+    rig.group.visible = enabled;
     rig.ready = true;
-    labSprite.visible = false;
-    readout.textContent = 'shader ocean + articulated lab';
+    labSprite.visible = !enabled;
+    labSprite.material.opacity = 0.08;
+    readout.textContent = 'shader ocean + procedural 3d lab';
   };
   image.src = url;
   return rig;
@@ -1161,6 +1163,7 @@ function makeArticulatedAlhena(url) {
     ready: false,
     parts: {},
   };
+  const enabled = false;
   rig.group.visible = false;
   rig.group.position.set(6.25, 0.12, 4.06);
   rig.group.scale.setScalar(0.86);
@@ -1186,10 +1189,11 @@ function makeArticulatedAlhena(url) {
     rig.parts.trayArm.rotation.z = -0.015;
     rig.parts.rightArm.rotation.z = 0.035;
     for (const part of Object.values(rig.parts)) rig.group.add(part);
-    rig.group.visible = true;
+    rig.group.visible = enabled;
     rig.ready = true;
     alhenaSprite.visible = false;
-    readout.textContent = 'shader ocean + articulated characters';
+    alhenaSprite.material.opacity = 0.0;
+    readout.textContent = 'shader ocean + procedural 3d characters';
   };
   image.src = url;
   return rig;
@@ -1630,13 +1634,20 @@ function makeDriftwood(x, z, scale = 1, rotation = 0) {
 }
 
 const dog = new THREE.Group();
-const dogMat = new THREE.MeshStandardMaterial({ color: 0x0b0b0a, map: materialMaps.fur, roughness: 0.72, metalness: 0.0, transparent: true, opacity: 0.42 });
+const dogMat = new THREE.MeshStandardMaterial({ color: 0x0b0b0a, map: materialMaps.fur, roughness: 0.66, metalness: 0.0, transparent: true, opacity: 0.96 });
 const dogNoseMat = new THREE.MeshStandardMaterial({ color: 0x050504, roughness: 0.34, metalness: 0.0 });
 const dogEyeMat = new THREE.MeshStandardMaterial({ color: 0x140f09, roughness: 0.22, metalness: 0.0 });
+const dogTongueMat = new THREE.MeshStandardMaterial({ color: 0xe17678, roughness: 0.46 });
+const dogCollarMat = new THREE.MeshStandardMaterial({ color: 0x2a87c9, roughness: 0.38, metalness: 0.04 });
 const dogBody = new THREE.Mesh(new THREE.CapsuleGeometry(0.55, 1.55, 6, 12), dogMat);
 dogBody.rotation.z = Math.PI / 2;
 dogBody.castShadow = true;
 dog.add(dogBody);
+const dogChest = new THREE.Mesh(new THREE.SphereGeometry(0.38, 18, 12), dogMat);
+dogChest.position.set(0.58, -0.01, 0.18);
+dogChest.scale.set(0.92, 0.78, 0.84);
+dogChest.castShadow = true;
+dog.add(dogChest);
 const dogHead = new THREE.Mesh(new THREE.SphereGeometry(0.45, 18, 12), dogMat);
 dogHead.position.set(1.03, 0.13, 0.18);
 dogHead.scale.set(1.06, 0.86, 0.92);
@@ -1647,18 +1658,33 @@ dogSnout.rotation.z = Math.PI / 2;
 dogSnout.position.set(1.42, 0.07, 0.18);
 dogSnout.scale.set(1.0, 0.72, 0.72);
 dog.add(dogSnout);
+const dogTongue = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.18, 5, 8), dogTongueMat);
+dogTongue.rotation.x = Math.PI / 2;
+dogTongue.position.set(1.54, -0.10, 0.16);
+dog.add(dogTongue);
+const dogCollar = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.028, 8, 28), dogCollarMat);
+dogCollar.rotation.x = Math.PI / 2;
+dogCollar.position.set(0.76, 0.08, 0.18);
+dog.add(dogCollar);
 const dogTail = new THREE.Mesh(new THREE.CapsuleGeometry(0.065, 0.82, 5, 10), dogMat);
 dogTail.position.set(-1.12, 0.24, 0.17);
 dogTail.rotation.set(0.1, 0.0, -0.88);
 dogTail.castShadow = true;
 dog.add(dogTail);
 const dogLegs = [];
+const dogPaws = [];
 for (let i = 0; i < 4; i++) {
   const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.58, 4, 8), dogMat);
   leg.position.set(i < 2 ? -0.48 : 0.42, -0.52, i % 2 ? -0.28 : 0.28);
   leg.castShadow = true;
   dog.add(leg);
   dogLegs.push(leg);
+  const paw = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), dogMat);
+  paw.position.set(leg.position.x + 0.06, -0.84, leg.position.z);
+  paw.scale.set(1.35, 0.42, 0.88);
+  paw.castShadow = true;
+  dog.add(paw);
+  dogPaws.push(paw);
 }
 for (let i = 0; i < 2; i++) {
   const ear = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.42, 8), dogMat);
@@ -1671,26 +1697,63 @@ for (let i = 0; i < 2; i++) {
   dog.add(eye);
 }
 dog.position.set(-2.95, 0.40, 6.82);
-dog.scale.setScalar(0.38);
-dog.visible = true;
+dog.scale.setScalar(0.48);
+dog.visible = false;
 scene.add(dog);
 
 const person = new THREE.Group();
-const dress = new THREE.Mesh(new THREE.ConeGeometry(0.58, 1.75, 28), new THREE.MeshStandardMaterial({ color: 0x2a9fc0, map: materialMaps.cloth, roughness: 0.62 }));
+const skinMat = new THREE.MeshStandardMaterial({ color: 0x8b5b42, roughness: 0.48 });
+const alhenaDressMat = new THREE.MeshStandardMaterial({ color: 0x2a9fc0, map: materialMaps.cloth, roughness: 0.58, metalness: 0.01 });
+const alhenaHairMat = new THREE.MeshStandardMaterial({ color: 0x1b130f, roughness: 0.70 });
+const dress = new THREE.Mesh(new THREE.ConeGeometry(0.58, 1.75, 28), alhenaDressMat);
 dress.position.y = 1.08;
 dress.castShadow = true;
 person.add(dress);
-const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 22, 16), new THREE.MeshStandardMaterial({ color: 0x8b5b42, roughness: 0.5 }));
+const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.30, 0.82, 8, 16), alhenaDressMat);
+torso.position.y = 1.72;
+torso.scale.set(0.88, 1.0, 0.70);
+torso.castShadow = true;
+person.add(torso);
+const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.22, 14), skinMat);
+neck.position.y = 2.00;
+neck.castShadow = true;
+person.add(neck);
+const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 22, 16), skinMat);
 head.position.y = 2.18;
+head.scale.set(0.92, 1.08, 0.90);
 head.castShadow = true;
 person.add(head);
-const hair = new THREE.Mesh(new THREE.SphereGeometry(0.38, 22, 16), new THREE.MeshStandardMaterial({ color: 0x1b130f, roughness: 0.72 }));
+const hair = new THREE.Mesh(new THREE.SphereGeometry(0.38, 22, 16), alhenaHairMat);
 hair.scale.set(1.08, 0.9, 1.05);
 hair.position.set(0, 2.22, -0.03);
 hair.castShadow = true;
 person.add(hair);
-person.position.set(6.2, 0.18, 3.75);
-person.scale.setScalar(0.72);
+const eyeMat = new THREE.MeshStandardMaterial({ color: 0x20140f, roughness: 0.30 });
+for (const x of [-0.10, 0.10]) {
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 6), eyeMat);
+  eye.position.set(x, 2.22, 0.30);
+  person.add(eye);
+}
+const tray = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.035, 32), new THREE.MeshStandardMaterial({ color: 0x1d3f3d, roughness: 0.32, metalness: 0.10 }));
+tray.rotation.x = Math.PI / 2;
+tray.position.set(-0.50, 1.52, 0.28);
+tray.castShadow = true;
+person.add(tray);
+const alhenaArms = [];
+for (const spec of [
+  { x: -0.42, y: 1.55, z: 0.10, rz: 0.78 },
+  { x: 0.38, y: 1.42, z: 0.06, rz: -0.58 },
+]) {
+  const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.74, 6, 10), skinMat);
+  arm.position.set(spec.x, spec.y, spec.z);
+  arm.rotation.z = spec.rz;
+  arm.rotation.x = 0.26;
+  arm.castShadow = true;
+  person.add(arm);
+  alhenaArms.push(arm);
+}
+person.position.set(5.30, 0.36, 6.28);
+person.scale.setScalar(0.62);
 person.visible = true;
 scene.add(person);
 
@@ -2086,11 +2149,15 @@ function animate() {
   dog.position.y = 0.42 + Math.sin(elapsed * 1.15) * 0.018;
   dog.rotation.y = Math.sin(elapsed * 0.55) * 0.12;
   dogBody.rotation.y = Math.sin(elapsed * 1.05) * 0.025;
+  dogChest.rotation.y = dogBody.rotation.y * 0.72;
   dogHead.rotation.z = Math.sin(elapsed * 0.92 + 1.1) * 0.045;
+  dogTongue.scale.y = 1.0 + Math.sin(elapsed * 6.2) * 0.08;
+  dogCollar.rotation.z = Math.sin(elapsed * 1.6) * 0.018;
   dogTail.rotation.z = -0.88 + Math.sin(elapsed * 4.6) * 0.22;
   for (let i = 0; i < dogLegs.length; i++) {
     dogLegs[i].rotation.z = Math.sin(elapsed * 2.6 + i * Math.PI) * 0.15;
     dogLegs[i].position.y = -0.52 + Math.max(0, Math.sin(elapsed * 2.6 + i * Math.PI)) * 0.035;
+    dogPaws[i].position.y = -0.84 + Math.max(0, Math.sin(elapsed * 2.6 + i * Math.PI)) * 0.020;
   }
   labSprite.position.x = -2.8 + Math.sin(elapsed * 0.55) * 0.38;
   labSprite.material.rotation = Math.sin(elapsed * 1.1) * 0.015;
@@ -2125,6 +2192,15 @@ function animate() {
   } else {
     alhenaSprite.position.y = 1.55 + Math.sin(elapsed * 1.2) * 0.025;
   }
+  const alhenaBreath = Math.sin(elapsed * 1.08);
+  person.rotation.y = Math.sin(elapsed * 0.38) * 0.08;
+  person.position.y = 0.34 + alhenaBreath * 0.006;
+  torso.rotation.z = alhenaBreath * 0.012;
+  head.rotation.z = Math.sin(elapsed * 0.62) * 0.020;
+  hair.rotation.z = head.rotation.z * 0.72;
+  tray.position.y = 1.52 + Math.sin(elapsed * 0.74 + 0.8) * 0.018;
+  alhenaArms[0].rotation.z = 0.78 + Math.sin(elapsed * 0.74 + 0.8) * 0.018;
+  alhenaArms[1].rotation.z = -0.58 - Math.sin(elapsed * 0.82 + 0.3) * 0.016;
   houseSprite.material.rotation = Math.sin(elapsed * 0.22) * 0.004;
   houseShadow.material.opacity = 0.18 + Math.sin(elapsed * 0.18) * 0.015;
   barShadow.material.opacity = 0.20 + Math.sin(elapsed * 0.21) * 0.014;
@@ -2148,7 +2224,6 @@ function animate() {
     fish.material.opacity = (0.10 + d.scale * 0.07) * weatherProfiles[weatherKey].reflection * (timeKey === 'night' ? 0.42 : 1);
     fish.scale.x = Math.sign(Math.cos(elapsed * d.speed * 0.33 + d.phase)) * Math.abs(d.scale * 1.25);
   }
-  person.rotation.y = Math.sin(elapsed * 0.38) * 0.08;
   const progressTarget = playState.cast ? 1 : 0;
   playState.castProgress += (progressTarget - playState.castProgress) * 0.055;
   const easedCast = easeInOut(playState.castProgress);
