@@ -71,15 +71,15 @@ renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.12;
+renderer.toneMappingExposure = 1.0;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x8fc8df);
 scene.fog = new THREE.FogExp2(0x91bfd1, 0.012);
 
 const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 240);
-camera.position.set(0, 3.2, 12);
-camera.lookAt(0, 1.1, -18);
+camera.position.set(0, 3.0, 13.5);
+camera.lookAt(0, 1.0, -16);
 
 const hemi = new THREE.HemisphereLight(0xb7eaff, 0x6a4f31, 1.35);
 scene.add(hemi);
@@ -147,7 +147,8 @@ const waterMaterial = new THREE.ShaderMaterial({
       vec3 base = mix(uFar, uNear, pow(vUv.y, 1.4));
       vec3 sky = vec3(0.62, 0.84, 0.92);
       float fresnel = pow(1.0 - clamp(dot(normalize(cameraPosition - vWorld), vec3(0.0,1.0,0.0)), 0.0, 1.0), 2.4);
-      float glitter = pow(max(0.0, sin((p.x - p.y) * 7.0 + uTime * 3.0) * 0.5 + 0.5), 18.0) * smoothstep(0.0, 0.72, vUv.y);
+      float streak = sin((p.x - p.y) * 4.2 + uTime * 2.2) * 0.5 + 0.5;
+      float glitter = pow(max(0.0, streak * noise(p * 0.24 + uTime * 0.04)), 12.0) * smoothstep(0.0, 0.72, vUv.y);
       vec3 col = mix(base, sky, fresnel * 0.55);
       col += vec3(1.0, .78, .34) * glitter * 0.28;
       col = mix(col, vec3(.92,.98,1.0), clamp(foam + shoreFoam * .8, 0.0, 1.0) * .72);
@@ -193,6 +194,72 @@ const sunDisk = new THREE.Mesh(
 sunDisk.position.set(-18, 16, -80);
 scene.add(sunDisk);
 
+function canvasTexture(size, painter) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const cx = c.getContext('2d');
+  painter(cx, size);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 8;
+  return tex;
+}
+
+function sandTexture() {
+  return canvasTexture(512, (cx, s) => {
+    const g = cx.createLinearGradient(0, 0, s, s);
+    g.addColorStop(0, '#e7c985');
+    g.addColorStop(0.55, '#c9a86b');
+    g.addColorStop(1, '#9b7748');
+    cx.fillStyle = g;
+    cx.fillRect(0, 0, s, s);
+    for (let i = 0; i < 4500; i++) {
+      const a = 0.04 + Math.random() * 0.16;
+      cx.fillStyle = Math.random() > 0.55 ? `rgba(255,244,190,${a})` : `rgba(82,55,34,${a})`;
+      cx.fillRect(Math.random() * s, Math.random() * s, 1 + Math.random() * 1.8, 1);
+    }
+    cx.strokeStyle = 'rgba(120,88,50,0.14)';
+    for (let i = 0; i < 70; i++) {
+      const y = Math.random() * s;
+      cx.beginPath();
+      cx.moveTo(0, y);
+      for (let x = 0; x < s; x += 24) cx.lineTo(x, y + Math.sin(x * 0.03 + i) * 5);
+      cx.stroke();
+    }
+  });
+}
+
+function woodTexture() {
+  return canvasTexture(512, (cx, s) => {
+    cx.fillStyle = '#7d4a25';
+    cx.fillRect(0, 0, s, s);
+    for (let y = 0; y < s; y += 13) {
+      const shade = 60 + (y % 47);
+      cx.strokeStyle = `rgba(${shade + 80},${shade + 36},${shade},0.33)`;
+      cx.lineWidth = 2;
+      cx.beginPath();
+      cx.moveTo(0, y);
+      for (let x = 0; x <= s; x += 12) cx.lineTo(x, y + Math.sin(x * 0.04 + y) * 5);
+      cx.stroke();
+    }
+    for (let i = 0; i < 36; i++) {
+      cx.strokeStyle = 'rgba(45,23,10,0.35)';
+      cx.beginPath();
+      cx.ellipse(Math.random() * s, Math.random() * s, 18, 5, Math.random() * Math.PI, 0, Math.PI * 2);
+      cx.stroke();
+    }
+  });
+}
+
+const matSand = new THREE.MeshStandardMaterial({ map: sandTexture(), color: 0xe2bd79, roughness: 0.96 });
+matSand.map.repeat.set(7, 3);
+const matWood = new THREE.MeshStandardMaterial({ map: woodTexture(), color: 0xb07438, roughness: 0.78 });
+matWood.map.repeat.set(2, 1);
+const matDarkWood = new THREE.MeshStandardMaterial({ map: woodTexture(), color: 0x5a2f18, roughness: 0.72 });
+matDarkWood.map.repeat.set(1.4, 1);
+const matBamboo = new THREE.MeshStandardMaterial({ color: 0xc59042, roughness: 0.68 });
+
 for (const [x, z, sx] of [[-22, -55, 10], [17, -62, 16], [39, -52, 9]]) {
   const island = new THREE.Mesh(
     new THREE.ConeGeometry(sx, 3, 5),
@@ -204,10 +271,16 @@ for (const [x, z, sx] of [[-22, -55, 10], [17, -62, 16], [39, -52, 9]]) {
   scene.add(island);
 }
 
-const sand = new THREE.Mesh(
-  new THREE.PlaneGeometry(80, 34, 80, 12),
-  new THREE.MeshStandardMaterial({ color: 0xcaa86d, roughness: 0.92, metalness: 0.0 })
-);
+const sandGeometry = new THREE.PlaneGeometry(80, 34, 110, 36);
+const sandPos = sandGeometry.attributes.position;
+for (let i = 0; i < sandPos.count; i++) {
+  const x = sandPos.getX(i);
+  const y = sandPos.getY(i);
+  const shoreBias = THREE.MathUtils.smoothstep(y, -17, 17);
+  sandPos.setZ(i, Math.sin(x * 0.34) * 0.04 + Math.sin(y * 0.55) * 0.035 - shoreBias * 0.08);
+}
+sandGeometry.computeVertexNormals();
+const sand = new THREE.Mesh(sandGeometry, matSand);
 sand.rotation.x = -Math.PI / 2;
 sand.position.set(0, -0.18, 7.6);
 sand.receiveShadow = true;
@@ -223,13 +296,60 @@ function box(name, size, pos, color, rough = 0.8) {
   return mesh;
 }
 
-box('beach-house-body', [4.2, 2.2, 2.6], [-9.5, 1.0, 2.6], 0x8b5633);
+box('beach-house-body', [4.2, 2.2, 2.6], [-9.5, 1.0, 2.6], 0x8b5633).material = matWood;
 const roof = box('beach-house-roof', [4.9, 0.35, 3.2], [-9.5, 2.28, 2.6], 0x5b1d17, 0.7);
 roof.rotation.z = 0.08;
-box('bar-bamboo-face', [5.8, 1.35, 1.0], [8.0, 0.66, 2.0], 0x8a5a2c);
-box('bar-counter', [6.3, 0.28, 1.35], [8.0, 1.52, 2.0], 0x3b2517, 0.48);
+roof.material = matDarkWood;
+box('bar-bamboo-face', [5.8, 1.35, 1.0], [8.0, 0.66, 2.0], 0x8a5a2c).material = matWood;
+box('bar-counter', [6.3, 0.28, 1.35], [8.0, 1.52, 2.0], 0x3b2517, 0.48).material = matDarkWood;
 box('cooler', [1.4, 0.62, 0.86], [-1.2, 0.18, 5.2], 0x9bd8e6);
 box('chair', [0.9, 0.16, 1.0], [1.0, 0.28, 5.1], 0xd36d45);
+
+function cylinder(name, radius, depth, pos, rot, material) {
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, depth, 18), material);
+  mesh.name = name;
+  mesh.position.set(...pos);
+  mesh.rotation.set(...rot);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  return mesh;
+}
+
+for (let i = 0; i < 11; i++) {
+  cylinder('bar-bamboo-' + i, 0.095, 1.52, [5.25 + i * 0.55, 0.7, 1.45], [0, 0, 0], matBamboo);
+}
+for (let i = 0; i < 8; i++) {
+  cylinder('house-palm-log-' + i, 0.07, 2.1, [-11.25 + i * 0.48, 0.9, 1.22], [0, 0, 0], matBamboo);
+}
+
+function addGrassClump(x, z, scale = 1) {
+  const group = new THREE.Group();
+  group.position.set(x, 0.02, z);
+  for (let i = 0; i < 9; i++) {
+    const blade = new THREE.Mesh(
+      new THREE.ConeGeometry(0.025 * scale, (0.55 + (i % 4) * 0.1) * scale, 5),
+      new THREE.MeshStandardMaterial({ color: i % 2 ? 0x315f42 : 0x1f4c36, roughness: 0.85 })
+    );
+    blade.position.set((i - 4) * 0.07 * scale, 0.25 * scale, Math.sin(i) * 0.08 * scale);
+    blade.rotation.z = (i - 4) * 0.14;
+    blade.rotation.x = Math.sin(i * 2.1) * 0.32;
+    blade.castShadow = true;
+    group.add(blade);
+  }
+  scene.add(group);
+}
+
+for (const [x, z, s] of [[-14, 5, 1.4], [-7, 7.8, 0.75], [14, 5.4, 1.1], [18, 8, 1.6], [4, 8.2, 0.7]]) addGrassClump(x, z, s);
+
+const shellMat = new THREE.MeshStandardMaterial({ color: 0xf1d7a5, roughness: 0.64 });
+for (let i = 0; i < 45; i++) {
+  const shell = new THREE.Mesh(new THREE.SphereGeometry(0.035 + (i % 5) * 0.009, 10, 6), shellMat);
+  shell.position.set(((i * 5.37) % 31) - 15.5, -0.02, 3.0 + ((i * 3.91) % 8));
+  shell.scale.y = 0.28;
+  shell.castShadow = true;
+  scene.add(shell);
+}
 
 const loader = new THREE.TextureLoader();
 loader.load('../assets/alhena-black-lab.png', tex => {
