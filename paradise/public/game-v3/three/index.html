@@ -287,7 +287,7 @@ button.active { color: #07131b; background: linear-gradient(135deg, #fff2b6, #d5
 }
 </script>
 </head>
-<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v7-composite" data-character-system="procedural-3d-rig-v2">
+<body data-paradise-v3="shader-ocean-composite" data-water-system="paradise-pandorachat-webgl2-jonswap-ocean-v7-composite" data-character-system="procedural-3d-rig-v2" data-shoreline-system="authored-glb-visible-v1">
 <iframe class="ocean-pass-frame" id="ocean-pass-frame" title="PandoraChat WebGL ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
 <div class="shoreline-atmosphere" aria-hidden="true"></div>
 <div class="cinematic-grade" aria-hidden="true"></div>
@@ -2003,21 +2003,42 @@ window.__paradiseDebug = {
 };
 
 new GLTFLoader().load('/assets/models/paradise-shoreline.glb', gltf => {
-  gltf.scene.position.set(-5.8, -0.42, 7.6);
-  gltf.scene.scale.setScalar(0.62);
+  gltf.scene.position.set(0, -0.58, 4.85);
+  gltf.scene.scale.set(0.48, 0.70, 0.38);
+  const tuneShorelineMaterial = (material, objectName = '') => {
+    if (!material) return;
+    const name = `${material.name || ''} ${objectName}`.toLowerCase();
+    material.roughness = name.includes('wet') ? 0.20 : Math.max(material.roughness || 0.7, 0.62);
+    material.metalness = name.includes('wet') ? 0.02 : material.metalness || 0.0;
+    material.envMapIntensity = name.includes('foam') ? 0.24 : name.includes('wet') ? 0.48 : 0.36;
+    if (name.includes('foam')) {
+      material.transparent = true;
+      material.opacity = 0.36;
+      material.depthWrite = false;
+    }
+    if (name.includes('wet')) {
+      material.transparent = true;
+      material.opacity = 0.18;
+      material.depthWrite = false;
+    }
+    if (name.includes('pebble') || name.includes('shell')) {
+      material.transparent = true;
+      material.opacity = name.includes('pebble') ? 0.12 : 0.24;
+      material.depthWrite = false;
+      material.color?.setHex(name.includes('pebble') ? 0xb59763 : 0xe8d6ad);
+    }
+  };
   gltf.scene.traverse(obj => {
     if (obj.isMesh) {
       obj.castShadow = true;
       obj.receiveShadow = true;
-      if (obj.material) {
-        obj.material.roughness = Math.max(obj.material.roughness || 0.7, 0.62);
-        obj.material.envMapIntensity = 0.45;
-      }
+      const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+      for (const material of materials) tuneShorelineMaterial(material, obj.name || '');
     }
   });
-  gltf.scene.visible = false;
+  gltf.scene.visible = true;
   scene.add(gltf.scene);
-  readout.textContent = 'mesh ocean + glb validated / hidden';
+  readout.textContent = 'mesh ocean + authored shoreline glb';
 }, undefined, err => {
   readout.textContent = `mesh ocean / glb missing: ${err.message || 'load failed'}`;
 });
