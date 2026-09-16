@@ -11086,7 +11086,7 @@ fn getViewDir() {
       scale += diffuse * caustic.r * 2.0 * caustic.g;
     } else {
       /* shadow for the rim of the pool */
-      vec2 t = intersectCube(point, refractedLight, vec3(-1.0, -poolHeight, -1.0), vec3(1.0, 2.0, 1.0));
+      vec2 t = intersectCube(point, refractedLight, vec3(-100.0, -poolHeight, -100.0), vec3(100.0, 2.0, 100.0));
       diffuse *= 1.0 / (1.0 + exp(-200.0 / (1.0 + 10.0 * (t.y - t.x)) * (point.y + refractedLight.y * t.y - 2.0 / 12.0)));
 
       scale += diffuse * 0.5;
@@ -11115,10 +11115,10 @@ fn getViewDir() {
     if (q < 1.0e6) {
       color = getSphereColor(origin + ray * q);
     } else if (ray.y < 0.0) {
-      vec2 t = intersectCube(origin, ray, vec3(-1.0, -poolHeight, -1.0), vec3(1.0, 2.0, 1.0));
+      vec2 t = intersectCube(origin, ray, vec3(-100.0, -poolHeight, -100.0), vec3(100.0, 2.0, 100.0));
       color = getWallColor(origin + ray * t.y);
     } else {
-      vec2 t = intersectCube(origin, ray, vec3(-1.0, -poolHeight, -1.0), vec3(1.0, 2.0, 1.0));
+      vec2 t = intersectCube(origin, ray, vec3(-100.0, -poolHeight, -100.0), vec3(100.0, 2.0, 100.0));
       vec3 hit = origin + ray * t.y;
       if (hit.y < 2.0 / 12.0) {
         color = getWallColor(hit);
@@ -11219,7 +11219,7 @@ fn getViewDir() {
 
   /* project the ray onto the plane */
   vec3 project(vec3 origin, vec3 ray, vec3 refractedLight) {
-    vec2 tcube = intersectCube(origin, ray, vec3(-1.0, -poolHeight, -1.0), vec3(1.0, 2.0, 1.0));
+    vec2 tcube = intersectCube(origin, ray, vec3(-100.0, -poolHeight, -100.0), vec3(100.0, 2.0, 100.0));
     origin += ray * tcube.y;
     float tplane = (-origin.y - 1.0) / refractedLight.y;
     return origin + refractedLight * tplane;
@@ -11268,7 +11268,7 @@ fn getViewDir() {
     color.g = shadow;
 
     /* shadow for the rim of the pool */
-    vec2 t = intersectCube(newPos, -refractedLight, vec3(-1.0, -poolHeight, -1.0), vec3(1.0, 2.0, 1.0));
+    vec2 t = intersectCube(newPos, -refractedLight, vec3(-100.0, -poolHeight, -100.0), vec3(100.0, 2.0, 100.0));
     color.r *= 1.0 / (1.0 + exp(-200.0 / (1.0 + 10.0 * (t.y - t.x)) * (newPos.y - refractedLight.y * t.y - 2.0 / 12.0)));
 
     gl_FragColor = color;
@@ -11356,7 +11356,7 @@ fn getViewDir() {
       let caustic = textureSampleLevel(causticTex, causticTexSampler, 0.75 * (point.xz - point.y * refractedLight.xz / refractedLight.y) * 0.5 + vec2f(0.5), 0.0);
       scale = scale + diffuse * caustic.r * 2.0 * caustic.g;
     } else {
-      let t = intersectCube(point, refractedLight, vec3f(-1.0, -poolHeight, -1.0), vec3f(1.0, 2.0, 1.0));
+      let t = intersectCube(point, refractedLight, vec3f(-100.0, -poolHeight, -100.0), vec3f(100.0, 2.0, 100.0));
       diffuse = diffuse * (1.0 / (1.0 + exp(-200.0 / (1.0 + 10.0 * (t.y - t.x)) * (point.y + refractedLight.y * t.y - 2.0 / 12.0))));
       scale = scale + diffuse * 0.5;
     }
@@ -11390,10 +11390,10 @@ fn getViewDir() {
     if (q < 1.0e6) {
       color = getSphereColor(origin + ray * q);
     } else if (ray.y < 0.0) {
-      let t = intersectCube(origin, ray, vec3f(-1.0, -poolHeight, -1.0), vec3f(1.0, 2.0, 1.0));
+      let t = intersectCube(origin, ray, vec3f(-100.0, -poolHeight, -100.0), vec3f(100.0, 2.0, 100.0));
       color = getWallColor(origin + ray * t.y);
     } else {
-      let t = intersectCube(origin, ray, vec3f(-1.0, -poolHeight, -1.0), vec3f(1.0, 2.0, 1.0));
+      let t = intersectCube(origin, ray, vec3f(-100.0, -poolHeight, -100.0), vec3f(100.0, 2.0, 100.0));
       let hit = origin + ray * t.y;
       if (hit.y < 2.0 / 12.0) {
         color = getWallColor(hit);
@@ -11509,7 +11509,7 @@ fn getViewDir() {
   varying ray: vec3f;
 
   fn project(origin0: vec3f, ray: vec3f, refractedLight: vec3f) -> vec3f {
-    let tcube = intersectCube(origin0, ray, vec3f(-1.0, -poolHeight, -1.0), vec3f(1.0, 2.0, 1.0));
+    let tcube = intersectCube(origin0, ray, vec3f(-100.0, -poolHeight, -100.0), vec3f(100.0, 2.0, 100.0));
     let origin = origin0 + ray * tcube.y;
     let tplane = (-origin.y - 1.0) / refractedLight.y;
     return origin + refractedLight * tplane;
@@ -11565,7 +11565,7 @@ fn getViewDir() {
     color.g = shadow;
 
     /* shadow for the rim of the pool */
-    let t = intersectCube(input.newPos, -refractedLight, vec3f(-1.0, -poolHeight, -1.0), vec3f(1.0, 2.0, 1.0));
+    let t = intersectCube(input.newPos, -refractedLight, vec3f(-100.0, -poolHeight, -100.0), vec3f(100.0, 2.0, 100.0));
     color.r = color.r * (1.0 / (1.0 + exp(-200.0 / (1.0 + 10.0 * (t.y - t.x)) * (input.newPos.y - refractedLight.y * t.y - 2.0 / 12.0))));
 
     var output: FragmentOutput;
