@@ -1913,14 +1913,6 @@ function drawShore(t, time) {
   drawWetSandCaustics(t, y, time);
   drawShellsAndPebbles(t, y, time);
   drawFootprintsAndTideWrack(t, y, time);
-  drawBeachGear(w * 0.48, h * 0.89, 1.0, t, time);
-  drawBeachHouse(w * 0.11, h * 0.735, 1.14, time);
-  const lab = labLocomotion(w, h, t);
-  drawBlackLab(lab.x, lab.y, lab.s, t, time, lab);
-  drawForegroundPlants(w * 0.965, h * 0.87, 1.0, time);
-  drawForegroundPlants(w * 0.035, h * 0.93, 0.68, time);
-  drawRod(t);
-  drawBarAndAlhena(w * 0.80, h * 0.725, t, time);
 }
 
 function drawWetReflections(t, shoreTop, time) {

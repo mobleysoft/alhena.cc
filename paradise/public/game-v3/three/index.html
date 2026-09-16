@@ -27,7 +27,7 @@ canvas { display: block; }
   border: 0;
   pointer-events: none;
   background: #07131b;
-  transform: scale(1.82);
+  transform: scale(3.5);
   transform-origin: 50% 48%;
   filter: saturate(1.16) brightness(1.10) contrast(1.08);
 }
@@ -2573,7 +2573,29 @@ const dockBobber = new THREE.Vector3(8.55, 0.02, 5.0);
 const waterBobber = new THREE.Vector3(0.4, -0.05, -11.0);
 const lineMidA = new THREE.Vector3();
 const lineMidB = new THREE.Vector3();
+
 const bobberTarget = new THREE.Vector3();
+
+// Physics State
+const bobberPhysics = {
+  velocity: new THREE.Vector3(0, 0, 0),
+  acceleration: new THREE.Vector3(0, -9.81, 0), // Gravity
+  mass: 0.15,
+  drag: 0.92,
+  buoyancy: 12.0
+};
+
+// Line Segments for Verlet Integration
+const numLineSegments = 12;
+const lineNodes = [];
+for (let i = 0; i < numLineSegments; i++) {
+  lineNodes.push({
+    pos: new THREE.Vector3(),
+    oldPos: new THREE.Vector3(),
+    locked: i === 0 // first node locked to rod tip
+  });
+}
+
 const playState = {
   cast: true,
   castProgress: 1,
