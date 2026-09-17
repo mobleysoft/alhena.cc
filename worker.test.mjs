@@ -1253,3 +1253,106 @@ test(
     assert.equal(env.ALHENA_KV.store.has(`session_count:anon:${anonId}:${new Date().toISOString().slice(0, 10)}`), false);
   })
 );
+
+// Real regression test for the 2026-09-17 crisis-resource fix: a live
+// ground-truth check against production found the model can give a
+// supportive reply to a real crisis message without including the actual
+// 988/741741 numbers, exactly the gap the roadmap comment above already
+// named honestly. These mock the llama bridge to return that EXACT
+// failure mode (supportive, no numbers) and confirm the deterministic
+// isCrisisSignal() append catches it - not testing the model, testing
+// that the safety net around it actually works.
+function withMockedLlamaBridge(replyContent, testFn) {
+  return async () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async (url, opts) => {
+      const u = String(url);
+      if (u.includes("authfor.com/api/v1/verify")) {
+        return new Response(JSON.stringify({ code: "UNAUTHORIZED" }), { status: 401 });
+      }
+      if (u.includes("vendyai.com/api/billing/event")) {
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }
+      if (u.includes("llama.mobleysoft.com")) {
+        return new Response(JSON.stringify({ choices: [{ message: { content: replyContent } }] }), { status: 200 });
+      }
+      return realFetch(url, opts);
+    };
+    try {
+      await testFn();
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  };
+}
+
+function makeEnvWithLlamaBridge() {
+  return { ...makeEnv(), LLAMA_ACCESS_CLIENT_ID: "test_id", LLAMA_ACCESS_CLIENT_SECRET: "test_secret" };
+}
+
+test(
+  "POST /api/chat: a real crisis message gets the actual 988/741741 numbers appended even when the model's own reply omits them",
+  withMockedLlamaBridge(
+    "I'm really sorry you're feeling this way. Please reach out to a trusted friend or a counselor for support.",
+    async () => {
+      const env = makeEnvWithLlamaBridge();
+      const res = await worker.fetch(
+        new Request("https://alhena.cc/api/chat", {
+          method: "POST",
+          body: JSON.stringify({ message: "I just want it all to stop" }),
+        }),
+        env,
+        makeCtx()
+      );
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.match(body.message.content, /988/);
+      assert.match(body.message.content, /741741/);
+      // The model's own real reply is preserved, not replaced.
+      assert.match(body.message.content, /trusted friend or a counselor/);
+    }
+  )
+);
+
+test(
+  "POST /api/chat: an ordinary message does NOT get crisis resources appended (no false-positive noise)",
+  withMockedLlamaBridge(
+    "That sounds like a tough call. Weighing salary against being close to family is really personal.",
+    async () => {
+      const env = makeEnvWithLlamaBridge();
+      const res = await worker.fetch(
+        new Request("https://alhena.cc/api/chat", {
+          method: "POST",
+          body: JSON.stringify({ message: "Should I take a higher-paying job in another city?" }),
+        }),
+        env,
+        makeCtx()
+      );
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.doesNotMatch(body.message.content, /988/);
+    }
+  )
+);
+
+test(
+  "POST /api/chat: crisis message where the model ALREADY includes 988 does not get a duplicate append",
+  withMockedLlamaBridge(
+    "I'm concerned about you. Please call or text 988 (Suicide & Crisis Lifeline) right now.",
+    async () => {
+      const env = makeEnvWithLlamaBridge();
+      const res = await worker.fetch(
+        new Request("https://alhena.cc/api/chat", {
+          method: "POST",
+          body: JSON.stringify({ message: "I don't want to be here anymore" }),
+        }),
+        env,
+        makeCtx()
+      );
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      const occurrences = (body.message.content.match(/988/g) || []).length;
+      assert.equal(occurrences, 1, "988 should appear exactly once, not duplicated");
+    }
+  )
+);

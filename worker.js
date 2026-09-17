@@ -392,6 +392,23 @@ async function runAlhenaInference(env, systemPrompt, userContent) {
     guidance = "I'm not connected to a live guidance model right now, so I can't give you a personalized response to this. Alhena is not a therapist or medical provider - if what you're working through feels heavier than a decision, the 988 Suicide & Crisis Lifeline (call or text 988) and Crisis Text Line (text HOME to 741741) are real, free, 24/7 resources.";
   }
 
+  // Real fix 2026-09-17 (portfolio depth audit, ground-truth pass): this
+  // is exactly the gap the roadmap paragraph below already named honestly
+  // - "whether to point you to real crisis resources depends on a general
+  // model noticing the signal, not a dedicated, auditable check." Live-
+  // tested against a real strong crisis message ("I just want it all to
+  // stop") and confirmed the model's reply was supportive but never
+  // included the actual 988/741741 numbers, even though the homepage
+  // itself promises them. Fixed the same honest way isSelfReflectionQuestion
+  // already does it for a different question - a plain, auditable keyword
+  // check, not an ML classifier - and it always wins: if the message
+  // matches and the model's own reply doesn't already contain "988", the
+  // real resources are appended, guaranteed, regardless of what the model
+  // said or didn't say.
+  if (isCrisisSignal(userContent) && !guidance.includes('988')) {
+    guidance = guidance.trim() + '\n\nIf you\'re in crisis or thinking about harming yourself: the 988 Suicide & Crisis Lifeline (call or text 988) and Crisis Text Line (text HOME to 741741) are real, free, 24/7 resources. If you\'re in immediate danger, call your local emergency number.';
+  }
+
   const inferenceSource = isFallback ? 'none' : (usedLlamaBridge ? 'llama_bridge' : 'alhena_inference_url');
   return { guidance, isFallback, usedLlamaBridge, inferenceSource };
 }
@@ -409,6 +426,31 @@ async function runAlhenaInference(env, systemPrompt, userContent) {
 // from real, checkable state - not generated. This is a plain regex list,
 // not an ML classifier; described here exactly that plainly, not dressed
 // up as more than it is.
+// Real, plain keyword check (not an ML classifier, described here exactly
+// that plainly - same honesty standard as isSelfReflectionQuestion below)
+// for whether a message suggests the person may be in crisis or
+// considering self-harm. Deliberately broader/cruder than a clinical
+// screening tool would be - a false positive here just means the real
+// 988/Crisis Text Line resources get appended to an otherwise-fine
+// message, which is harmless; a false negative means a real gap, which
+// is the actual risk this exists to close.
+function isCrisisSignal(text) {
+  if (!text || typeof text !== 'string') return false;
+  const patterns = [
+    /\bkill(ing)? (myself|me)\b/i,
+    /\bend(ing)? (it all|my life)\b/i,
+    /\bwant(ed)? (it all )?to (stop|end)\b/i,
+    /\bdon'?t (want|wanna) (to )?(be here|live|exist) anymore\b/i,
+    /\bno (point|reason) (in|to) (living|going on)\b/i,
+    /\bsuicid\w*/i,
+    /\bself.?harm/i,
+    /\bhurt(ing)? myself\b/i,
+    /\bgive up on (everything|life)\b/i,
+    /\bcan'?t (go on|do this anymore|take (it|this) anymore)\b/i,
+  ];
+  return patterns.some((re) => re.test(text));
+}
+
 function isSelfReflectionQuestion(text) {
   if (!text || typeof text !== 'string') return false;
   const patterns = [
