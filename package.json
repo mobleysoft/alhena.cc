@@ -1,0 +1,8 @@
+{
+  "name": "alhena-conglomerate",
+  "private": true,
+  "workspaces": [
+    "mythal-engine",
+    "paradise/game-v4"
+  ]
+}

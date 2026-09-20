@@ -1,0 +1,14 @@
+{
+  "name": "@alhena/mythal-engine",
+  "version": "1.0.0",
+  "description": "Sovereign WebGPU Engine for AAA Browser Experiences",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./physics/*": "./physics/*",
+    "./materials/*": "./materials/*",
+    "./behavior/*": "./behavior/*",
+    "./core/*": "./core/*"
+  }
+}

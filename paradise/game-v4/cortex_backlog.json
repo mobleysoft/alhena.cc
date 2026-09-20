@@ -1,0 +1,4 @@
+[
+  { "task": "Add a wooden dock GLTF asset loaded via AssetPipeline near the origin" },
+  { "task": "Import a seagull GLTF asset and place it on top of the bobber" }
+]

@@ -1,0 +1,16 @@
+{
+  "name": "@alhena/paradise-v4",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "three": "^0.160.0",
+    "@alhena/mythal-engine": "*"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}
