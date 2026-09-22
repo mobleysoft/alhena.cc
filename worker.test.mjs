@@ -877,6 +877,70 @@ test("POST /api/v1/companion/self-reflection: missing note is a real 400, not a 
   assert.equal(res.status, 400);
 });
 
+// ── GET /api/v1/companion/self-reflection admin read (added 2026-09-22) ─
+// Fail-closed, same convention as paintedwhore.cc's PAINTEDWHORE_ADMIN_SECRET:
+// identical 404 whether the secret is unset or wrong, so this can never
+// become an accidental open read of cross-user data.
+
+test("GET /api/v1/companion/self-reflection: no ALHENA_ADMIN_SECRET configured -> 404, not an open read", async () => {
+  const env = makeEnv();
+  await worker.fetch(
+    new Request("https://alhena.cc/api/v1/companion/self-reflection", {
+      method: "POST",
+      body: JSON.stringify({ note: "should not be readable without the secret" }),
+    }),
+    env,
+    makeCtx()
+  );
+  const res = await worker.fetch(
+    new Request("https://alhena.cc/api/v1/companion/self-reflection?secret=anything"),
+    env,
+    makeCtx()
+  );
+  assert.equal(res.status, 404);
+});
+
+test("GET /api/v1/companion/self-reflection: wrong secret -> identical 404", async () => {
+  const env = { ...makeEnv(), ALHENA_ADMIN_SECRET: "real_secret" };
+  const res = await worker.fetch(
+    new Request("https://alhena.cc/api/v1/companion/self-reflection?secret=wrong"),
+    env,
+    makeCtx()
+  );
+  assert.equal(res.status, 404);
+});
+
+test("GET /api/v1/companion/self-reflection: missing secret param -> identical 404", async () => {
+  const env = { ...makeEnv(), ALHENA_ADMIN_SECRET: "real_secret" };
+  const res = await worker.fetch(
+    new Request("https://alhena.cc/api/v1/companion/self-reflection"),
+    env,
+    makeCtx()
+  );
+  assert.equal(res.status, 404);
+});
+
+test("GET /api/v1/companion/self-reflection: correct secret returns the real logged entries", async () => {
+  const env = { ...makeEnv(), ALHENA_ADMIN_SECRET: "real_secret" };
+  await worker.fetch(
+    new Request("https://alhena.cc/api/v1/companion/self-reflection", {
+      method: "POST",
+      body: JSON.stringify({ note: "real admin-visible entry", source: "manual" }),
+    }),
+    env,
+    makeCtx()
+  );
+  const res = await worker.fetch(
+    new Request("https://alhena.cc/api/v1/companion/self-reflection?secret=real_secret"),
+    env,
+    makeCtx()
+  );
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.count, 1);
+  assert.equal(body.entries[0].note, "real admin-visible entry");
+});
+
 // ── Real tier-gating (added 2026-09-13) ─────────────────────────────────
 // Closes a genuine gap: /api/vendyai/webhook has always written a real
 // paying user's tier to `user:${email}` in KV, but nothing ever read it

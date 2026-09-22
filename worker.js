@@ -197,11 +197,12 @@ const GUIDANCE_HISTORY_TURNS_INJECTED = 5; // how many prior Q&A pairs get fed b
 // Real "getting Alhena involved in the process" log (added 2026-09-12) -
 // a single shared list (not per-user, since it's for John to review real
 // user-surfaced gaps/ideas across everyone, not one person's own history),
-// same bounded-list KV pattern as everything else in this file. Read back
+// same bounded-list KV pattern as everything else in this file. Readable
 // via `wrangler kv key get --namespace-id=<ALHENA_KV id> self_reflection_log`
-// (same mechanism every other feature here already uses to persist real
-// data - no new admin auth system invented for this) or via the
-// authenticated GET route below.
+// (same raw-KV mechanism every other feature here already uses), or via
+// GET /api/v1/companion/self-reflection?secret=... below - added
+// 2026-09-22, reusing paintedwhore.cc's fail-closed ADMIN_SECRET pattern
+// rather than inventing a new one.
 const MAX_STORED_SELF_REFLECTIONS = 300;
 
 // Real tier-gating (added 2026-09-13, closing a genuine feature-
@@ -806,13 +807,7 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
     // idea that came up in conversation but didn't match the keyword list.
     // Deliberately NOT auto-triaged, NOT fed into any automated retraining
     // or code-change pipeline - it is exactly what it looks like: a real,
-    // capped, append-only log a human reads later. No GET route is exposed
-    // here on purpose - this log spans all users, not one person's own
-    // data, and this codebase has no owner/admin auth concept to gate a
-    // public read on; the honest read path is direct KV access
-    // (`wrangler kv key get --namespace-id=<ALHENA_KV id> self_reflection_log`),
-    // same access every other real feature here already required to
-    // inspect production KV state.
+    // capped, append-only log a human reads later.
     if (url.pathname === '/api/v1/companion/self-reflection' && request.method === 'POST') {
       try {
         const body = await request.json().catch(() => null);
@@ -841,6 +836,40 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
+    }
+
+    // Real gap found 2026-09-22 depth audit: self_reflection_log has been
+    // write-only since 2026-09-12 - the only documented read path was a
+    // raw `wrangler kv key get` CLI call (a comment near
+    // MAX_STORED_SELF_REFLECTIONS above still says exactly that), so the
+    // venture's own recorded next step ("watching self_reflection_log +
+    // real usage patterns") had no repeatable way to actually happen
+    // without a human manually running that command and pasting the
+    // namespace id each time. This log spans all users, not one person's
+    // own data, so it can't hang off resolveIdentity() like every other
+    // GET route here - it needs real admin auth, which this codebase
+    // never had. Rather than inventing a new auth scheme, reused the
+    // exact fail-closed pattern already built and live-verified on
+    // paintedwhore.cc (nginx/workers/venture-fleet/src/worker.js,
+    // PAINTEDWHORE_ADMIN_SECRET): a query-param secret, identical 404
+    // whether the secret is unset or wrong, so this can never become an
+    // accidental open read of cross-user data just because the route
+    // exists - it only starts working once a human deliberately
+    // provisions ALHENA_ADMIN_SECRET via
+    // `wrangler secret put ALHENA_ADMIN_SECRET`.
+    if (url.pathname === '/api/v1/companion/self-reflection' && request.method === 'GET') {
+      const configuredSecret = env.ALHENA_ADMIN_SECRET;
+      const providedSecret = url.searchParams.get('secret') || '';
+      if (!configuredSecret || providedSecret !== configuredSecret) {
+        return new Response(JSON.stringify({ error: 'Not found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      const entries = await readKvList(env, 'self_reflection_log');
+      return new Response(JSON.stringify({ count: entries.length, entries }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     // Core Companion Wellness Check-in
