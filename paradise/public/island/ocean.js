@@ -1,7 +1,15 @@
 import * as THREE from './vendor/three.module.min.js';
+import { createRippleField, RIPPLE } from './ripple-field.js';
 
 const TAU = Math.PI * 2;
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+// Small wind waves supply the curvature that focuses sunlight. The legacy
+// 32-component swell remains unchanged; this layer also enters CPU buoyancy.
+export const SHORT_WAVES=Object.freeze([.8,1.1,1.65,2.2].map((length,i)=>{
+  const k=TAU/length,angle=[.4,-.7,1.1,-.2][i];
+  return Object.freeze({kx:Math.cos(angle)*k,kz:Math.sin(angle)*k,amplitude:[.008,.010,.016,.019][i],frequency:Math.sqrt(9.81*k+.000074*k**3)});
+}));
+export const shortWaveHeight=(x,z,t,wind=12)=>SHORT_WAVES.reduce((h,w)=>h+w.amplitude*Math.sin(w.kx*x+w.kz*z-w.frequency*t),0)*Math.min(1.6,Math.max(.4,wind/12));
 export function groundHeight(x, z) {
   const r = Math.hypot(x / 12.8, (z - 3.3) / 9.2);
   return 1.18 - 3.9 * smooth(.48, 1.22, r) - 16 * smooth(1.3, 4.8, r)
@@ -36,42 +44,45 @@ uniform float uTime;
 uniform float uChop;
 uniform vec4 uWaves[32];
 uniform float uFrequencies[32];
-uniform vec4 uImpacts[8];
+uniform vec4 uShortWaves[4];
+uniform float uRippleWind;
+uniform sampler2D uRipples;
 ${groundGLSL}
+float rippleAt(vec2 p) {
+  vec2 uv=(p-vec2(-13.0,0.0))/26.0;
+  if(any(lessThan(uv,vec2(0)))||any(greaterThan(uv,vec2(1))))return 0.0;
+  return texture2D(uRipples,(uv*127.0+.5)/128.0).r;
+}
 float heightAt(vec2 p) {
   float h = 0.0;
   for (int i = 0; i < 32; i++) {
     vec4 w = uWaves[i];
     h += w.z * sin(dot(w.xy, p) - uFrequencies[i] * uTime + w.w);
   }
-  h *= uChop * smoothstep(-.05, 8.0, -ground(p));
-  for (int i = 0; i < 8; i++) {
-    vec4 impact = uImpacts[i];
-    float age = uTime - impact.z;
-    float dist = length(p - impact.xy);
-    float front = dist - age * 2.3;
-    float edge = 1.0-smoothstep(4.5,5.8,max(abs(p.x-.5),abs(p.y-19.0)));
-    if (age > 0.0 && age < 6.0) h += sin(front * 13.0) * exp(-front * front * 2.8) * exp(-age * .8) * impact.w * edge;
-  }
-  return h;
+  h *= uChop;
+  for(int i=0;i<4;i++){vec4 w=uShortWaves[i];h+=w.z*sin(dot(w.xy,p)-w.w*uTime)*uRippleWind;}
+  h *= smoothstep(-.05, 8.0, -ground(p));
+  return h+rippleAt(p);
 }`;
 
 export function createOcean(renderer, scene) {
-  let waves = spectrum(12), chop = 1.2, time = 0, impulseIndex = 0;
-  const impacts = Array.from({ length: 8 }, () => new THREE.Vector4(0, 0, -100, 0));
+  let waves = spectrum(12), wind=12, chop = 1.2, time = 0, causticTime=-1;
+  const rippleTexture=new THREE.DataTexture(new Float32Array(RIPPLE.size**2*4),RIPPLE.size,RIPPLE.size,THREE.RGBAFormat,THREE.FloatType);
+  rippleTexture.minFilter=rippleTexture.magFilter=THREE.LinearFilter;rippleTexture.needsUpdate=true;
+  const fluid=createRippleField(groundHeight,{preferGPU:new URLSearchParams(location.search).get('fluid')!=='cpu',onChange:data=>{rippleTexture.image.data=data;rippleTexture.needsUpdate=true;}});
   const size = new THREE.Vector2(); renderer.getDrawingBufferSize(size);
   const refractTarget = new THREE.WebGLRenderTarget(size.x, size.y, { depthBuffer: true });
   const reflectTarget = new THREE.WebGLRenderTarget(Math.max(256, size.x >> 1), Math.max(256, size.y >> 1));
   const uniforms = {
     uTime: { value: 0 }, uChop: { value: chop },
     uWaves: { value: waves.map(w => new THREE.Vector4(w.kx, w.kz, w.amplitude, w.phase)) },
-    uFrequencies: { value: waves.map(w => w.freq) }, uImpacts: { value: impacts },
+    uFrequencies: { value: waves.map(w => w.freq) }, uRipples: { value: rippleTexture },
+    uShortWaves:{value:SHORT_WAVES.map(w=>new THREE.Vector4(w.kx,w.kz,w.amplitude,w.frequency))},uRippleWind:{value:1},
     uResolution: { value: size }, uRefraction: { value: refractTarget.texture }, uReflection: { value: reflectTarget.texture },
     uSun: { value: new THREE.Vector3(-.6, .7, -.5).normalize() },
     uColor: { value: new THREE.Color('#329d91') }, uSky: { value: new THREE.Color('#c9e1d3') },
     uWarmth: { value: new THREE.Color('#ffdeb0') }, uLight: { value: 1 }, uSpecular: { value: 1 },
     uReflectionMatrix: { value: new THREE.Matrix4() },
-    uDetailLayer: { value: 0 },
   };
   const material = new THREE.ShaderMaterial({
     uniforms,
@@ -80,10 +91,8 @@ export function createOcean(renderer, scene) {
       varying vec4 vMirror;
       varying vec3 vWaterNormal;
       uniform mat4 uReflectionMatrix;
-      uniform float uDetailLayer;
       void main() {
         vec3 p = position;
-        if(uDetailLayer<.5) p.xz = sign(p.xz) * pow(abs(p.xz) / 180.0, vec2(2.2)) * 180.0;
         p.y = heightAt(p.xz);
         float eps = .04;
         vWaterNormal = normalize(vec3(-(heightAt(p.xz+vec2(eps,0.0))-p.y)/eps,1.0,-(heightAt(p.xz+vec2(0.0,eps))-p.y)/eps));
@@ -104,9 +113,7 @@ export function createOcean(renderer, scene) {
       uniform vec3 uSun;
       uniform float uLight;
       uniform float uSpecular;
-      uniform float uDetailLayer;
       void main() {
-        if(uDetailLayer<.5 && abs(vWorld.x-.5)<6.0 && abs(vWorld.z-19.0)<6.0) discard;
         float h = vWorld.y;
         float depth = h - ground(vWorld.xz);
         if (depth < .015) discard;
@@ -138,42 +145,81 @@ export function createOcean(renderer, scene) {
         #include <colorspace_fragment>
       }`,
   });
-  const geometry = new THREE.PlaneGeometry(360, 360, 220, 220);
-  geometry.rotateX(-Math.PI / 2);
+  // One stitched topology: uniform around fishing/shore, stretched offshore.
+  // Separate overlapping meshes left cracks where their wave samples differed.
+  const axis=(lo,hi)=>[
+    ...Array.from({length:40},(_,i)=>lo-(lo+180)*((40-i)/40)**2),
+    ...Array.from({length:257},(_,i)=>lo+(hi-lo)*i/256),
+    ...Array.from({length:40},(_,i)=>hi+(180-hi)*((i+1)/40)**2),
+  ];
+  const xs=axis(-13,13),zs=axis(0,26);
+  const geometry=new THREE.PlaneGeometry(1,1,xs.length-1,zs.length-1);
+  const positions=geometry.attributes.position;
+  for(let z=0;z<zs.length;z++)for(let x=0;x<xs.length;x++)positions.setXYZ(z*xs.length+x,xs[x],0,zs[z]);
+  geometry.computeVertexNormals();
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = 'JONSWAP ocean'; mesh.frustumCulled = false; scene.add(mesh);
-  // Resolving the short bobber ripples on the distant ocean's coarse grid
-  // produced triangular reflection folds. This local patch samples each crest.
-  const detailGeometry = new THREE.PlaneGeometry(13,13,168,168);
-  detailGeometry.rotateX(-Math.PI/2);detailGeometry.translate(.5,0,19);
-  const detailMaterial=material.clone();
-  detailMaterial.uniforms={...uniforms,uDetailLayer:{value:1}};
-  const detailMesh=new THREE.Mesh(detailGeometry,detailMaterial);
-  detailMesh.name='Resolved fishing ripples';detailMesh.frustumCulled=false;scene.add(detailMesh);
+  // Refract a grid of sunlight rays through the same displaced surface, then
+  // measure the area contraction on the seabed (rather than painting sine nets).
+  const causticSize=768,causticSpan=40;
+  const causticTarget=new THREE.WebGLRenderTarget(causticSize,causticSize,{type:THREE.HalfFloatType,depthBuffer:false});
+  const causticScene=new THREE.Scene(),causticCamera=new THREE.Camera();
+  const causticMaterial=new THREE.ShaderMaterial({
+    uniforms,side:THREE.DoubleSide,depthTest:false,depthWrite:false,transparent:true,blending:THREE.AdditiveBlending,
+    vertexShader:`${heightGLSL}
+      uniform vec3 uSun;varying vec3 vOriginal,vProjected;varying float vWet;
+      void main(){vec2 p=position.xz;float h=heightAt(p),e=.055;
+        vec3 n=normalize(vec3(-(heightAt(p+vec2(e,0))-heightAt(p-vec2(e,0)))/(2.0*e),1.0,-(heightAt(p+vec2(0,e))-heightAt(p-vec2(0,e)))/(2.0*e)));
+        vec3 ray=refract(-normalize(uSun),n,1.0/1.333);
+        vec3 origin=vec3(p.x,h,p.y);float distanceToBed=max(0.0,(h-ground(p))/max(.15,-ray.y));
+        vec3 hit=origin+ray*distanceToBed;
+        distanceToBed=max(0.0,(h-ground(hit.xz))/max(.15,-ray.y));hit=origin+ray*min(distanceToBed,18.0);
+        vOriginal=origin;vProjected=hit;vWet=step(.03,h-ground(p))*step(-12.0,ground(p));
+        gl_Position=vec4(hit.x/20.0,(hit.z-10.0)/20.0,0.0,1.0);
+      }`,
+    fragmentShader:`varying vec3 vOriginal,vProjected;varying float vWet;
+      void main(){float initial=length(cross(dFdx(vOriginal),dFdy(vOriginal)));
+        float projected=length(cross(dFdx(vProjected),dFdy(vProjected)));
+        float concentration=clamp(initial/max(projected,.00001),0.0,8.0);
+        gl_FragColor=vec4(vec3(concentration*vWet),1.0);
+      }`,
+  });
+  const causticGrid=new THREE.PlaneGeometry(causticSpan,causticSpan,320,320);causticGrid.rotateX(-Math.PI/2);causticGrid.translate(0,0,10);
+  const rays=new THREE.Mesh(causticGrid,causticMaterial);rays.frustumCulled=false;causticScene.add(rays);
   const mirrorCamera = new THREE.PerspectiveCamera();
   const view = new THREE.Vector3(), target = new THREE.Vector3();
   const clip = new THREE.Plane(new THREE.Vector3(0, 1, 0), -.02);
   return {
-    mesh, uniforms,
-    height(x, z, t = time) {
-      let h = waves.reduce((sum, w) => sum + w.amplitude * Math.sin(w.kx*x + w.kz*z - w.freq*t + w.phase), 0) * chop * smooth(-.05,8,-groundHeight(x,z));
-      for (const p of impacts) { const age=t-p.z, front=Math.hypot(x-p.x,z-p.y)-age*2.3;
-        const edge=1-smooth(4.5,5.8,Math.max(Math.abs(x-.5),Math.abs(z-19)));
-        if(age>0 && age<6) h += Math.sin(front*13)*Math.exp(-front*front*2.8)*Math.exp(-age*.8)*p.w*edge;
-      } return h;
+    mesh, uniforms, fluid,
+    optics:{caustics:{value:causticTarget.texture},light:uniforms.uLight,sun:uniforms.uSun},
+    causticEvidence() {
+      const pixels=new Uint16Array(causticSize*causticSize*4);
+      renderer.readRenderTargetPixels(causticTarget,0,0,causticSize,causticSize,pixels);
+      let min=Infinity,max=0,sum=0,lit=0;
+      for(let i=0;i<pixels.length;i+=4){const v=THREE.DataUtils.fromHalfFloat(pixels[i]);min=Math.min(min,v);max=Math.max(max,v);sum+=v;if(v>1.1)lit++;}
+      return {min,max,mean:sum/(causticSize*causticSize),focusedPixels:lit};
     },
-    impulse(x, z, strength = .09) { impacts[impulseIndex++ % 8].set(x,z,time,strength); },
-    setWeather(wind, choppiness) {
-      waves = spectrum(wind); chop = choppiness; uniforms.uChop.value = chop;
+    height(x, z, t = time) {
+      let h = (waves.reduce((sum, w) => sum + w.amplitude * Math.sin(w.kx*x + w.kz*z - w.freq*t + w.phase), 0) * chop + shortWaveHeight(x,z,t,wind)) * smooth(-.05,8,-groundHeight(x,z));
+      return h+fluid.height(x,z);
+    },
+    impulse(x, z, strength = .09) { fluid.impulse(x,z,strength); },
+    setWeather(nextWind, choppiness) {
+      wind=nextWind;waves = spectrum(wind); chop = choppiness; uniforms.uChop.value = chop;uniforms.uRippleWind.value=Math.min(1.6,Math.max(.4,wind/12));
       waves.forEach((w,i) => { uniforms.uWaves.value[i].set(w.kx,w.kz,w.amplitude,w.phase); uniforms.uFrequencies.value[i]=w.freq; });
     },
-    update(t) { time=t; uniforms.uTime.value=t; },
+    update(t) { time=t; uniforms.uTime.value=t;fluid.step(); },
     resize() {
       renderer.getDrawingBufferSize(size); refractTarget.setSize(size.x,size.y);
       reflectTarget.setSize(Math.max(256,size.x>>1),Math.max(256,size.y>>1));
     },
     render(camera, outputTarget = null) {
-      mesh.visible=false;detailMesh.visible=false;
+      if(time-causticTime>1/30){
+        const color=renderer.getClearColor(new THREE.Color()),alpha=renderer.getClearAlpha();
+        renderer.setClearColor(0,0);renderer.setRenderTarget(causticTarget);renderer.render(causticScene,causticCamera);
+        renderer.setClearColor(color,alpha);causticTime=time;
+      }
+      mesh.visible=false;
       renderer.setRenderTarget(refractTarget); renderer.render(scene,camera);
       mirrorCamera.copy(camera); mirrorCamera.position.y *= -1;
       camera.getWorldDirection(view); target.copy(camera.position).add(view); target.y *= -1;
@@ -182,27 +228,30 @@ export function createOcean(renderer, scene) {
       uniforms.uReflectionMatrix.value.multiply(mirrorCamera.projectionMatrix).multiply(mirrorCamera.matrixWorldInverse);
       const priorClips=renderer.clippingPlanes;
       renderer.clippingPlanes=[clip]; renderer.setRenderTarget(reflectTarget); renderer.render(scene,mirrorCamera);
-      renderer.clippingPlanes=priorClips; mesh.visible=true;detailMesh.visible=true; renderer.setRenderTarget(outputTarget); renderer.render(scene,camera);
+      renderer.clippingPlanes=priorClips; mesh.visible=true; renderer.setRenderTarget(outputTarget); renderer.render(scene,camera);
     },
   };
 }
 
-export function makeSandMaterial(timeUniform) {
+export function makeSandMaterial(timeUniform,optics) {
   const material = new THREE.MeshStandardMaterial({color:0xe9d5a6,roughness:.93});
   material.onBeforeCompile = shader => {
     shader.uniforms.uTime = timeUniform;
+    shader.uniforms.uCaustics=optics.caustics;shader.uniforms.uCausticLight=optics.light;shader.uniforms.uCausticSun=optics.sun;
     shader.vertexShader = 'varying vec3 vTerrain;\n' + shader.vertexShader;
     shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvTerrain=position;');
-    shader.fragmentShader = 'varying vec3 vTerrain; uniform float uTime;\n' + shader.fragmentShader;
+    shader.fragmentShader = 'varying vec3 vTerrain; uniform float uTime,uCausticLight;uniform sampler2D uCaustics;uniform vec3 uCausticSun;\n' + shader.fragmentShader;
     shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       float grain = fract(sin(dot(floor(vTerrain.xz*85.0),vec2(12.9898,78.233)))*43758.5453);
       diffuseColor.rgb *= .94 + grain * .12;
       float wet = 1.0 - smoothstep(-.2,.55,vTerrain.y);
       diffuseColor.rgb *= mix(1.0,.79,wet);
-      float a=sin(vTerrain.x*2.6+sin(vTerrain.z*2.3+uTime*.5));
-      float b=sin(vTerrain.z*3.0+sin(vTerrain.x*2.1-uTime*.4));
-      float caustic=pow(max(0.0,1.0-abs(a+b)*.6),14.0);
-      diffuseColor.rgb += vec3(.13,.19,.12)*caustic*(1.0-smoothstep(-.45,-.04,vTerrain.y))*exp(min(0.0,vTerrain.y)*.18);`);
+      vec2 causticUv=(vTerrain.xz-vec2(-20.0,-10.0))/40.0;
+      float caustic=texture2D(uCaustics,causticUv).r;
+      caustic*=step(0.0,causticUv.x)*step(0.0,causticUv.y)*step(causticUv.x,1.0)*step(causticUv.y,1.0);
+      float submerged=1.0-smoothstep(-.15,.015,vTerrain.y);
+      float light=max(0.0,caustic-.8)*submerged*exp(min(0.0,vTerrain.y)*.23)*uCausticLight;
+      diffuseColor.rgb += vec3(.15,.20,.16)*min(light,2.5);`);
   };
   return material;
 }

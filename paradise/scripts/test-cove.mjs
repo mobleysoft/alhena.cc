@@ -1,7 +1,37 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spectrum, groundHeight } from '../public/island/ocean.js';
+import { spectrum, groundHeight, shortWaveHeight, SHORT_WAVES } from '../public/island/ocean.js';
 import { catchCount, chooseFish, readCatches, recordCatch } from '../public/island/catalog.js';
+import { createState, stepField, sampleField, createRippleField, RIPPLE } from '../public/island/ripple-field.js';
+
+test('finite-difference water is stable, propagates disturbances and dissipates energy',()=>{
+  const n=64;let a=createState(()=>-2,n),b=new Float32Array(a.length);
+  const cell=RIPPLE.span/(n-1),x=RIPPLE.minX+32*cell,z=32*cell;
+  stepField(a,b,[{x,z,strength:.22,radius:.22}],n);[a,b]=[b,a];
+  assert.ok(sampleField(a,x,z,n)<0,'impact depresses the surface');
+  let farPeak=0,earlyEnergy=0,lateEnergy=0;
+  for(let t=0;t<600;t++){
+    stepField(a,b,[],n);[a,b]=[b,a];
+    farPeak=Math.max(farPeak,Math.abs(sampleField(a,x+2,z,n)));
+    assert.ok(a.every(Number.isFinite));
+    const energy=a.reduce((sum,v,i)=>sum+(i%4<2?v*v:0),0);
+    if(t===60)earlyEnergy=energy;if(t===599)lateEnergy=energy;
+  }
+  assert.ok(farPeak>.001,'force propagates beyond the injection footprint');
+  assert.ok(lateEnergy<earlyEnergy*.1,'damping dissipates the disturbance');
+});
+test('shoreline mask remains dry; published field matches the sampled surface',()=>{
+  const field=createRippleField((x)=>x<0?1:-2,{preferGPU:false});
+  assert.equal(field.impulse(-1,13,.2),false);
+  assert.equal(field.impulse(NaN,13,.2),false);
+  assert.equal(field.impulse(1,13,.2),true);
+  for(let i=0;i<150;i++)field.step();
+  assert.equal(field.height(-1,13),0);
+  assert.equal(field.height(100,100),0);
+  assert.equal(field.height(1,13),sampleField(field.data,1,13));
+  assert.equal(field.snapshot().impulseCount,1);
+  field.dispose();
+});
 
 test('32 finite wave components retain PandoraChat dispersion and spectrum',()=>{
   for(const wind of [8,12,18]){
@@ -20,6 +50,12 @@ test('shore transitions continuously into a deep seabed',()=>{
   assert.ok(groundHeight(0,3.3)>1);
   assert.ok(groundHeight(45,3.3)<-10);
   for(let x=0;x<80;x+=.01){assert.ok(Math.abs(groundHeight(x+.01,3.3)-groundHeight(x,3.3))<.03);}
+});
+test('small wind waves are bounded, weather-driven and use gravity-capillary dispersion',()=>{
+  const limit=SHORT_WAVES.reduce((sum,w)=>sum+w.amplitude,0)*1.6;
+  for(const w of SHORT_WAVES){const k=Math.hypot(w.kx,w.kz);assert.ok(Math.abs(w.frequency**2-9.81*k-.000074*k**3)<1e-12);}
+  for(let t=0;t<100;t+=.13){assert.ok(Math.abs(shortWaveHeight(2,19,t,18))<=limit);assert.ok(Number.isFinite(shortWaveHeight(2,19,t,8)));}
+  assert.ok(Math.abs(shortWaveHeight(2,19,2,18))>Math.abs(shortWaveHeight(2,19,2,8)));
 });
 test('legacy catch counts are preserved exactly and imported once',()=>{
   const saved=new Map([['paradise_fish_log',JSON.stringify({'glass minnow':27,'tide perch':3})]]);

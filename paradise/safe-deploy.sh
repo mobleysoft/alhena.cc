@@ -36,5 +36,11 @@ sd_verify_response_body \
 sd_verify_response_body \
   "https://paradise.alhena.cc/island/vendor/three.module.min.js" \
   'WebGLRenderer'
+sd_verify_response_body \
+  "https://paradise.alhena.cc/island/ripple-field.js" \
+  'createComputePipelineAsync'
+sd_verify_response_body \
+  "https://paradise.alhena.cc/island/ocean.js" \
+  'causticEvidence'
 
 sd_banner_done "alhena-paradise-worker"

@@ -152,7 +152,7 @@ function umbrella(parent,x,z) {
   return g;
 }
 
-export function createIsland(scene,timeUniform) {
+export function createIsland(scene,timeUniform,optics) {
   const world=group(scene);world.name='Sculpted cove';
   const groundGeo=new THREE.PlaneGeometry(400,400,180,180);groundGeo.rotateX(-Math.PI/2);
   const p=groundGeo.attributes.position;for(let i=0;i<p.count;i++){
@@ -160,7 +160,7 @@ export function createIsland(scene,timeUniform) {
     const z=Math.sign(p.getZ(i))*(Math.abs(p.getZ(i))/200)**2*200;
     p.setXYZ(i,x,groundHeight(x,z),z);
   }groundGeo.computeVertexNormals();
-  const ground=mesh(world,groundGeo,makeSandMaterial(timeUniform));ground.castShadow=false;
+  const ground=mesh(world,groundGeo,makeSandMaterial(timeUniform,optics));ground.castShadow=false;
   const cottage=house(world,-5,3), bar=beachBar(world,4.5,3.1), dock=jetty(world);
   const dog=lab(world);dog.g.position.set(-.4,groundHeight(-.4,7),7);
   const palms=[palm(world,-8,2,6.8,.8),palm(world,-7,6,5.9,-.3),palm(world,8,3,6.7,.6)];

@@ -25,7 +25,7 @@ sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-19;sun.shadow.camera.r
 sun.shadow.normalBias=.035;sun.shadow.bias=-.00008;scene.add(sun);
 const timeUniform={value:0};
 const ocean=createOcean(renderer,scene);
-const island=createIsland(scene,timeUniform);
+const island=createIsland(scene,timeUniform,ocean.optics);
 const skyUniforms={uTop:{value:new THREE.Color('#91bfc4')},uHorizon:{value:new THREE.Color('#e5e9cb')},uSun:{value:new THREE.Vector3(-.6,.6,.2).normalize()},uTime:timeUniform,uCloud:{value:.35},uNight:{value:0}};
 const sky=new THREE.Mesh(new THREE.SphereGeometry(250,32,16),new THREE.ShaderMaterial({
   side:THREE.BackSide,depthWrite:false,uniforms:skyUniforms,
@@ -252,5 +252,5 @@ function animate(now){
   if(!$('begin').dataset.ready){$('begin').dataset.ready='true';$('begin').disabled=false;$('begin').textContent='Take a little time  \u2197';$('loading').textContent='Your island is ready';document.body.dataset.ready='true';}
 }
 // Read-only evidence for browser verification; gameplay is exercised through real controls.
-window.__paradise={snapshot:()=>({build:document.body.dataset.paradiseBuild,renderer:'Three.js WebGL2',waveComponents:32,phase,entered,catches:catchCount(catches),time:timeKey,weather:weatherKey,fps:Math.round(fps),canvases:document.querySelectorAll('canvas').length,frames:document.querySelectorAll('iframe').length,bobber:bobber.position.toArray(),surface:ocean.height(bobber.position.x,bobber.position.z),tension,reelProgress,motionEnabled})};
+window.__paradise={optics:()=>ocean.causticEvidence(),snapshot:()=>({build:document.body.dataset.paradiseBuild,renderer:'Three.js WebGL2',waveComponents:32,fluid:ocean.fluid.snapshot(),caustics:'surface-refracted-ray-grid',phase,entered,catches:catchCount(catches),time:timeKey,weather:weatherKey,fps:Math.round(fps),canvases:document.querySelectorAll('canvas').length,frames:document.querySelectorAll('iframe').length,bobber:bobber.position.toArray(),surface:ocean.height(bobber.position.x,bobber.position.z),tension,reelProgress,motionEnabled})};
 requestAnimationFrame(animate);
