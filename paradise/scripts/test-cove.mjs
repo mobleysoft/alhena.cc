@@ -4,6 +4,41 @@ import { spectrum, groundHeight, shortWaveHeight, SHORT_WAVES } from '../public/
 import { catchCount, chooseFish, readCatches, recordCatch } from '../public/island/catalog.js';
 import { createState, stepField, sampleField, createRippleField, RIPPLE } from '../public/island/ripple-field.js';
 import { createQuadruped, solveTwoBone, distance, LEG } from '../public/island/locomotion.js';
+import { createSpray, SPLASH } from '../public/island/splash.js';
+
+test('ballistic spray returns to water with bounded, non-recursive impulses',()=>{
+  const hits=[],spray=createSpray({height:()=>0,ground:()=>-2,random:()=>.5,impulse:(...args)=>hits.push(args)});
+  assert.equal(spray.burst(1,19,.22),true);let peakHeight=0;
+  const initial=spray.snapshot().emitted;
+  for(let i=0;i<120;i++){
+    spray.step(1/60);
+    for(const d of spray.drops.filter(d=>d.alive)){
+      assert.ok([d.x,d.y,d.z,d.vx,d.vy,d.vz].every(Number.isFinite));peakHeight=Math.max(peakHeight,d.y);
+    }
+  }
+  const final=spray.snapshot();assert.ok(peakHeight>.15);
+  assert.equal(final.active,0);assert.equal(final.crowns,0);assert.equal(final.returned,initial);
+  assert.equal(final.emitted,initial,'returning spray must not recursively emit particles');
+  assert.ok(hits.length>0);hits.forEach(([x,z,force])=>{assert.ok(Number.isFinite(x+z));assert.ok(force>0&&force<=.025);});
+});
+test('spray pool is bounded and rejects dry or invalid impacts',()=>{
+  const spray=createSpray({height:()=>0,ground:x=>x<0?1:-2,random:()=>.5});
+  for(const args of [[-1,0,.2],[NaN,0,.2],[0,Infinity,.2],[0,0,-1],[0,0,Infinity]])assert.equal(spray.burst(...args),false);
+  for(let i=0;i<500;i++)spray.burst(1,19,.3);
+  assert.equal(spray.snapshot().active,SPLASH.capacity);assert.equal(spray.snapshot().emitted,SPLASH.capacity);
+  assert.equal(spray.snapshot().crowns,SPLASH.crowns);
+  spray.step(NaN);spray.step(Infinity);spray.step(-1);
+  for(let i=0;i<180;i++)spray.step(1/60);
+  assert.equal(spray.snapshot().active,0);
+});
+test('spray follows a moving water surface and expires if the surface disappears',()=>{
+  let t=0;const spray=createSpray({height:()=>Math.sin(t)*.2,random:()=>.5});spray.burst(0,19,.28);
+  for(let i=0;i<120;i++){t+=1/60;spray.step(1/60);}
+  assert.equal(spray.snapshot().returned,spray.snapshot().emitted);
+  let height=0;const lost=createSpray({height:()=>height,random:()=>.5});lost.burst(0,19,.28);height=-100;
+  for(let i=0;i<120;i++)lost.step(1/60);
+  assert.equal(lost.snapshot().active,0);assert.equal(lost.snapshot().expired,lost.snapshot().emitted);
+});
 
 test('two-bone IK preserves segment lengths and clamps unreachable targets',()=>{
   for(const target of [[0,0,0],[0,-.6,.2],[0,2,0],[1,2,3]]){

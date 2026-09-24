@@ -1,0 +1,27 @@
+{
+  "at": "2026-09-24T23:28:32.630Z",
+  "url": "https://paradise.alhena.cc/",
+  "engine": "chromium",
+  "errors": [],
+  "screenshots": [
+    "walking.png",
+    "turning.png",
+    "sniffing.png"
+  ],
+  "motion": {
+    "frames": 1231,
+    "states": {
+      "walking": 837,
+      "rest": 103,
+      "sniffing": 291
+    },
+    "maxRenderedError": 2.845724904160528e-15,
+    "maxStanceSlip": 4.171839369083926e-15,
+    "maxGroundError": 1.609823385706477e-15,
+    "maxReachError": 0,
+    "minContacts": 3,
+    "steps": 61
+  },
+  "reducedMotion": true,
+  "ok": true
+}

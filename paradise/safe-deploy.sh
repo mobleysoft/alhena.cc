@@ -45,5 +45,8 @@ sd_verify_response_body \
 sd_verify_response_body \
   "https://paradise.alhena.cc/island/locomotion.js" \
   'solveTwoBone'
+sd_verify_response_body \
+  "https://paradise.alhena.cc/island/splash.js" \
+  'createSplashes'
 
 sd_banner_done "alhena-paradise-worker"

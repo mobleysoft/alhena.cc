@@ -1,5 +1,6 @@
 import * as THREE from './vendor/three.module.min.js';
-import { createOcean } from './ocean.js';
+import { createOcean, groundHeight } from './ocean.js';
+import { createSplashes } from './splash.js';
 import { createIsland, makeFish } from './models.js';
 import { readCatches, recordCatch, catchCount, chooseFish } from './catalog.js';
 
@@ -25,6 +26,7 @@ sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-19;sun.shadow.camera.r
 sun.shadow.normalBias=.035;sun.shadow.bias=-.00008;scene.add(sun);
 const timeUniform={value:0};
 const ocean=createOcean(renderer,scene);
+const splashes=createSplashes(scene,ocean,groundHeight,{reducedMotion});
 const island=createIsland(scene,timeUniform,ocean.optics);
 const skyUniforms={uTop:{value:new THREE.Color('#91bfc4')},uHorizon:{value:new THREE.Color('#e5e9cb')},uSun:{value:new THREE.Vector3(-.6,.6,.2).normalize()},uTime:timeUniform,uCloud:{value:.35},uNight:{value:0}};
 const sky=new THREE.Mesh(new THREE.SphereGeometry(250,32,16),new THREE.ShaderMaterial({
@@ -81,6 +83,7 @@ function environment(){
   ocean.uniforms.uSky.value.copy(skyUniforms.uHorizon.value);ocean.uniforms.uColor.value.set(e.water);ocean.uniforms.uWarmth.value.set(e.sun);ocean.uniforms.uLight.value=e.light*level;
   ocean.uniforms.uSpecular.value=(timeKey==='night'?.07:1)*(storm?.35:1);
   ocean.setWeather(weather[weatherKey].wind,weather[weatherKey].chop);island.lamp.intensity=timeKey==='night'?12:2;
+  splashes.setColor(ocean.uniforms.uColor.value);
   document.body.classList.toggle('night',timeKey==='night');document.body.dataset.time=timeKey;document.body.dataset.weather=weatherKey;
   for(const b of document.querySelectorAll('[data-time]'))b.classList.toggle('active',b.dataset.time===timeKey);
   for(const b of document.querySelectorAll('[data-weather]'))b.classList.toggle('active',b.dataset.weather===weatherKey);
@@ -118,9 +121,22 @@ function sound(frequency=160,duration=.2){
   const osc=audioContext.createOscillator(),gain=audioContext.createGain(),t=audioContext.currentTime;
   osc.type='sine';osc.frequency.setValueAtTime(frequency,t);osc.frequency.exponentialRampToValueAtTime(40,t+duration);
   gain.gain.setValueAtTime(.0001,t);gain.gain.exponentialRampToValueAtTime(.12,t+.01);gain.gain.exponentialRampToValueAtTime(.0001,t+duration);
-  osc.connect(gain).connect(audioContext.destination);osc.start();osc.stop(t+duration+.03);
+  osc.connect(gain).connect(audioContext.destination);osc.onended=()=>{osc.disconnect();gain.disconnect();};osc.start();osc.stop(t+duration+.03);
 }
 function haptic(pattern){if(navigator.vibrate)navigator.vibrate(pattern);}
+function impact(x,z,strength){
+  ocean.impulse(x,z,strength);splashes.burst(x,z,strength);
+  if(!audioEnabled)return;
+  sound(180-strength*160,.22+strength*.7);
+  const t=audioContext.currentTime,duration=.18+strength*.5;
+  const buffer=audioContext.createBuffer(1,Math.ceil(audioContext.sampleRate*duration),audioContext.sampleRate);
+  const data=buffer.getChannelData(0);for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*(1-i/data.length)**2;
+  const source=audioContext.createBufferSource(),filter=audioContext.createBiquadFilter(),gain=audioContext.createGain();
+  source.buffer=buffer;filter.type='lowpass';filter.frequency.setValueAtTime(1600,t);filter.frequency.exponentialRampToValueAtTime(180,t+duration);
+  gain.gain.setValueAtTime(.025+strength*.15,t);gain.gain.exponentialRampToValueAtTime(.0001,t+duration);
+  source.connect(filter).connect(gain).connect(audioContext.destination);
+  source.onended=()=>{source.disconnect();filter.disconnect();gain.disconnect();};source.start();
+}
 function setPhase(value,text){
   phase=value;phaseAt=elapsed;$('phase').textContent={idle:'A GOOD DAY FOR NOTHING',cast:'A LITTLE FURTHER',hunt:'FOLLOW THE SHADOWS',strike:'NOW. SET THE HOOK.',fight:'EASY DOES IT',landed:'A LITTLE DISCOVERY'}[value];
   $('status').textContent=text;$('cast').textContent={idle:'Cast a line',cast:'Casting...',hunt:'Twitch the lure',strike:'Hook!',fight:'Hold to reel',landed:'Cast again'}[value];
@@ -146,26 +162,26 @@ function land(){
   const name=chooseFish(weatherKey,timeKey);recordCatch(catches,name,storage);
   journal();$('catch-name').textContent=name;$('catch-toast').hidden=false;setTimeout(()=>$('catch-toast').hidden=true,4500);
   setPhase('landed','A good catch. Back to the sea it goes.');haptic([30,45,70]);sound(600,.6);holding=false;
-  ocean.impulse(bobber.position.x,bobber.position.z,.2);bobber.visible=false;line.visible=false;
+  impact(bobber.position.x,bobber.position.z,.2);bobber.visible=false;line.visible=false;
 }
 function updateFishing(dt){
   if(phase==='cast'){
     const t=Math.min(1,(elapsed-phaseAt)/1.2);bobber.position.lerpVectors(rodTip,new THREE.Vector3(.5,0,19),t);bobber.position.y+=Math.sin(t*Math.PI)*2.8;
-    if(t===1){ocean.impulse(.5,19,.22);sound(210,.34);setPhase('hunt','Watch the float. A twitch will bring the shadows closer.');biteAt=elapsed+7+Math.random()*4;nextNibble=elapsed+2.5;}
+    if(t===1){impact(.5,19,.22);setPhase('hunt','Watch the float. A twitch will bring the shadows closer.');biteAt=elapsed+7+Math.random()*4;nextNibble=elapsed+2.5;}
   }else if(['hunt','strike','fight'].includes(phase)){
     const h=ocean.height(bobber.position.x,bobber.position.z);
     const dip=phase==='strike'?-.18:0;
     bobberVy+=(h+dip-bobber.position.y)*36*dt;bobberVy*=Math.exp(-7*dt);bobber.position.y+=bobberVy*dt;
     bobber.rotation.z=Math.atan((ocean.height(bobber.position.x+.04,bobber.position.z)-h)/.04)*.8;
     if(phase==='hunt' && elapsed>=nextNibble){bobberVy-=.6;ocean.impulse(bobber.position.x,bobber.position.z,.035);nextNibble=elapsed+2.6;haptic(8);}
-    if(phase==='hunt' && elapsed>=biteAt){setPhase('strike','The float is under. Tap now!');ocean.impulse(bobber.position.x,bobber.position.z,.28);sound(130,.45);haptic([40,20,40]);}
+    if(phase==='hunt' && elapsed>=biteAt){setPhase('strike','The float is under. Tap now!');impact(bobber.position.x,bobber.position.z,.28);haptic([40,20,40]);}
     if(phase==='strike' && elapsed-phaseAt>2.2){setPhase('hunt','A clever one. Twitch the lure and try again.');biteAt=elapsed+5;}
     if(phase==='fight'){
       const jumping=Math.sin((elapsed-phaseAt)*1.55)>.96;
       tension=THREE.MathUtils.clamp(tension+dt*(holding?.2+(jumping?.7:0):-.42),0,1);
       if(holding && tension<.86)reelProgress+=dt*.115;
       bobber.position.x=.5+Math.sin(elapsed*1.6)*.5;bobber.position.z=19-reelProgress*3;
-      if(jumping && elapsed-lastImpulse>.9){lastImpulse=elapsed;ocean.impulse(bobber.position.x,bobber.position.z,.24);sound(150,.2);haptic(22);}
+      if(jumping && elapsed-lastImpulse>.9){lastImpulse=elapsed;impact(bobber.position.x,bobber.position.z,.24);haptic(22);}
       $('status').textContent=jumping?'It is jumping. Release the reel!':tension>.78?'Ease off. Let the line cool.':'Keep a gentle pull. The line tells you everything.';
       if(tension>=1){setPhase('hunt','The line slipped. Take a breath and try again.');biteAt=elapsed+6;holding=false;tension=0;reelProgress=0;}
       else if(reelProgress>=1)land();
@@ -225,7 +241,8 @@ renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDef
 function animate(now){
   requestAnimationFrame(animate);if(document.hidden)return;
   const dt=Math.min((now-lastFrame)/1000,.25);lastFrame=now;accumulator+=dt;
-  while(accumulator>=1/60){elapsed+=1/60;ocean.update(elapsed);updateFishing(1/60);accumulator-=1/60;}
+  while(accumulator>=1/60){elapsed+=1/60;ocean.update(elapsed);updateFishing(1/60);splashes.step(1/60);accumulator-=1/60;}
+  splashes.render();
   timeUniform.value=elapsed;island.update(reducedMotion?0:elapsed,dt,weatherKey==='storm'?2:1,{phase,target:bobber.visible?bobber.position.toArray():[.5,0,19],reducedMotion});
   for(let i=0;i<fish.length;i++){const f=fish[i];const attracted=phase==='hunt'||phase==='strike'||phase==='fight';
     const cx=attracted&&i<4?bobber.position.x:Math.sin(i*1.5)*9,cz=attracted&&i<4?bobber.position.z:15+i%4*2;
@@ -252,5 +269,5 @@ function animate(now){
   if(!$('begin').dataset.ready){$('begin').dataset.ready='true';$('begin').disabled=false;$('begin').textContent='Take a little time  \u2197';$('loading').textContent='Your island is ready';document.body.dataset.ready='true';}
 }
 // Read-only evidence for browser verification; gameplay is exercised through real controls.
-window.__paradise={actors:()=>island.actors(),optics:()=>ocean.causticEvidence(),snapshot:()=>({build:document.body.dataset.paradiseBuild,renderer:'Three.js WebGL2',waveComponents:32,fluid:ocean.fluid.snapshot(),caustics:'surface-refracted-ray-grid',phase,entered,catches:catchCount(catches),time:timeKey,weather:weatherKey,fps:Math.round(fps),canvases:document.querySelectorAll('canvas').length,frames:document.querySelectorAll('iframe').length,bobber:bobber.position.toArray(),surface:ocean.height(bobber.position.x,bobber.position.z),tension,reelProgress,motionEnabled})};
+window.__paradise={spray:()=>splashes.snapshot(),actors:()=>island.actors(),optics:()=>ocean.causticEvidence(),snapshot:()=>({build:document.body.dataset.paradiseBuild,renderer:'Three.js WebGL2',waveComponents:32,fluid:ocean.fluid.snapshot(),caustics:'surface-refracted-ray-grid',phase,entered,catches:catchCount(catches),time:timeKey,weather:weatherKey,fps:Math.round(fps),canvases:document.querySelectorAll('canvas').length,frames:document.querySelectorAll('iframe').length,bobber:bobber.position.toArray(),surface:ocean.height(bobber.position.x,bobber.position.z),tension,reelProgress,motionEnabled})};
 requestAnimationFrame(animate);
