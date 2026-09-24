@@ -1,6 +1,7 @@
 import * as THREE from './vendor/three.module.min.js';
 import { createOcean, groundHeight } from './ocean.js';
 import { createSplashes } from './splash.js';
+import { createRain } from './rain.js';
 import { createIsland, makeFish } from './models.js';
 import { readCatches, recordCatch, catchCount, chooseFish } from './catalog.js';
 
@@ -27,6 +28,7 @@ sun.shadow.normalBias=.035;sun.shadow.bias=-.00008;scene.add(sun);
 const timeUniform={value:0};
 const ocean=createOcean(renderer,scene);
 const splashes=createSplashes(scene,ocean,groundHeight,{reducedMotion});
+const rain=createRain(scene,ocean,groundHeight,{reducedMotion});
 const island=createIsland(scene,timeUniform,ocean.optics);
 const skyUniforms={uTop:{value:new THREE.Color('#91bfc4')},uHorizon:{value:new THREE.Color('#e5e9cb')},uSun:{value:new THREE.Vector3(-.6,.6,.2).normalize()},uTime:timeUniform,uCloud:{value:.35},uNight:{value:0}};
 const sky=new THREE.Mesh(new THREE.SphereGeometry(250,32,16),new THREE.ShaderMaterial({
@@ -83,7 +85,7 @@ function environment(){
   ocean.uniforms.uSky.value.copy(skyUniforms.uHorizon.value);ocean.uniforms.uColor.value.set(e.water);ocean.uniforms.uWarmth.value.set(e.sun);ocean.uniforms.uLight.value=e.light*level;
   ocean.uniforms.uSpecular.value=(timeKey==='night'?.07:1)*(storm?.35:1);
   ocean.setWeather(weather[weatherKey].wind,weather[weatherKey].chop);island.lamp.intensity=timeKey==='night'?12:2;
-  splashes.setColor(ocean.uniforms.uColor.value);
+  splashes.setColor(ocean.uniforms.uColor.value);rain.setColor(ocean.uniforms.uColor.value);
   document.body.classList.toggle('night',timeKey==='night');document.body.dataset.time=timeKey;document.body.dataset.weather=weatherKey;
   for(const b of document.querySelectorAll('[data-time]'))b.classList.toggle('active',b.dataset.time===timeKey);
   for(const b of document.querySelectorAll('[data-weather]'))b.classList.toggle('active',b.dataset.weather===weatherKey);
@@ -229,10 +231,6 @@ $('motion').onclick=async()=>{
   }catch(error){$('motion-status').textContent=error.message;}
 };
 
-const rainGeo=new THREE.BufferGeometry(),rainPositions=new Float32Array(600*3);
-for(let i=0;i<600;i++){rainPositions[i*3]=(Math.random()-.5)*45;rainPositions[i*3+1]=Math.random()*22;rainPositions[i*3+2]=(Math.random()-.5)*45;}
-rainGeo.setAttribute('position',new THREE.BufferAttribute(rainPositions,3));
-const rain=new THREE.Points(rainGeo,new THREE.PointsMaterial({color:'#d8edeb',size:.055,transparent:true,opacity:.65}));scene.add(rain);
 let frameCount=0,lastFrame=performance.now(),fpsAt=lastFrame,fps=0,shadowAt=0,accumulator=0;
 function resize(){camera.aspect=innerWidth/innerHeight;camera.fov=innerHeight>innerWidth?56:40;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);ocean.resize();const size=renderer.getDrawingBufferSize(new THREE.Vector2());frameTarget.setSize(size.x,size.y);postUniforms.resolution.value.copy(size);}
 addEventListener('resize',resize);resize();
@@ -251,7 +249,7 @@ function animate(now){
     f.g.rotation.y=Math.atan2(Math.cos(elapsed*.3+i*2)*2.1,-Math.sin(elapsed*.3+i*2)*.8);f.tail.rotation.y=Math.sin(elapsed*8+i)*.23;
     if(phase==='fight'&&i===0&&Math.sin((elapsed-phaseAt)*1.55)>.9)f.g.position.set(bobber.position.x,.35+Math.sin(elapsed*8)*.2,bobber.position.z);
   }
-  rain.visible=weatherKey==='storm';if(rain.visible){for(let i=0;i<600;i++){rainPositions[i*3+1]-=dt*11;if(rainPositions[i*3+1]<0)rainPositions[i*3+1]=22;}rainGeo.attributes.position.needsUpdate=true;}
+  rain.update(dt,weatherKey==='storm');
   const portrait=innerHeight>innerWidth;let targetFocus;
   if(!entered||wide){
     const radius=portrait?44:38,angle=.63+orbit;
@@ -269,5 +267,5 @@ function animate(now){
   if(!$('begin').dataset.ready){$('begin').dataset.ready='true';$('begin').disabled=false;$('begin').textContent='Take a little time  \u2197';$('loading').textContent='Your island is ready';document.body.dataset.ready='true';}
 }
 // Read-only evidence for browser verification; gameplay is exercised through real controls.
-window.__paradise={spray:()=>splashes.snapshot(),actors:()=>island.actors(),optics:()=>ocean.causticEvidence(),snapshot:()=>({build:document.body.dataset.paradiseBuild,renderer:'Three.js WebGL2',waveComponents:32,fluid:ocean.fluid.snapshot(),caustics:'surface-refracted-ray-grid',phase,entered,catches:catchCount(catches),time:timeKey,weather:weatherKey,fps:Math.round(fps),canvases:document.querySelectorAll('canvas').length,frames:document.querySelectorAll('iframe').length,bobber:bobber.position.toArray(),surface:ocean.height(bobber.position.x,bobber.position.z),tension,reelProgress,motionEnabled})};
+window.__paradise={rain:()=>rain.snapshot(),spray:()=>splashes.snapshot(),actors:()=>island.actors(),optics:()=>ocean.causticEvidence(),snapshot:()=>({build:document.body.dataset.paradiseBuild,renderer:'Three.js WebGL2',waveComponents:32,fluid:ocean.fluid.snapshot(),caustics:'surface-refracted-ray-grid',phase,entered,catches:catchCount(catches),time:timeKey,weather:weatherKey,fps:Math.round(fps),canvases:document.querySelectorAll('canvas').length,frames:document.querySelectorAll('iframe').length,bobber:bobber.position.toArray(),surface:ocean.height(bobber.position.x,bobber.position.z),tension,reelProgress,motionEnabled})};
 requestAnimationFrame(animate);

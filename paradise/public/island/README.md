@@ -26,6 +26,10 @@ PlayCanvas iframe, or independent background renderer.
   field feeds both the visible surface and spring-bobber buoyancy. One pending
   GPU readback and at most four queued steps bound resource use. The CPU path
   can be checked explicitly with `?fluid=cpu`.
+- `rain.js`: bounded wind-slanted streaks and instanced contact rings. Contacts
+  are sampled against the current ocean and terrain; rings follow the water
+  tangent, fade with the storm, and are disabled with reduced motion. This is
+  decorative surface detail, not fluid forcing or a volumetric rain solver.
 - `main.js`: procedural sky, day/weather lighting, depth-buffer lens blur,
   fixed-step spring buoyancy and Verlet line, three-phase fishing, touch,
   optional device-motion and vibration support. Motion/haptics depend on the
@@ -60,3 +64,8 @@ fallback. A compiling shader or a backend label alone does not pass this test.
 positions against IK and terrain over 22 seconds, including stance slip,
 reach, three-foot contact, walking/sniffing states and reduced motion. It
 supports `PARADISE_BROWSER=webkit` as well as Chromium.
+
+Rain verification: `node --test paradise/scripts/test-rain.mjs` and
+`node paradise/scripts/verify-rain.mjs` (same Playwright environment variables).
+The latter checks desktop/mobile, moonlight, storm-to-calm transitions and
+reduced motion.
