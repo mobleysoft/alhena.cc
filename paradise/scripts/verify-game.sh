@@ -2,6 +2,13 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# The public root is now Unified Cove. Old marker checks below are archival
+# diagnostics only; they cannot establish current gameplay or visual quality.
+if [[ "${PARADISE_VERIFY_LEGACY:-0}" != "1" ]]; then
+  node --test "$ROOT/scripts/test-cove.mjs"
+  export PARADISE_URL="${1:-https://paradise.alhena.cc/}"
+  exec node "$ROOT/scripts/verify-cove.mjs"
+fi
 GAME_HTML="$ROOT/public/game/index.html"
 GAME_V2_HTML="$ROOT/public/game-v2/index.html"
 TMP_MODULE="/tmp/paradise-game-module.mjs"

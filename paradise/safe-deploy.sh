@@ -21,13 +21,20 @@ sd_require_config_lines "$CONFIG" \
   'binding = "ASSETS"||Cloudflare Assets binding serving Paradise game files'
 
 echo "Pre-deploy checks passed: on main, clean tree, required Paradise asset binding present."
+node --test scripts/test-cove.mjs
 
 sd_deploy "$CONFIG" "$@"
 
 echo ""
 echo "== post-deploy verification =="
 sd_verify_response_body \
-  "https://paradise.alhena.cc/game-v3/three/?time=dawn&weather=breeze" \
-  'Paradise Fishing.'
+  "https://paradise.alhena.cc/" \
+  'data-paradise-build="unified-cove-20260924"'
+sd_verify_response_body \
+  "https://paradise.alhena.cc/island/main.js" \
+  'createOcean'
+sd_verify_response_body \
+  "https://paradise.alhena.cc/island/vendor/three.module.min.js" \
+  'WebGLRenderer'
 
 sd_banner_done "alhena-paradise-worker"

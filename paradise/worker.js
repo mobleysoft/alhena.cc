@@ -1,11 +1,11 @@
 // alhena-paradise-worker
 //
 // Tiny, single-purpose Worker: serves the general-audience cozy fishing
-// game at paradise.alhena.cc (public/index.html — a sovereign,
-// zero-third-party WebGL2 ocean renderer, adapted from reference/
-// legacy-roots/pandorachat/oasis.html, with a real cast/wait/catch loop
-// and a persistent catch catalog). No API routes, no state, no dependency
-// on alhena.cc's main worker.js — deliberately kept separate and minimal.
+// game at paradise.alhena.cc. The root is a unified Three.js/WebGL2 cove
+// using a vendored MIT-licensed renderer and the legacy PandoraChat wave
+// spectrum. Catch notes persist in the browser. Legacy game assets remain
+// available at their original paths. No backend gameplay state or dependency
+// on alhena.cc's main worker.js.
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);

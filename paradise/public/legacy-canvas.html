@@ -1,0 +1,3186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#06101d">
+<meta property="og:title" content="Paradise">
+<meta property="og:description" content="A small ocean world for fishing at the edge of Alhena.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://paradise.alhena.cc">
+<title>Paradise - Archived Canvas Edition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;1,500&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #f7edce;
+  --glass: rgba(5, 14, 25, 0.5);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #050a12; color: var(--paper); font-family: "DM Sans", sans-serif; }
+button { font: inherit; color: inherit; }
+
+#ocean-pass-frame, #water, #world {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+}
+
+#ocean-pass-frame {
+  z-index: 0;
+  border: 0;
+  pointer-events: none;
+  background: #050a12;
+}
+
+#water {
+  z-index: 1;
+  background: #050a12;
+  display: none;
+}
+
+#world {
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.veil {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 35%, transparent 0 45%, rgba(0,0,0,0.13) 78%, rgba(0,0,0,0.38) 100%),
+    linear-gradient(180deg, rgba(255,255,255,0.04), transparent 18%, rgba(0,0,0,0.12) 100%);
+  mix-blend-mode: multiply;
+}
+
+.intro {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  z-index: 10;
+  background: radial-gradient(circle at 50% 55%, rgba(71,158,188,0.13), rgba(4,8,15,0.68) 58%, rgba(4,8,15,0.9));
+  transition: opacity 650ms ease, visibility 650ms ease;
+}
+.intro.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+.intro-card {
+  max-width: 600px;
+  text-align: center;
+  padding: 34px;
+  border: 1px solid rgba(255,240,190,0.22);
+  border-radius: 28px;
+  background: var(--glass);
+  box-shadow: 0 30px 120px rgba(0,0,0,0.42), inset 0 1px rgba(255,255,255,0.11);
+  backdrop-filter: blur(18px) saturate(1.25);
+}
+.intro-kicker {
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(255,229,162,0.68);
+  margin-bottom: 18px;
+}
+.intro-title {
+  font-family: "Cormorant Garamond", serif;
+  font-size: clamp(54px, 13vw, 108px);
+  line-height: 0.86;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  text-shadow: 0 0 40px rgba(87,173,204,0.2);
+}
+.intro-copy {
+  max-width: 460px;
+  margin: 22px auto 0;
+  color: rgba(247,237,206,0.72);
+  font-size: 15px;
+  line-height: 1.65;
+}
+.start {
+  margin-top: 28px;
+  border: 1px solid rgba(255,240,190,0.35);
+  border-radius: 999px;
+  padding: 13px 22px;
+  background: rgba(255,240,190,0.12);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 11px;
+}
+.rebuild-link {
+  display: inline-block;
+  margin-top: 12px;
+  color: rgba(255,229,162,.72);
+  font-size: 10px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+.rebuild-link:hover { color: #fff0b0; }
+
+.hint {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(5,14,25,0.48);
+  border: 1px solid rgba(255,240,190,0.18);
+  color: rgba(247,237,206,0.58);
+  backdrop-filter: blur(14px);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 420ms ease;
+}
+body.started .hint { opacity: 1; }
+body.cinematic .hint {
+  opacity: 0.34;
+}
+body.started.cinematic .hud {
+  opacity: 0;
+  transform: translateY(-10px);
+  pointer-events: none;
+}
+body.started.cinematic .touch-controls {
+  opacity: 0.24;
+}
+
+.hud {
+  position: fixed;
+  inset: 18px 18px auto 18px;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: minmax(238px, 390px) minmax(260px, 480px) minmax(218px, 310px);
+  gap: 14px;
+  align-items: end;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 520ms ease, transform 520ms ease;
+}
+body.started .hud { opacity: 1; transform: none; }
+.panel, .tray, .log {
+  pointer-events: auto;
+  background: var(--glass);
+  border: 1px solid rgba(255,240,190,0.2);
+  border-radius: 16px;
+  box-shadow: 0 18px 62px rgba(0,0,0,0.28), inset 0 1px rgba(255,255,255,0.08);
+  backdrop-filter: blur(16px) saturate(1.18);
+}
+.panel { padding: 14px; }
+.brand {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+.brand h1 {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.count, .log-title, .readout {
+  color: rgba(255,229,162,0.78);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.status {
+  min-height: 42px;
+  color: rgba(247,237,206,0.78);
+  line-height: 1.5;
+  font-size: 14px;
+}
+.status strong { color: #fff2b6; }
+.meter {
+  margin: 10px 0 12px;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgba(255,255,255,0.08);
+}
+.meter span {
+  display: block;
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4ad0f1, #f1c45d, #f16f5d);
+  transition: width 170ms ease;
+}
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 78px 118px;
+  gap: 8px;
+}
+.actions button, .pill-row button {
+  border: 1px solid rgba(255,240,190,0.24);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.06);
+  padding: 10px 9px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 10px;
+}
+.actions button:hover, .pill-row button:hover, .actions button.active, .pill-row button.active {
+  background: rgba(255,229,162,0.16);
+  border-color: rgba(255,229,162,0.48);
+}
+#cast {
+  grid-row: span 2;
+}
+.tray {
+  justify-self: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 9px;
+  min-width: min(500px, 100%);
+}
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.pill-row button {
+  padding: 9px 12px;
+  border-radius: 999px;
+  color: rgba(247,237,206,0.66);
+}
+.pill-row button.active { color: #fff2b6; }
+.log {
+  padding: 13px;
+  max-height: 154px;
+  overflow: hidden;
+}
+.log-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.fish-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+.fish-chip {
+  min-width: 0;
+  padding: 8px 9px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.06);
+  color: rgba(247,237,206,0.37);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fish-chip.caught {
+  color: rgba(247,237,206,0.88);
+  border-color: rgba(255,229,162,0.28);
+  background: rgba(255,229,162,0.1);
+}
+.catch {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.92);
+  z-index: 6;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 240ms ease, transform 240ms ease;
+  padding: 18px 22px;
+  border-radius: 22px;
+  background: rgba(5,14,25,0.66);
+  border: 1px solid rgba(255,229,162,0.38);
+  box-shadow: 0 18px 80px rgba(0,0,0,0.48);
+  text-align: center;
+}
+.catch.visible { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.catch-fish {
+  width: 116px;
+  height: 42px;
+  margin: 0 auto 10px;
+  border-radius: 62% 38% 42% 58% / 54% 44% 56% 46%;
+  background: var(--catch-color, linear-gradient(90deg, #d7f8ff, #5ab9d8));
+  position: relative;
+  box-shadow: 0 0 30px var(--catch-glow, rgba(125,207,239,0.32));
+}
+.catch-fish::before {
+  content: "";
+  position: absolute;
+  left: -20px;
+  top: 8px;
+  width: 28px;
+  height: 26px;
+  background: var(--catch-tail, rgba(215,248,255,0.74));
+  clip-path: polygon(100% 50%, 0 0, 18% 50%, 0 100%);
+}
+.catch-name {
+  color: #fff1b6;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 11px;
+}
+.touch-controls {
+  position: fixed;
+  inset: auto max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) auto;
+  z-index: 7;
+  display: none;
+  grid-template-columns: repeat(2, minmax(74px, 1fr));
+  gap: 8px;
+  width: min(230px, 48vw);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 320ms ease, transform 320ms ease;
+}
+body.started .touch-controls {
+  opacity: 1;
+  transform: none;
+}
+.touch-controls button {
+  min-height: 48px;
+  border: 1px solid rgba(255,240,190,0.28);
+  border-radius: 17px;
+  background: rgba(5,14,25,0.54);
+  color: var(--paper);
+  box-shadow: 0 12px 38px rgba(0,0,0,0.28), inset 0 1px rgba(255,255,255,0.08);
+  backdrop-filter: blur(14px) saturate(1.18);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 10px;
+  font-weight: 700;
+  touch-action: manipulation;
+}
+.touch-controls .primary {
+  grid-row: span 2;
+  min-height: 104px;
+  background: linear-gradient(135deg, rgba(255,232,163,0.26), rgba(64,179,206,0.18));
+  border-color: rgba(255,229,162,0.48);
+}
+.orientation-note {
+  position: fixed;
+  left: 50%;
+  top: max(10px, env(safe-area-inset-top));
+  z-index: 8;
+  transform: translateX(-50%);
+  display: none;
+  padding: 8px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,240,190,0.18);
+  background: rgba(5,14,25,0.48);
+  color: rgba(247,237,206,0.68);
+  backdrop-filter: blur(14px);
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+@media (max-width: 900px) {
+  .hud {
+    grid-template-columns: 1fr;
+    inset: auto 10px 10px 10px;
+    gap: 8px;
+  }
+  .panel { padding: 14px; }
+  .tray { order: -1; min-width: 0; width: 100%; padding: 8px; }
+  .log { display: none; }
+  .brand h1 { font-size: 24px; }
+  .status { min-height: 36px; font-size: 13px; }
+  .hint { top: 10px; bottom: auto; width: calc(100vw - 20px); text-align: center; }
+  .touch-controls { display: grid; }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .hud {
+    display: flex;
+    grid-template-columns: none;
+    inset: auto 8px 7px 8px;
+    justify-content: space-between;
+    align-items: end;
+    gap: 8px;
+  }
+  .log { display: none; }
+  .panel {
+    width: auto;
+    max-width: 53vw;
+    padding: 7px;
+    border-radius: 999px;
+  }
+  .brand { display: none; }
+  .count { display: none; }
+  .status, .meter { display: none; }
+  .actions {
+    display: flex;
+    grid-template-columns: none;
+    gap: 6px;
+    margin-top: 0;
+  }
+  .actions button, .pill-row button {
+    padding: 8px 10px;
+    font-size: 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  #motion { min-width: 104px; }
+  .tray {
+    width: auto;
+    max-width: 45vw;
+    flex-direction: row;
+    padding: 7px;
+    border-radius: 999px;
+  }
+  .pill-row { flex-wrap: nowrap; gap: 5px; }
+  .hint { display: none; }
+  .intro-card { padding: 24px; }
+  .intro-title { font-size: clamp(44px, 10vw, 76px); }
+  .touch-controls {
+    display: grid;
+    left: auto;
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(7px, env(safe-area-inset-bottom));
+    width: min(218px, 39vw);
+  }
+  .touch-controls button {
+    min-height: 39px;
+    border-radius: 14px;
+    padding: 7px;
+    font-size: 8px;
+  }
+  .touch-controls .primary { min-height: 86px; }
+  body.started .orientation-note { display: block; }
+}
+</style>
+</head>
+<body data-water-system="pandorachat-webgl2-jonswap-ocean-v8-root-composite-ocean-pass-v6">
+<iframe id="ocean-pass-frame" title="PandoraChat spectral ocean pass" src="/game-v3/ocean-pass/?time=dawn&amp;weather=breeze"></iframe>
+<canvas id="water" aria-hidden="true"></canvas>
+<canvas id="world" aria-label="Paradise ocean fishing game"></canvas>
+<div class="veil"></div>
+<div class="hint" id="hint">Tap/click to cast · space reels · C or double-tap hides controls</div>
+<div class="orientation-note">Landscape touch mode · cast left, tune right</div>
+
+<section class="intro" id="intro">
+  <div class="intro-card">
+    <div class="intro-kicker">Alhena presents</div>
+    <div class="intro-title">Paradise</div>
+    <p class="intro-copy">A small, cozy ocean at the edge of Alhena. Cast a line, wait for a bite, and see what you pull up — no accounts, no ads, nothing to lose.</p>
+    <button class="start" id="start">Start Fishing</button>
+  </div>
+</section>
+
+<main class="hud" aria-label="Paradise controls">
+  <section class="panel">
+    <div class="brand">
+      <h1>Paradise Fishing</h1>
+      <div class="count" id="count">0 / 8 logged</div>
+    </div>
+    <div class="status" id="status">Cast beyond the foam line. When the bobber drops, reel before the tension breaks.</div>
+    <div class="meter"><span id="meter"></span></div>
+    <div class="actions">
+      <button id="cast">cast line</button>
+      <button id="clear">clear</button>
+      <button id="motion">enable motion</button>
+      <button id="face">Alhena</button>
+      <button id="view">view</button>
+    </div>
+  </section>
+
+  <section class="tray" aria-label="time and weather controls">
+    <div class="pill-row" id="time-controls">
+      <button data-time="dawn">dawn</button>
+      <button data-time="noon">noon</button>
+      <button data-time="sunset">sunset</button>
+      <button data-time="night">night</button>
+    </div>
+    <div class="pill-row" id="weather-controls">
+      <button data-weather="calm">calm</button>
+      <button data-weather="breeze">breeze</button>
+      <button data-weather="overcast">overcast</button>
+      <button data-weather="storm">storm</button>
+    </div>
+  </section>
+
+  <section class="log">
+    <div class="log-title">
+      <span>catch log</span>
+      <span id="weather-readout">dawn / calm</span>
+    </div>
+    <div class="fish-grid" id="catalog"></div>
+  </section>
+</main>
+
+<nav class="touch-controls" aria-label="Touch fishing controls">
+  <button class="primary" id="touch-primary">cast</button>
+  <button id="touch-view">view</button>
+  <button id="touch-motion">motion</button>
+</nav>
+
+<div class="catch" id="catch-card">
+  <div class="catch-fish" id="catch-fish"></div>
+  <div class="catch-name" id="catch-name">glass minnow</div>
+</div>
+
+<script>
+const waterCanvas = document.getElementById('water');
+const oceanPassFrame = document.getElementById('ocean-pass-frame');
+const canvas = document.getElementById('world');
+const ctx = canvas.getContext('2d', { alpha: true });
+const intro = document.getElementById('intro');
+const startBtn = document.getElementById('start');
+const castBtn = document.getElementById('cast');
+const clearBtn = document.getElementById('clear');
+const motionBtn = document.getElementById('motion');
+const faceBtn = document.getElementById('face');
+const viewBtn = document.getElementById('view');
+const touchPrimaryBtn = document.getElementById('touch-primary');
+const touchViewBtn = document.getElementById('touch-view');
+const touchMotionBtn = document.getElementById('touch-motion');
+const statusEl = document.getElementById('status');
+const countEl = document.getElementById('count');
+const meterEl = document.getElementById('meter');
+const catalogEl = document.getElementById('catalog');
+const weatherReadout = document.getElementById('weather-readout');
+const catchCard = document.getElementById('catch-card');
+const catchFish = document.getElementById('catch-fish');
+const catchName = document.getElementById('catch-name');
+const hintEl = document.getElementById('hint');
+const labSprite = new Image();
+labSprite.src = './assets/alhena-black-lab.png';
+const alhenaSprite = new Image();
+alhenaSprite.src = './assets/alhena-bartender-billboard.png';
+const barSprite = new Image();
+barSprite.src = './assets/beach-bar-billboard.png';
+const houseSprite = new Image();
+houseSprite.src = './assets/beach-house-billboard.png';
+const palmSprite = new Image();
+palmSprite.src = './assets/palm-cluster-billboard.png';
+let waterProgram = null;
+let oceanPassSrc = '';
+
+const TIMES = {
+  dawn: {
+    skyTop: '#2f5f8a', skyMid: '#8fc8df', horizon: '#ffd28a', sun: '#fff0ba',
+    seaNear: '#227f9d', seaFar: '#8bcbd4', sand: '#d4b779', light: 0.9, sunX: 0.22, sunY: 0.34, stars: 0
+  },
+  noon: {
+    skyTop: '#3386db', skyMid: '#77c7ee', horizon: '#d7eff7', sun: '#fff5c9',
+    seaNear: '#1f83a3', seaFar: '#62c3d6', sand: '#d4b879', light: 1, sunX: 0.58, sunY: 0.18, stars: 0
+  },
+  sunset: {
+    skyTop: '#241b3d', skyMid: '#df765e', horizon: '#ffd182', sun: '#ffb15f',
+    seaNear: '#153d58', seaFar: '#a75f62', sand: '#aa8358', light: 0.72, sunX: 0.75, sunY: 0.38, stars: 0.08
+  },
+  night: {
+    skyTop: '#040918', skyMid: '#102342', horizon: '#314968', sun: '#d9ecff',
+    seaNear: '#071524', seaFar: '#1c435d', sand: '#5d563f', light: 0.38, sunX: 0.68, sunY: 0.24, stars: 0.92
+  },
+};
+
+const WEATHER = {
+  calm: { wave: 0.55, chop: 0.25, foam: 0.26, cloud: 0.04, haze: 0.05, rain: 0, label: 'calm' },
+  breeze: { wave: 0.9, chop: 0.5, foam: 0.36, cloud: 0.12, haze: 0.09, rain: 0, label: 'breeze' },
+  overcast: { wave: 0.72, chop: 0.42, foam: 0.32, cloud: 0.54, haze: 0.28, rain: 0.04, label: 'overcast' },
+  storm: { wave: 1.55, chop: 1.08, foam: 0.62, cloud: 0.86, haze: 0.44, rain: 0.52, label: 'storm' },
+};
+
+const ALHENA = [
+  { skin: '#7f5138', hair: '#1d1512', dress: '#2a9fc0' },
+  { skin: '#b77754', hair: '#21150f', dress: '#c68c4b' },
+  { skin: '#6d4737', hair: '#070708', dress: '#2d687c' },
+  { skin: '#95604a', hair: '#704021', dress: '#4ca6a1' },
+];
+
+// First playable core loop: cast -> wait -> bite -> reel -> catalog,
+// with rarer fish weighted in by storm/overcast weather (chooseFish()
+// below). Roadmap, deliberately not built this pass: a real day/weather
+// cycle (currently a fixed time/weather picker, not a clock), NPCs,
+// home-base progression, and a field guide beyond the plain catch count.
+const FISH = [
+  { name: 'glass minnow', rarity: 36, color: '#d7f8ff' },
+  { name: 'tide perch', rarity: 24, color: '#86d896' },
+  { name: 'moon mackerel', rarity: 16, color: '#cbd7ff' },
+  { name: 'blue runner', rarity: 10, color: '#54bdf0' },
+  { name: 'goldfin jack', rarity: 7, color: '#f1c45d' },
+  { name: 'storm eel', rarity: 4, color: '#a86bc8' },
+  { name: 'opal marlin', rarity: 2, color: '#e9fbff' },
+  { name: 'alhena starfish', rarity: 1, color: '#ff9b68' },
+];
+
+const state = {
+  started: false,
+  time: localStorage.getItem('paradise_time') || 'dawn',
+  weather: localStorage.getItem('paradise_weather') || 'calm',
+  alhena: Number(localStorage.getItem('paradise_alhena') || 0),
+  mode: 'idle',
+  tension: 0,
+  bobber: null,
+  lastCastAt: 0,
+  biteAt: 0,
+  biteEndsAt: 0,
+  fish: null,
+  catches: JSON.parse(localStorage.getItem('paradise_fish_log') || '{}'),
+  motion: false,
+  lastMotionAt: 0,
+  splashes: [],
+  camera: { x: 0, y: 0, tx: 0, ty: 0 },
+  lab: { seed: Math.random() * 1000 },
+  cinematic: false,
+  lastTapAt: 0,
+  tapTimer: null,
+  dpr: 1,
+  w: 0,
+  h: 0,
+};
+
+function resize() {
+  state.dpr = Math.min(window.devicePixelRatio || 1, 2);
+  state.w = window.innerWidth;
+  state.h = window.innerHeight;
+  waterCanvas.width = Math.floor(state.w * state.dpr);
+  waterCanvas.height = Math.floor(state.h * state.dpr);
+  waterCanvas.style.width = state.w + 'px';
+  waterCanvas.style.height = state.h + 'px';
+  canvas.width = Math.floor(state.w * state.dpr);
+  canvas.height = Math.floor(state.h * state.dpr);
+  canvas.style.width = state.w + 'px';
+  canvas.style.height = state.h + 'px';
+  ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+  if (waterProgram) waterProgram.gl.viewport(0, 0, waterCanvas.width, waterCanvas.height);
+}
+
+function hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function rgbToHex(rgb) {
+  return '#' + rgb.map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+}
+
+function mix(a, b, t) {
+  const ar = hexToRgb(a), br = hexToRgb(b);
+  return rgbToHex(ar.map((v, i) => v + (br[i] - v) * t));
+}
+
+function shade(hex, amount) {
+  const rgb = hexToRgb(hex).map(v => v + (amount > 0 ? (255 - v) * amount : v * amount));
+  return rgbToHex(rgb);
+}
+
+function lit(base, time, weather, amount = 0) {
+  const cool = weather.haze + weather.cloud * 0.16;
+  let color = mix(base, state.time === 'night' ? '#06101d' : time.sun, Math.max(0, amount) * time.light);
+  color = mix(color, '#1a2430', (1 - time.light) * 0.42 + cool * 0.26);
+  return color;
+}
+
+function materialGradient(x0, y0, x1, y1, stops) {
+  const g = ctx.createLinearGradient(x0, y0, x1, y1);
+  stops.forEach(([p, c]) => g.addColorStop(p, c));
+  return g;
+}
+
+function hexToUnit(hex) {
+  return hexToRgb(hex).map(v => v / 255);
+}
+
+function clamp01(v) {
+  return Math.max(0, Math.min(1, v));
+}
+
+function initWaterShader() {
+  const gl = waterCanvas.getContext('webgl', { alpha: true, antialias: false, depth: false, stencil: false, premultipliedAlpha: false });
+  if (!gl) return null;
+  const vertexSource = `
+    attribute vec2 a_position;
+    void main() {
+      gl_Position = vec4(a_position, 0.0, 1.0);
+    }
+  `;
+  const fragmentSource = `
+    precision highp float;
+    uniform vec2 u_resolution;
+    uniform float u_time;
+    uniform float u_wind;
+    uniform float u_chop;
+    uniform float u_foam;
+    uniform float u_haze;
+    uniform vec3 u_sea_near;
+    uniform vec3 u_sea_far;
+    uniform vec3 u_sky_top;
+    uniform vec3 u_horizon;
+    uniform vec2 u_sun;
+    uniform float u_light;
+
+    float hash(vec2 p) {
+      p = fract(p * vec2(123.34, 456.21));
+      p += dot(p, p + 45.32);
+      return fract(p.x * p.y);
+    }
+
+    float noise(vec2 p) {
+      vec2 i = floor(p);
+      vec2 f = fract(p);
+      vec2 u = f * f * (3.0 - 2.0 * f);
+      return mix(
+        mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+        mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
+        u.y
+      );
+    }
+
+    float fbm(vec2 p) {
+      float v = 0.0;
+      float a = 0.5;
+      for (int i = 0; i < 5; i++) {
+        v += noise(p) * a;
+        p = mat2(1.63, -1.08, 1.08, 1.63) * p + 7.31;
+        a *= 0.52;
+      }
+      return v;
+    }
+
+    float jonswapSpectrum(float omega, float wp) {
+      float sigma = omega <= wp ? 0.07 : 0.09;
+      float peak = exp(-pow(omega - wp, 2.0) / (2.0 * sigma * sigma * wp * wp));
+      return 0.0081 * 9.81 * 9.81 / pow(omega, 5.0)
+        * exp(-1.25 * pow(wp / omega, 4.0))
+        * pow(3.3, peak);
+    }
+
+    void waveComponent(float i, float windSpeed, out vec2 dir, out float k, out float omega, out float amp, out float phase) {
+      float t = i / 39.0;
+      float wp = 0.13 * 9.81 / max(windSpeed, 1.5) * 6.28318530718;
+      float wMin = wp * 0.38;
+      float wMax = wp * 7.80;
+      omega = wMin * pow(wMax / wMin, t);
+      k = omega * omega / 9.81;
+      float spectrum = jonswapSpectrum(omega, wp);
+      float spread = mix(1.18, 0.12, smoothstep(0.0, 1.0, t));
+      float theta = -1.57079632679 + (t - 0.5) * 3.14159265359 * spread + 0.24 + (hash(vec2(i, 8.31)) - 0.5) * 0.34;
+      dir = normalize(vec2(cos(theta), sin(theta)));
+      float longSet = mix(1.26, 0.70, smoothstep(0.42, 1.0, t));
+      amp = clamp(sqrt(2.0 * spectrum * ((wMax - wMin) / 40.0)) * 0.74 * windSpeed / 12.0 * longSet, 0.0, 2.35);
+      phase = hash(vec2(i * 19.19, 3.7)) * 6.28318530718;
+    }
+
+    float oceanHeight(vec2 p, float windSpeed) {
+      float h = 0.0;
+      for (int i = 0; i < 40; i++) {
+        vec2 dir;
+        float k;
+        float omega;
+        float amp;
+        float phase;
+        waveComponent(float(i), windSpeed, dir, k, omega, amp, phase);
+        float w = dot(dir, p) * k - omega * u_time + phase;
+        h += amp * sin(w);
+      }
+      return h * (0.50 + u_chop * 0.78);
+    }
+
+    vec2 oceanGradient(vec2 p, float windSpeed) {
+      vec2 g = vec2(0.0);
+      for (int i = 0; i < 40; i++) {
+        vec2 dir;
+        float k;
+        float omega;
+        float amp;
+        float phase;
+        waveComponent(float(i), windSpeed, dir, k, omega, amp, phase);
+        float w = dot(dir, p) * k - omega * u_time + phase;
+        g += dir * (amp * k * cos(w));
+      }
+      return g * (0.50 + u_chop * 0.78);
+    }
+
+    float curvature(vec2 p, float windSpeed) {
+      float c = 0.0;
+      for (int i = 0; i < 40; i++) {
+        vec2 dir;
+        float k;
+        float omega;
+        float amp;
+        float phase;
+        waveComponent(float(i), windSpeed, dir, k, omega, amp, phase);
+        float w = dot(dir, p) * k - omega * u_time + phase;
+        c += -amp * k * k * sin(w);
+      }
+      return c * (0.50 + u_chop * 0.78);
+    }
+
+    float schlick(float cosTheta) {
+      return 0.0204 + 0.9796 * pow(1.0 - clamp(cosTheta, 0.0, 1.0), 5.0);
+    }
+
+    vec3 acesTone(vec3 x) {
+      return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
+    }
+
+    void main() {
+      vec2 uv = gl_FragCoord.xy / u_resolution;
+      float y = 1.0 - uv.y;
+      float waterTop = 0.54;
+      float shore = 0.88;
+      if (y < waterTop || y > shore) {
+        gl_FragColor = vec4(0.0);
+        return;
+      }
+
+      float depth = clamp((y - waterTop) / (shore - waterTop), 0.0, 1.0);
+      float windSpeed = mix(4.8, 19.5, clamp(u_wind, 0.0, 1.0));
+      float range = min(155.0, 1.0 / max(0.030, pow(1.0 - depth + 0.055, 1.75)));
+      vec2 q = (gl_FragCoord.xy * 2.0 - u_resolution) / min(u_resolution.x, u_resolution.y);
+      vec2 world = vec2(q.x * range * 2.75, range * 5.15 - u_time * (0.32 + windSpeed * 0.018));
+      world += vec2(
+        fbm(world * 0.045 + vec2(7.0, u_time * 0.02)),
+        fbm(world * 0.075 + vec2(-3.0, -u_time * 0.018))
+      ) * 0.35 * u_chop;
+
+      float h = oceanHeight(world, windSpeed);
+      vec2 grad = oceanGradient(world, windSpeed);
+      float curve = abs(curvature(world, windSpeed));
+      float slope = clamp(length(grad) * 1.05, 0.0, 1.0);
+      vec2 micro = vec2(
+        fbm(world * vec2(0.52, 2.4) + vec2(u_time * 0.11, -u_time * 0.06)),
+        fbm(world * vec2(1.8, 0.48) + vec2(-u_time * 0.16, u_time * 0.04))
+      ) - 0.5;
+      vec3 normal = normalize(vec3(-grad.x, 1.0, -grad.y) + vec3(micro.x, 0.0, micro.y) * (0.18 + u_chop * 0.18));
+
+      vec3 viewDir = normalize(vec3(q.x * 0.42, 0.38 + depth * 0.92, 1.0));
+      float fresnel = schlick(dot(normal, viewDir));
+      vec3 reflectedSky = mix(u_horizon, u_sky_top, clamp(0.36 + normal.z * 0.36 - depth * 0.12, 0.0, 1.0));
+      vec3 deep = mix(u_sea_far * 0.34, vec3(0.002, 0.015, 0.050), 0.46);
+      vec3 middle = mix(u_sea_far, u_sea_near, 0.34);
+      vec3 shallow = mix(u_sea_near, vec3(0.035, 0.32, 0.34), 0.34);
+      vec3 body = mix(deep, middle, smoothstep(0.04, 0.68, depth));
+      body = mix(body, shallow, smoothstep(0.62, 1.0, depth));
+
+      float backScatter = pow(max(dot(normal, normalize(vec3(-0.22, 0.74, 0.62))), 0.0), 1.6);
+      float forwardScatter = pow(max(dot(viewDir, normalize(vec3(-0.15, 0.12, 0.96))), 0.0), 3.2);
+      float caustics = smoothstep(0.62, 0.92, fbm(world * vec2(0.42, 1.18) + micro * 0.7));
+      body += vec3(0.00, 0.34, 0.31) * backScatter * depth * 0.32;
+      body += vec3(0.10, 0.40, 0.34) * forwardScatter * smoothstep(0.34, 1.0, depth) * 0.22;
+      body += vec3(0.10, 0.58, 0.52) * caustics * smoothstep(0.70, 1.0, depth) * (1.0 - u_haze) * 0.13;
+
+      vec2 sunUv = vec2(u_sun.x, 1.0 - u_sun.y);
+      vec2 toSun = normalize((sunUv - uv) * vec2(u_resolution.x / u_resolution.y, 1.0));
+      vec2 slopeDir = normalize(normal.xz + vec2(0.0001));
+      float sunPath = pow(max(0.0, 1.0 - abs(uv.x - u_sun.x) * 5.2), 3.0) * pow(1.0 - abs(depth - 0.24), 2.4);
+      float glints = smoothstep(0.68, 0.96, fbm(world * vec2(4.8, 1.25) + vec2(u_time * 0.28, -u_time * 0.10)));
+      float specular = pow(max(dot(slopeDir, toSun), 0.0), 28.0) * glints * sunPath * (0.50 + u_chop * 1.20) * u_light;
+
+      float crestEnergy = smoothstep(0.05, 0.42, abs(h)) * max(slope, curve * 0.14);
+      float streakField = smoothstep(0.48, 0.86, fbm(vec2(world.x * 0.09 - u_time * 0.035, world.y * 1.65 + u_time * 0.15)));
+      float foamNoise = fbm(world * vec2(0.86, 1.95) + vec2(u_time * 0.08, -u_time * 0.05));
+      float microFoam = smoothstep(0.36 + (1.0 - u_foam) * 0.22, 0.86, abs(h) + slope * 0.14) * smoothstep(0.42, 0.82, foamNoise);
+      float shoreLine = 0.82 + sin(world.x * 0.065 + u_time * 0.70) * 0.018;
+      float shoreFoam = smoothstep(0.045, 0.0, abs(depth - shoreLine)) * smoothstep(0.42, 0.82, fbm(vec2(world.x * 0.58, u_time * 0.42)));
+      float foam = clamp((crestEnergy * microFoam * (0.52 + streakField * 0.76) + shoreFoam * 0.72) * (0.45 + u_foam * 1.55), 0.0, 1.0);
+
+      vec3 color = mix(body, reflectedSky, clamp(fresnel * 0.74 + slope * 0.055, 0.0, 0.72));
+      float swellShadow = smoothstep(0.40, 0.84, fbm(vec2(world.x * 0.025 - u_time * 0.012, world.y * 0.15 + u_time * 0.035)));
+      color = mix(color, color * vec3(0.58, 0.74, 0.80), swellShadow * smoothstep(0.04, 0.82, 1.0 - depth) * 0.32);
+      color += vec3(0.018, 0.19, 0.22) * streakField * smoothstep(0.02, 0.88, depth) * 1.45;
+      color += vec3(1.0, 0.84, 0.48) * specular;
+      color = mix(color, vec3(0.91, 0.975, 1.0), foam * 0.58);
+      color += vec3(0.05, 0.00, 0.08) * foam * curve * 0.018;
+      float horizonFog = pow(1.0 - depth, 2.85) * (0.18 + u_haze * 0.62);
+      color = mix(color, mix(u_horizon, vec3(0.55,0.66,0.69), u_haze), horizonFog);
+      color = mix(color, vec3(0.34, 0.39, 0.42), u_haze * 0.28);
+      color *= 0.78 + u_light * 0.48;
+      float vignette = smoothstep(0.92, 0.22, length((uv - 0.5) * vec2(1.05, 0.88)));
+      color *= 0.74 + vignette * 0.34;
+      color = acesTone(color * 1.18);
+      color = pow(color, vec3(0.4545));
+
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `;
+
+  function compile(type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader));
+    return shader;
+  }
+
+  try {
+    const program = gl.createProgram();
+    gl.attachShader(program, compile(gl.VERTEX_SHADER, vertexSource));
+    gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fragmentSource));
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
+    gl.useProgram(program);
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const position = gl.getAttribLocation(program, 'a_position');
+    gl.enableVertexAttribArray(position);
+    gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+    return {
+      gl,
+      program,
+      uniforms: {
+        resolution: gl.getUniformLocation(program, 'u_resolution'),
+        time: gl.getUniformLocation(program, 'u_time'),
+        wind: gl.getUniformLocation(program, 'u_wind'),
+        chop: gl.getUniformLocation(program, 'u_chop'),
+        foam: gl.getUniformLocation(program, 'u_foam'),
+        haze: gl.getUniformLocation(program, 'u_haze'),
+        seaNear: gl.getUniformLocation(program, 'u_sea_near'),
+        seaFar: gl.getUniformLocation(program, 'u_sea_far'),
+        skyTop: gl.getUniformLocation(program, 'u_sky_top'),
+        horizon: gl.getUniformLocation(program, 'u_horizon'),
+        sun: gl.getUniformLocation(program, 'u_sun'),
+        light: gl.getUniformLocation(program, 'u_light'),
+      }
+    };
+  } catch (err) {
+    console.warn('Water shader unavailable:', err);
+    return null;
+  }
+}
+
+function drawWaterShader(t, time, weather) {
+  if (!waterProgram) return;
+  const gl = waterProgram.gl;
+  const u = waterProgram.uniforms;
+  gl.useProgram(waterProgram.program);
+  gl.viewport(0, 0, waterCanvas.width, waterCanvas.height);
+  gl.uniform2f(u.resolution, waterCanvas.width, waterCanvas.height);
+  gl.uniform1f(u.time, t * 0.001);
+  gl.uniform1f(u.wind, clamp01((weather.wave - 0.45) / 1.25));
+  gl.uniform1f(u.chop, weather.chop);
+  gl.uniform1f(u.foam, weather.foam);
+  gl.uniform1f(u.haze, weather.haze + weather.cloud * 0.18);
+  gl.uniform3fv(u.seaNear, hexToUnit(mix(time.seaNear, '#092838', weather.haze * 0.82 + weather.cloud * 0.08)));
+  gl.uniform3fv(u.seaFar, hexToUnit(mix(time.seaFar, '#0b2438', 0.34 + weather.haze * 0.62)));
+  gl.uniform3fv(u.skyTop, hexToUnit(mix(time.skyTop, '#7c8592', weather.haze)));
+  gl.uniform3fv(u.horizon, hexToUnit(mix(mix(time.horizon, time.seaFar, 0.55), '#53646a', weather.haze * 0.7)));
+  gl.uniform2f(u.sun, time.sunX, time.sunY);
+  gl.uniform1f(u.light, time.light);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+function pulse(pattern) {
+  if (navigator.vibrate) navigator.vibrate(pattern);
+}
+
+function status(html) {
+  statusEl.innerHTML = html;
+}
+
+function saveLog() {
+  localStorage.setItem('paradise_fish_log', JSON.stringify(state.catches));
+}
+
+function setTension(v) {
+  state.tension = Math.max(0, Math.min(100, v));
+  meterEl.style.width = state.tension + '%';
+}
+
+function renderCatalog() {
+  catalogEl.innerHTML = '';
+  const caught = FISH.filter(f => state.catches[f.name]).length;
+  countEl.textContent = `${caught} / ${FISH.length} logged`;
+  FISH.forEach(f => {
+    const chip = document.createElement('div');
+    const n = state.catches[f.name] || 0;
+    chip.className = 'fish-chip' + (n ? ' caught' : '');
+    chip.textContent = n ? `${f.name} x${n}` : 'unknown';
+    catalogEl.appendChild(chip);
+  });
+}
+
+function setTime(name) {
+  if (!TIMES[name]) name = 'dawn';
+  state.time = name;
+  localStorage.setItem('paradise_time', name);
+  updateControlState();
+}
+
+function setWeather(name) {
+  if (!WEATHER[name]) name = 'calm';
+  state.weather = name;
+  localStorage.setItem('paradise_weather', name);
+  updateControlState();
+}
+
+function updateControlState() {
+  document.querySelectorAll('[data-time]').forEach(b => b.classList.toggle('active', b.dataset.time === state.time));
+  document.querySelectorAll('[data-weather]').forEach(b => b.classList.toggle('active', b.dataset.weather === state.weather));
+  weatherReadout.textContent = `${state.time} / ${WEATHER[state.weather].label}`;
+  syncOceanPass();
+}
+
+function syncOceanPass() {
+  const src = `/game-v3/ocean-pass/?time=${encodeURIComponent(state.time)}&weather=${encodeURIComponent(state.weather)}`;
+  if (oceanPassSrc === src) return;
+  oceanPassSrc = src;
+  oceanPassFrame.src = src;
+}
+
+function setCinematic(enabled) {
+  state.cinematic = enabled;
+  document.body.classList.toggle('cinematic', enabled);
+  viewBtn.textContent = enabled ? 'controls' : 'view';
+  touchViewBtn.textContent = enabled ? 'controls' : 'view';
+  hintEl.textContent = enabled
+    ? 'Cinematic view · press C or double-tap to restore controls'
+    : 'Tap/click to cast · space reels · C or double-tap hides controls';
+}
+
+function toggleCinematic() {
+  setCinematic(!state.cinematic);
+}
+
+function chooseFish() {
+  const rareBonus = state.weather === 'storm' ? 1.8 : state.weather === 'overcast' ? 1.22 : 1;
+  const weighted = FISH.map((fish, i) => ({ fish, weight: fish.rarity * (i >= 4 ? rareBonus : 1) }));
+  const total = weighted.reduce((sum, x) => sum + x.weight, 0);
+  let roll = Math.random() * total;
+  for (const item of weighted) {
+    roll -= item.weight;
+    if (roll <= 0) return item.fish;
+  }
+  return FISH[0];
+}
+
+function cast() {
+  if (state.mode === 'bite') return reel();
+  if (state.mode !== 'idle') return;
+  state.mode = 'waiting';
+  state.lastCastAt = performance.now();
+  state.fish = chooseFish();
+  state.biteAt = state.lastCastAt + 1600 + Math.random() * 3000;
+  state.bobber = { x: state.w * (0.42 + Math.random() * 0.24), y: state.h * (0.56 + Math.random() * 0.11), dip: 0 };
+  createSplash(state.bobber.x, state.bobber.y, 1.1);
+  castBtn.textContent = 'waiting';
+  touchPrimaryBtn.textContent = 'wait';
+  setTension(16);
+  status('Line out past the foam. Watch the bobber.');
+  pulse(18);
+}
+
+function bite(now) {
+  state.mode = 'bite';
+  state.biteEndsAt = now + 1500 + Math.random() * 900;
+  if (state.bobber) createSplash(state.bobber.x, state.bobber.y + 8, 0.7);
+  castBtn.textContent = 'reel';
+  touchPrimaryBtn.textContent = 'reel';
+  status('<strong>Bite.</strong> Reel now.');
+  pulse([40, 55, 40, 55, 80]);
+}
+
+function miss() {
+  state.mode = 'idle';
+  if (state.bobber) createSplash(state.bobber.x, state.bobber.y + 10, 0.42);
+  state.bobber = null;
+  castBtn.textContent = 'cast line';
+  touchPrimaryBtn.textContent = 'cast';
+  setTension(0);
+  status('The fish slipped the hook. Cast again when the water settles.');
+  pulse(20);
+}
+
+function reel() {
+  if (state.mode !== 'bite') return;
+  const fish = state.fish || chooseFish();
+  if (state.bobber) createSplash(state.bobber.x, state.bobber.y, 1.45);
+  state.catches[fish.name] = (state.catches[fish.name] || 0) + 1;
+  saveLog();
+  renderCatalog();
+  state.mode = 'idle';
+  state.bobber = null;
+  castBtn.textContent = 'cast line';
+  touchPrimaryBtn.textContent = 'cast';
+  setTension(100);
+  setTimeout(() => setTension(0), 520);
+  status(`Caught a <strong>${fish.name}</strong>. Saved locally in this browser.`);
+  catchFish.style.setProperty('--catch-color', `linear-gradient(90deg, #fff, ${fish.color})`);
+  catchFish.style.setProperty('--catch-tail', fish.color);
+  catchName.textContent = fish.name;
+  catchCard.classList.add('visible');
+  setTimeout(() => catchCard.classList.remove('visible'), 1300);
+  pulse([30, 42, 30]);
+}
+
+function createSplash(x, y, strength = 1) {
+  const now = performance.now();
+  state.splashes.push({ x, y, strength, born: now, ttl: 980 + strength * 340 });
+  if (state.splashes.length > 16) state.splashes.splice(0, state.splashes.length - 16);
+}
+
+function clearLog() {
+  state.catches = {};
+  saveLog();
+  renderCatalog();
+  status('Catch log cleared. The shoreline is reset.');
+}
+
+async function enableMotion() {
+  try {
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+      const permission = await DeviceMotionEvent.requestPermission();
+      if (permission !== 'granted') throw new Error('motion permission denied');
+    }
+    window.addEventListener('devicemotion', onMotion, { passive: true });
+    state.motion = true;
+    motionBtn.textContent = 'motion on';
+    touchMotionBtn.textContent = 'motion on';
+    motionBtn.classList.add('active');
+    touchMotionBtn.classList.add('active');
+    status('Motion enabled. Flick forward to cast. Pull back during a bite to reel.');
+  } catch (err) {
+    status('Motion was not available. Tap to cast and reel.');
+  }
+}
+
+function onMotion(event) {
+  if (!state.motion) return;
+  const a = event.accelerationIncludingGravity || event.acceleration || {};
+  const impulse = Math.abs(a.x || 0) + Math.abs(a.y || 0) + Math.abs(a.z || 0);
+  const now = performance.now();
+  if (impulse < 18 || now - state.lastMotionAt < 900) return;
+  state.lastMotionAt = now;
+  if (state.mode === 'idle') cast();
+  else if (state.mode === 'bite') reel();
+}
+
+function drawSky(t, time, weather) {
+  if (oceanPassFrame) {
+    const skyH = state.h * 0.54;
+    if (time.stars > 0) {
+      ctx.save();
+      ctx.fillStyle = '#eef7ff';
+      for (let i = 0; i < 80; i++) {
+        const x = ((i * 193.7) % state.w) - state.camera.x * 10;
+        const y = ((i * 71.3) % (skyH * 0.72)) - state.camera.y * 5;
+        const r = ((i * 17) % 3) * 0.35 + 0.45;
+        ctx.globalAlpha = time.stars * (0.28 + 0.55 * Math.sin(t * 0.001 + i));
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    drawBirds(t, time, weather, skyH);
+    return;
+  }
+  const w = state.w, h = state.h;
+  const cam = state.camera;
+  const skyH = h * 0.54;
+  const haze = weather.haze + weather.cloud * 0.13;
+  const top = mix(time.skyTop, '#7c8592', haze);
+  const mid = mix(time.skyMid, '#9aa1a7', haze);
+  const horizon = mix(time.horizon, '#b8aea0', haze * 0.7);
+  const g = ctx.createLinearGradient(0, 0, 0, skyH);
+  g.addColorStop(0, top);
+  g.addColorStop(0.62, mid);
+  g.addColorStop(1, horizon);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, skyH);
+
+  if (time.stars > 0) {
+    ctx.save();
+    ctx.fillStyle = '#eef7ff';
+    for (let i = 0; i < 80; i++) {
+      const x = ((i * 193.7) % w) - cam.x * 10;
+      const y = ((i * 71.3) % (skyH * 0.72)) - cam.y * 5;
+      const r = ((i * 17) % 3) * 0.35 + 0.45;
+      ctx.globalAlpha = time.stars * (0.35 + 0.65 * Math.sin(t * 0.001 + i));
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  const sx = w * time.sunX - cam.x * 20;
+  const sy = h * time.sunY - cam.y * 8;
+  const sunR = state.time === 'night' ? 22 : 44;
+  const rg = ctx.createRadialGradient(sx, sy, 2, sx, sy, sunR * 3.6);
+  rg.addColorStop(0, time.sun);
+  rg.addColorStop(0.24, state.time === 'night' ? 'rgba(225,241,255,0.56)' : 'rgba(255,229,150,0.72)');
+  rg.addColorStop(1, 'rgba(255,229,150,0)');
+  ctx.fillStyle = rg;
+  ctx.beginPath();
+  ctx.arc(sx, sy, sunR * 3.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = time.sun;
+  ctx.beginPath();
+  ctx.arc(sx, sy, sunR, 0, Math.PI * 2);
+  ctx.fill();
+
+  drawClouds(t, weather, skyH);
+  drawAtmosphere(t, time, weather, skyH);
+  drawDistantLand(t, time, weather, skyH);
+  drawBirds(t, time, weather, skyH);
+}
+
+function drawAtmosphere(t, time, weather, skyH) {
+  const w = state.w, h = state.h;
+  ctx.save();
+  const sx = w * time.sunX;
+  const sy = h * time.sunY;
+  ctx.globalCompositeOperation = 'screen';
+  for (let i = 0; i < 7; i++) {
+    const angle = -0.45 + i * 0.15 + Math.sin(t * 0.00018 + i) * 0.04;
+    const length = w * (0.55 + i * 0.035);
+    const width = h * (0.04 + i * 0.008);
+    const grad = ctx.createLinearGradient(sx, sy, sx + Math.cos(angle) * length, sy + Math.sin(angle) * length);
+    grad.addColorStop(0, `rgba(255,229,160,${0.05 * time.light * (1 - weather.cloud * 0.55)})`);
+    grad.addColorStop(1, 'rgba(255,229,160,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx + Math.cos(angle - 0.045) * length, sy + Math.sin(angle - 0.045) * length + width);
+    ctx.lineTo(sx + Math.cos(angle + 0.045) * length, sy + Math.sin(angle + 0.045) * length - width);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawDistantLand(t, time, weather, skyH) {
+  const w = state.w, h = state.h;
+  const base = h * 0.532;
+  ctx.save();
+  ctx.globalAlpha = 0.12 + weather.haze * 0.16;
+  ctx.fillStyle = mix('#284454', time.skyTop, 0.32);
+  ctx.beginPath();
+  ctx.moveTo(0, base);
+  for (let x = 0; x <= w; x += 44) {
+    const y = base - 8 - Math.sin(x * 0.012 + t * 0.00008) * 8 - Math.sin(x * 0.004) * 18;
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(w, base + 10);
+  ctx.lineTo(0, base + 10);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawBirds(t, time, weather, skyH) {
+  if (state.time === 'night' || weather.rain > 0.2) return;
+  const w = state.w;
+  ctx.save();
+  ctx.globalAlpha = 0.18 + time.light * 0.12;
+  ctx.strokeStyle = 'rgba(35,48,55,0.62)';
+  ctx.lineWidth = 1.4;
+  for (let i = 0; i < 5; i++) {
+    const x = (w + 160 - ((t * (0.018 + i * 0.004) + i * 227) % (w + 320))) - 80;
+    const y = skyH * (0.2 + ((i * 17) % 28) / 100);
+    const wing = 5 + Math.sin(t * 0.008 + i) * 2;
+    ctx.beginPath();
+    ctx.moveTo(x - 10, y);
+    ctx.quadraticCurveTo(x - 4, y - wing, x, y);
+    ctx.quadraticCurveTo(x + 4, y - wing, x + 10, y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawClouds(t, weather, skyH) {
+  if (weather.cloud <= 0.02) return;
+  const w = state.w;
+  ctx.save();
+  ctx.filter = `blur(${6 + weather.cloud * 10}px)`;
+  const night = state.time === 'night';
+  const cloudTone = night ? 'rgba(24,29,42,' : 'rgba(245,242,225,';
+  const shadowTone = night ? 'rgba(8,11,20,' : 'rgba(95,108,112,';
+  for (let i = 0; i < 6; i++) {
+    const baseX = ((i * 337 + t * (0.004 + i * 0.0007)) % (w + 560)) - 280 - state.camera.x * (8 + i * 2);
+    const y = skyH * (0.13 + ((i * 31) % 34) / 100) - state.camera.y * 5;
+    const scale = 0.9 + ((i * 23) % 80) / 100;
+    const width = 230 * scale * (0.86 + weather.cloud);
+    const height = 34 * scale * (0.8 + weather.cloud * 0.8);
+    const g = ctx.createLinearGradient(baseX - width, y - height, baseX + width, y + height);
+    g.addColorStop(0, `${cloudTone}${0.04 + weather.cloud * 0.12})`);
+    g.addColorStop(0.46, `${cloudTone}${0.12 + weather.cloud * 0.32})`);
+    g.addColorStop(1, `${shadowTone}${0.04 + weather.cloud * 0.18})`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(baseX - width * 0.58, y + height * 0.22);
+    ctx.bezierCurveTo(baseX - width * 0.42, y - height * 0.75, baseX - width * 0.12, y - height * 1.08, baseX + width * 0.06, y - height * 0.42);
+    ctx.bezierCurveTo(baseX + width * 0.32, y - height * 1.15, baseX + width * 0.72, y - height * 0.48, baseX + width * 0.68, y + height * 0.1);
+    ctx.bezierCurveTo(baseX + width * 0.48, y + height * 0.62, baseX - width * 0.1, y + height * 0.66, baseX - width * 0.58, y + height * 0.22);
+    ctx.fill();
+  }
+  ctx.filter = 'none';
+  ctx.restore();
+}
+
+function blob(x, y, w, h) {
+  ctx.beginPath();
+  ctx.ellipse(x, y, w, h, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function waveY(x, base, amp, freq, phase) {
+  return base + Math.sin(x * freq + phase) * amp + Math.sin(x * freq * 0.43 + phase * 1.7) * amp * 0.42;
+}
+
+function drawWater(t, time, weather) {
+  const w = state.w, h = state.h;
+  const top = h * 0.54;
+  const bottom = h * 0.88;
+  if (!waterProgram && !oceanPassFrame) {
+    const g = ctx.createLinearGradient(0, top, 0, bottom);
+    const far = mix(time.seaFar, '#66737b', weather.haze);
+    const near = mix(time.seaNear, '#243441', weather.haze + weather.cloud * 0.12);
+    g.addColorStop(0, far);
+    g.addColorStop(0.42, mix(far, near, 0.46));
+    g.addColorStop(1, near);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, top, w, bottom - top + 2);
+  }
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, top, w, bottom - top);
+  ctx.clip();
+
+  if (oceanPassFrame) {
+    drawOceanPassShorelineAccents(t, top, bottom, time, weather);
+    drawObjectWaterReflections(t, top, bottom, time);
+    drawFishShadows(t, top, bottom);
+    drawBobber(t);
+    drawSplashes(t);
+    ctx.restore();
+    return;
+  }
+
+  if (waterProgram) {
+    drawOceanPerspectiveRibbons(t, top, bottom, time, weather);
+    drawMolecularSurface(t, top, bottom, time, weather);
+    drawWaterVolumeBlobs(t, top, bottom, time, weather);
+    drawShaderWaterForeground(t, top, bottom, time, weather);
+    drawObjectWaterReflections(t, top, bottom, time);
+    drawFishShadows(t, top, bottom);
+    drawBobber(t);
+    drawSplashes(t);
+    ctx.restore();
+    return;
+  }
+
+  for (let layer = 0; layer < 16; layer++) {
+    const depth = layer / 15;
+    const y = top + depth * (bottom - top);
+    const amp = (2 + depth * 14) * weather.wave;
+    const freq = 0.006 + depth * 0.016;
+    const speed = t * (0.0012 + depth * 0.0015);
+    ctx.beginPath();
+    for (let x = -10; x <= w + 10; x += 12) {
+      const yy = waveY(x, y, amp, freq, speed + layer * 1.8);
+      if (x === -10) ctx.moveTo(x, yy);
+      else ctx.lineTo(x, yy);
+    }
+    ctx.strokeStyle = `rgba(236,253,255,${0.035 + depth * 0.09 * weather.foam})`;
+    ctx.lineWidth = 1 + depth * 1.2;
+    ctx.stroke();
+  }
+
+  drawOceanPerspectiveRibbons(t, top, bottom, time, weather);
+  drawMolecularSurface(t, top, bottom, time, weather);
+  drawWaterVolumeBlobs(t, top, bottom, time, weather);
+
+  const foamY = h * 0.85 + Math.sin(t * 0.0016) * 4;
+  const foam = ctx.createLinearGradient(0, foamY - 12, 0, foamY + 18);
+  foam.addColorStop(0, 'rgba(255,255,255,0)');
+  foam.addColorStop(0.48, `rgba(243,251,255,${0.34 + weather.foam * 0.26})`);
+  foam.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = foam;
+  ctx.fillRect(0, foamY - 18, w, 42);
+  drawSurfFlecks(t, top, bottom, weather);
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  for (let i = 0; i < 18; i++) {
+    const depth = i / 17;
+    const y = top + (bottom - top) * (0.18 + depth * 0.72);
+    const glow = 0.018 + (1 - depth) * 0.045 * time.light;
+    ctx.strokeStyle = `rgba(255,238,179,${glow})`;
+    ctx.lineWidth = 1.2 + (1 - depth) * 1.8;
+    ctx.beginPath();
+    for (let x = -40; x <= w + 40; x += 18) {
+      const yy = y + Math.sin(x * 0.017 + t * 0.002 + i) * (4 + weather.wave * 9);
+      if (x === -40) ctx.moveTo(x, yy);
+      else ctx.lineTo(x, yy);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  drawFishShadows(t, top, bottom);
+  drawBobber(t);
+  drawSplashes(t);
+  ctx.restore();
+}
+
+function drawOceanPassShorelineAccents(t, top, bottom, time, weather) {
+  const w = state.w;
+  const height = bottom - top;
+  const shore = top + height * 0.93;
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  for (let i = 0; i < 5; i++) {
+    const y = shore - 11 + i * 6 + Math.sin(t * 0.0015 + i) * (2 + weather.wave * 2.2);
+    const alpha = (0.045 + i * 0.012) * (0.7 + weather.foam * 0.65) * time.light;
+    ctx.strokeStyle = `rgba(232,252,255,${alpha})`;
+    ctx.lineWidth = 1.1 + i * 0.42;
+    ctx.beginPath();
+    for (let x = -40; x <= w + 40; x += 18) {
+      const yy = y
+        + Math.sin(x * 0.014 + t * 0.0022 + i * 1.8) * (2.6 + i * 0.75)
+        + Math.sin(x * 0.052 - t * 0.0011) * 1.0;
+      if (x === -40) ctx.moveTo(x, yy);
+      else ctx.lineTo(x, yy);
+    }
+    ctx.stroke();
+  }
+
+  const sunTrack = w * time.sunX;
+  for (let i = 0; i < 18; i++) {
+    const depth = i / 17;
+    const x = sunTrack + Math.sin(i * 7.37 + t * 0.002) * (34 + depth * 360);
+    const y = top + height * (0.12 + depth * 0.68);
+    const alpha = (0.010 + time.light * 0.035) * (1 - depth * 0.55) * (1 - weather.cloud * 0.54);
+    drawGaussianBlob(x, y, 18 + depth * 70 + weather.chop * 14, 2.5 + depth * 8, `rgba(255,229,150,${alpha})`, 0.24);
+  }
+
+  ctx.globalCompositeOperation = 'multiply';
+  const wetShade = ctx.createLinearGradient(0, bottom - height * 0.14, 0, bottom);
+  wetShade.addColorStop(0, 'rgba(4,13,18,0)');
+  wetShade.addColorStop(1, `rgba(5,15,18,${0.10 + weather.haze * 0.10})`);
+  ctx.fillStyle = wetShade;
+  ctx.fillRect(0, bottom - height * 0.16, w, height * 0.16);
+  ctx.restore();
+}
+
+function drawShaderWaterForeground(t, top, bottom, time, weather) {
+  const w = state.w;
+  const height = bottom - top;
+  const foamBase = top + height * 0.91;
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  for (let i = 0; i < 6; i++) {
+    const y = foamBase + i * 4 + Math.sin(t * 0.0014 + i) * (2 + weather.wave * 4);
+    const alpha = (0.035 + i * 0.010) * (0.72 + weather.foam);
+    ctx.strokeStyle = `rgba(237,253,255,${alpha})`;
+    ctx.lineWidth = 1.0 + i * 0.45;
+    ctx.beginPath();
+    for (let x = -30; x <= w + 30; x += 18) {
+      const yy = y
+        + Math.sin(x * 0.013 + t * 0.0021 + i * 1.7) * (2.2 + i * 0.8)
+        + Math.sin(x * 0.047 - t * 0.0014) * 1.2;
+      if (x === -30) ctx.moveTo(x, yy);
+      else ctx.lineTo(x, yy);
+    }
+    ctx.stroke();
+  }
+
+  const sunTrack = state.w * time.sunX;
+  for (let i = 0; i < 24; i++) {
+    const depth = i / 23;
+    const x = sunTrack + Math.sin(i * 7.37 + t * 0.002) * (36 + depth * 420);
+    const y = top + height * (0.10 + depth * 0.72);
+    const rx = 14 + depth * 80 + weather.chop * 22;
+    const ry = 2 + depth * 10;
+    const alpha = (0.018 + time.light * 0.055) * (1 - depth * 0.48) * (1 - weather.cloud * 0.52);
+    drawGaussianBlob(x, y, rx, ry, `rgba(255,229,150,${alpha})`, 0.18);
+  }
+
+  ctx.globalCompositeOperation = 'multiply';
+  for (let i = 0; i < 8; i++) {
+    const depth = i / 7;
+    const y = top + height * (0.14 + depth * 0.70) + Math.sin(t * 0.001 + i) * 8;
+    const x = ((i * 233 + t * (0.018 + depth * 0.016)) % (w + 420)) - 210;
+    drawGaussianBlob(x, y, 190 + depth * 330, 10 + depth * 28, `rgba(7,18,24,${0.016 + depth * 0.030})`, 0.08);
+  }
+  ctx.restore();
+}
+
+function drawObjectWaterReflections(t, top, bottom, time) {
+  const w = state.w, h = state.h;
+  const lab = labLocomotion(w, h, t);
+  const objects = [
+    { x: w * 0.16, y: h * 0.755, rx: 126, ry: 34, a: 0.18, tone: '88,57,31' },
+    { x: lab.x, y: lab.y - 6, rx: 80 * lab.s, ry: 22 * lab.s, a: 0.21, tone: '5,7,8' },
+    { x: w * 0.80, y: h * 0.750, rx: 145, ry: 38, a: 0.20, tone: '62,35,22' },
+    { x: w * 0.815, y: h * 0.720, rx: 58, ry: 42, a: 0.13, tone: '29,104,121' },
+  ];
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, top, w, bottom - top);
+  ctx.clip();
+  ctx.filter = 'blur(5px)';
+  ctx.globalCompositeOperation = 'multiply';
+  for (const o of objects) {
+    const waterline = h * 0.84;
+    const reflectedY = waterline - Math.max(0, o.y - waterline) * 0.34 - 14;
+    const g = ctx.createRadialGradient(o.x, reflectedY, 2, o.x, reflectedY, o.rx);
+    g.addColorStop(0, `rgba(${o.tone},${o.a * (0.76 + time.light * 0.18)})`);
+    g.addColorStop(0.52, `rgba(${o.tone},${o.a * 0.34})`);
+    g.addColorStop(1, `rgba(${o.tone},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(o.x + Math.sin(t * 0.001 + o.x) * 4, reflectedY, o.rx, o.ry, Math.sin(t * 0.0007 + o.x) * 0.035, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.filter = 'blur(1px)';
+  ctx.globalCompositeOperation = 'screen';
+  for (const o of objects) {
+    const reflectedY = h * 0.835 - Math.max(0, o.y - h * 0.84) * 0.22 - 18;
+    ctx.strokeStyle = `rgba(220,252,255,${0.035 + time.light * 0.035})`;
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    for (let x = o.x - o.rx * 0.78; x <= o.x + o.rx * 0.78; x += 10) {
+      const p = (x - o.x) / o.rx;
+      const y = reflectedY + Math.sin(p * 7.0 + t * 0.002) * 3.5 + Math.sin(p * 19.0 - t * 0.001) * 1.6;
+      if (x === o.x - o.rx * 0.78) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawOceanPerspectiveRibbons(t, top, bottom, time, weather) {
+  const w = state.w;
+  const height = bottom - top;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, top, w, height);
+  ctx.clip();
+
+  const horizonY = top + height * 0.04;
+  const vanishingX = w * (0.5 + state.camera.x * 0.018);
+  for (let i = 0; i < 22; i++) {
+    const d = i / 21;
+    const y = top + height * (0.06 + Math.pow(d, 1.72) * 0.86);
+    const perspectiveWidth = w * (0.1 + d * 1.18);
+    const amp = (1.5 + d * 17) * weather.wave;
+    const freq = 0.012 + d * 0.025;
+    const phase = t * (0.0014 + d * 0.0022) + i * 1.93;
+    const crestAlpha = (0.018 + d * 0.07) * (0.7 + weather.foam * 0.8);
+    const troughAlpha = (0.012 + d * 0.05) * (0.7 + weather.chop * 0.55);
+
+    ctx.globalCompositeOperation = 'multiply';
+    const trough = ctx.createLinearGradient(0, y - amp * 0.8, 0, y + amp * 2.2);
+    trough.addColorStop(0, 'rgba(0,0,0,0)');
+    trough.addColorStop(0.42, `rgba(7,18,24,${troughAlpha})`);
+    trough.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = trough;
+    ctx.beginPath();
+    for (let x = vanishingX - perspectiveWidth; x <= vanishingX + perspectiveWidth; x += 18) {
+      const p = (x - vanishingX) / Math.max(1, perspectiveWidth);
+      const yy = y + Math.sin(p * 7.8 + phase) * amp + Math.sin(p * 18.0 - phase * 0.73) * amp * 0.24;
+      if (x === vanishingX - perspectiveWidth) ctx.moveTo(x, yy);
+      else ctx.lineTo(x, yy);
+    }
+    for (let x = vanishingX + perspectiveWidth; x >= vanishingX - perspectiveWidth; x -= 18) {
+      const p = (x - vanishingX) / Math.max(1, perspectiveWidth);
+      const yy = y + 10 + d * 38 + Math.sin(p * 7.8 + phase + 0.6) * amp * 0.58;
+      ctx.lineTo(x, yy);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.globalCompositeOperation = 'screen';
+    ctx.strokeStyle = `rgba(238,252,255,${crestAlpha})`;
+    ctx.lineWidth = 0.7 + d * 2.4;
+    ctx.beginPath();
+    for (let x = vanishingX - perspectiveWidth; x <= vanishingX + perspectiveWidth; x += 12) {
+      const p = (x - vanishingX) / Math.max(1, perspectiveWidth);
+      const taper = 1 - Math.min(1, Math.abs(p));
+      const yy = y + Math.sin(p * 7.8 + phase) * amp + Math.sin(p * 18.0 - phase * 0.73) * amp * 0.24;
+      if (x === vanishingX - perspectiveWidth) ctx.moveTo(x, yy);
+      else ctx.lineTo(x, yy - taper * d * 2.2);
+    }
+    ctx.stroke();
+  }
+
+  ctx.globalCompositeOperation = 'screen';
+  for (let i = 0; i < 10; i++) {
+    const side = i % 2 ? -1 : 1;
+    const startX = vanishingX + side * (18 + i * 21);
+    const endX = vanishingX + side * w * (0.52 + (i % 5) * 0.08);
+    const endY = bottom - height * (0.05 + (i % 4) * 0.06);
+    const g = ctx.createLinearGradient(startX, horizonY, endX, endY);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(0.6, `rgba(204,246,255,${0.018 + weather.foam * 0.03})`);
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.strokeStyle = g;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(startX, horizonY);
+    ctx.quadraticCurveTo((startX + endX) * 0.5, top + height * 0.45 + Math.sin(t * 0.001 + i) * 22, endX, endY);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawWaterVolumeBlobs(t, top, bottom, time, weather) {
+  const w = state.w;
+  const height = bottom - top;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, top, w, height);
+  ctx.clip();
+
+  ctx.globalCompositeOperation = 'multiply';
+  for (let i = 0; i < 16; i++) {
+    const depth = (i % 8) / 7;
+    const lane = Math.floor(i / 8);
+    const speed = 0.012 + depth * 0.018 + weather.wave * 0.01;
+    const x = ((i * 173 + t * speed * 28) % (w + 360)) - 180;
+    const y = top + height * (0.12 + depth * 0.74) + Math.sin(t * 0.0013 + i * 2.1) * (8 + weather.wave * 10);
+    const rx = (170 + depth * 310) * (0.72 + lane * 0.34);
+    const ry = 11 + depth * 38;
+    const alpha = (0.025 + depth * 0.055) * (0.7 + weather.chop * 0.42);
+    drawGaussianBlob(x, y, rx, ry, `rgba(13,31,38,${alpha})`, 0.04);
+  }
+
+  ctx.globalCompositeOperation = 'screen';
+  const sunTrack = state.w * time.sunX;
+  for (let i = 0; i < 20; i++) {
+    const depth = i / 19;
+    const spread = 40 + depth * 360;
+    const x = sunTrack + Math.sin(i * 7.37 + t * 0.002) * spread + Math.sin(t * 0.0008 + i) * 24;
+    const y = top + height * (0.13 + depth * 0.72);
+    const rx = 18 + depth * 86 + weather.chop * 28;
+    const ry = 3 + depth * 14;
+    const alpha = (0.03 + time.light * 0.075) * (1 - depth * 0.42) * (1 - weather.cloud * 0.48);
+    drawGaussianBlob(x, y, rx, ry, `rgba(255,229,150,${alpha})`, 0.16);
+  }
+
+  for (let i = 0; i < 26; i++) {
+    const depth = i / 25;
+    const x = ((i * 251 + Math.sin(t * 0.001 + i) * 90) % (w + 260)) - 130;
+    const y = top + height * (0.18 + depth * 0.75);
+    const rx = 40 + depth * 155;
+    const ry = 4 + depth * 18;
+    const foamGate = 0.35 + weather.foam * 0.55;
+    const phase = Math.max(0, Math.sin(t * 0.003 + i * 1.71));
+    drawGaussianBlob(x, y, rx, ry, `rgba(222,252,255,${(0.018 + phase * 0.045) * foamGate})`, 0.2);
+  }
+
+  const fog = ctx.createLinearGradient(0, top, 0, bottom);
+  fog.addColorStop(0, `rgba(225,245,247,${0.14 + weather.haze * 0.22})`);
+  fog.addColorStop(0.18, `rgba(225,245,247,${0.06 + weather.haze * 0.16})`);
+  fog.addColorStop(0.55, 'rgba(225,245,247,0)');
+  fog.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = fog;
+  ctx.fillRect(0, top, w, height);
+  ctx.restore();
+}
+
+function drawGaussianBlob(x, y, rx, ry, color, hardStop = 0.0) {
+  const r = Math.max(rx, ry);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(rx / r, ry / r);
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+  g.addColorStop(0, color);
+  g.addColorStop(0.42 + hardStop, fadeRgba(color, 0.32));
+  g.addColorStop(1, fadeRgba(color, 0));
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function fadeRgba(color, alphaScale) {
+  const match = color.match(/rgba\(([^,]+),([^,]+),([^,]+),([^)]+)\)/);
+  if (!match) return color;
+  const r = Number(match[1]);
+  const g = Number(match[2]);
+  const b = Number(match[3]);
+  const a = Number(match[4]) * alphaScale;
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function drawSplashes(t) {
+  const now = performance.now();
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  state.splashes = state.splashes.filter(s => {
+    const age = now - s.born;
+    const p = age / s.ttl;
+    if (p >= 1) return false;
+    const alpha = (1 - p) * (0.42 + s.strength * 0.18);
+    const radius = 8 + p * (64 + s.strength * 30);
+    ctx.strokeStyle = `rgba(236,252,255,${alpha})`;
+    ctx.lineWidth = 1.6 * (1 - p) + 0.4;
+    ctx.beginPath();
+    ctx.ellipse(s.x, s.y + Math.sin(t * 0.006 + s.x) * 2, radius, radius * 0.18, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    for (let i = 0; i < 9; i++) {
+      const a = i * 0.698 + s.x * 0.01;
+      const dx = Math.cos(a) * radius * 0.42;
+      const dy = Math.sin(a) * radius * 0.12 - p * 18;
+      ctx.fillStyle = `rgba(255,255,255,${alpha * 0.72})`;
+      ctx.beginPath();
+      ctx.arc(s.x + dx, s.y + dy, Math.max(0.8, (1 - p) * 2.7 * s.strength), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return true;
+  });
+  ctx.restore();
+}
+
+function drawMolecularSurface(t, top, bottom, time, weather) {
+  const w = state.w;
+  const height = bottom - top;
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  ctx.lineWidth = 0.75;
+  for (let row = 0; row < 7; row++) {
+    const depth = row / 6;
+    const y = top + height * (0.18 + depth * 0.7);
+    const spacing = 44 + depth * 34;
+    const drift = (t * (0.007 + depth * 0.012) + row * 91) % spacing;
+    for (let x = -spacing; x < w + spacing; x += spacing) {
+      const px = x + drift + Math.sin(row * 4.7 + t * 0.0014) * 18;
+      const py = y + Math.sin(px * 0.012 + t * 0.002 + row) * (4 + weather.wave * 6);
+      const qx = px + spacing * 0.52;
+      const qy = py + Math.sin(qx * 0.018 - t * 0.0017) * (3 + weather.chop * 7);
+      const alpha = (0.014 + time.light * 0.018) * (1 - depth * 0.42);
+      ctx.strokeStyle = `rgba(210,252,255,${alpha})`;
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(qx, qy);
+      ctx.stroke();
+      ctx.fillStyle = `rgba(245,255,255,${alpha * 2.2})`;
+      ctx.beginPath();
+      ctx.arc(px, py, 1.1 + depth * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function drawSurfFlecks(t, top, bottom, weather) {
+  const w = state.w;
+  const foamBase = bottom - (bottom - top) * 0.09;
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  for (let i = 0; i < 90; i++) {
+    const x = (i * 89.7 + Math.sin(t * 0.001 + i) * 28) % w;
+    const y = foamBase + Math.sin(i * 11.31 + t * 0.004) * (5 + weather.wave * 8);
+    const alpha = (0.04 + weather.foam * 0.13) * (0.45 + 0.55 * Math.sin(t * 0.003 + i));
+    ctx.fillStyle = `rgba(244,253,255,${alpha})`;
+    ctx.beginPath();
+    ctx.ellipse(x, y, 1.6 + (i % 5) * 0.9, 0.55 + (i % 3) * 0.25, Math.sin(i) * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawFishShadows(t, top, bottom) {
+  const w = state.w;
+  ctx.save();
+  for (let i = 0; i < 7; i++) {
+    const x = (w - ((t * (0.018 + i * 0.004) + i * 221) % (w + 260))) + 130;
+    const y = top + ((i * 47) % 100) / 100 * (bottom - top) * 0.82;
+    const s = 0.55 + ((i * 13) % 60) / 100;
+    const fish = FISH[i % FISH.length];
+    drawFishSprite(x, y, 58 * s, fish.color, i % 2 ? -1 : 1, 0.09 + (1 - s) * 0.04, t * 0.001 + i);
+  }
+  ctx.restore();
+}
+
+function drawFishSprite(x, y, len, color, dir = 1, alpha = 1, phase = 0) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(dir, 1);
+  ctx.globalAlpha *= alpha;
+  const bodyH = len * 0.23;
+  const tail = len * 0.24;
+  const shimmer = Math.sin(phase * 6.283) * 0.08;
+  const grad = ctx.createLinearGradient(-len * 0.5, -bodyH, len * 0.5, bodyH);
+  grad.addColorStop(0, mix(color, '#0a1620', 0.42));
+  grad.addColorStop(0.34, mix(color, '#ffffff', 0.2 + shimmer));
+  grad.addColorStop(0.72, color);
+  grad.addColorStop(1, mix(color, '#031018', 0.52));
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, len * 0.46, bodyH, -0.02, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = mix(color, '#ffffff', 0.16);
+  ctx.beginPath();
+  ctx.moveTo(-len * 0.42, 0);
+  ctx.lineTo(-len * 0.42 - tail, -bodyH * 0.95);
+  ctx.quadraticCurveTo(-len * 0.52, 0, -len * 0.42 - tail, bodyH * 0.95);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = `rgba(255,255,255,${0.16 + alpha * 0.08})`;
+  ctx.beginPath();
+  ctx.ellipse(len * 0.08, -bodyH * 0.28, len * 0.18, bodyH * 0.2, -0.15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = `rgba(255,255,255,${0.14 + alpha * 0.08})`;
+  ctx.lineWidth = Math.max(0.7, len * 0.012);
+  for (let i = 0; i < 4; i++) {
+    const sx = -len * 0.16 + i * len * 0.11;
+    ctx.beginPath();
+    ctx.moveTo(sx, -bodyH * 0.72);
+    ctx.quadraticCurveTo(sx + len * 0.03, 0, sx - len * 0.02, bodyH * 0.74);
+    ctx.stroke();
+  }
+  ctx.fillStyle = mix(color, '#fff6cc', 0.22);
+  ctx.beginPath();
+  ctx.moveTo(-len * 0.06, -bodyH * 0.84);
+  ctx.lineTo(len * 0.12, -bodyH * 1.55);
+  ctx.lineTo(len * 0.2, -bodyH * 0.48);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(len * 0.04, bodyH * 0.78);
+  ctx.lineTo(len * 0.25, bodyH * 1.34);
+  ctx.lineTo(len * 0.2, bodyH * 0.28);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = 'rgba(5,12,16,0.75)';
+  ctx.beginPath();
+  ctx.arc(len * 0.31, -bodyH * 0.24, Math.max(1, len * 0.024), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawShore(t, time) {
+  const w = state.w, h = state.h;
+  const y = h * 0.84;
+  const g = ctx.createLinearGradient(0, y, 0, h);
+  g.addColorStop(0, mix(time.sand, '#ffffff', 0.15));
+  g.addColorStop(0.28, mix(time.sand, '#6b6656', 0.18));
+  g.addColorStop(1, mix(time.sand, '#4d3926', 0.24));
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(0, h);
+  ctx.lineTo(0, y + 30);
+  ctx.bezierCurveTo(w * 0.25, y + 12, w * 0.58, y + 34, w, y + 10);
+  ctx.lineTo(w, h);
+  ctx.closePath();
+  ctx.fill();
+
+  const wet = ctx.createLinearGradient(0, y - 4, 0, y + h * 0.13);
+  wet.addColorStop(0, 'rgba(215,244,255,0.36)');
+  wet.addColorStop(0.45, 'rgba(80,95,90,0.12)');
+  wet.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = wet;
+  ctx.beginPath();
+  ctx.moveTo(0, y + 14);
+  ctx.bezierCurveTo(w * 0.26, y + 2, w * 0.57, y + 24, w, y + 2);
+  ctx.lineTo(w, y + h * 0.16);
+  ctx.bezierCurveTo(w * 0.65, y + h * 0.12, w * 0.32, y + h * 0.15, 0, y + h * 0.1);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.save();
+  ctx.globalAlpha = 0.12 * time.light;
+  ctx.strokeStyle = '#fff3c6';
+  for (let i = 0; i < 24; i++) {
+    const yy = y + 34 + i * 8;
+    ctx.beginPath();
+    ctx.moveTo(0, yy);
+    ctx.bezierCurveTo(w * 0.3, yy - 12, w * 0.65, yy + 10, w, yy - 8);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  drawWetReflections(t, y, time);
+  drawShoreWash(t, y, time);
+  drawSandGrain(t, y, time);
+  drawWetSandCaustics(t, y, time);
+  drawShellsAndPebbles(t, y, time);
+  drawFootprintsAndTideWrack(t, y, time);
+}
+
+function drawWetReflections(t, shoreTop, time) {
+  const w = state.w, h = state.h;
+  const horizonGlow = state.time === 'night' ? 0.28 : time.light;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, shoreTop - 44, w, h - shoreTop + 44);
+  ctx.clip();
+  ctx.globalCompositeOperation = 'multiply';
+  const silhouettes = [
+    { x: w * 0.16, y: shoreTop - 38, rx: 98, ry: 28, a: 0.16 },
+    { x: w * 0.31, y: shoreTop - 22, rx: 54, ry: 16, a: 0.22 },
+    { x: w * 0.80, y: shoreTop - 24, rx: 122, ry: 25, a: 0.18 },
+  ];
+  for (const s of silhouettes) {
+    const g = ctx.createRadialGradient(s.x, s.y + 38, 4, s.x, s.y + 38, s.rx);
+    g.addColorStop(0, `rgba(20,17,13,${s.a})`);
+    g.addColorStop(0.58, `rgba(20,17,13,${s.a * 0.4})`);
+    g.addColorStop(1, 'rgba(20,17,13,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(s.x, s.y + 38, s.rx, s.ry, Math.sin(t * 0.0008 + s.x) * 0.035, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalCompositeOperation = 'screen';
+  const lightPools = [
+    { x: w * 0.18, y: shoreTop + 6, c: '255,211,112', a: state.time === 'night' ? 0.34 : 0.12 },
+    { x: w * 0.79, y: shoreTop + 4, c: '116,221,224', a: 0.12 + horizonGlow * 0.08 },
+  ];
+  for (const p of lightPools) {
+    const g = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, 130);
+    g.addColorStop(0, `rgba(${p.c},${p.a})`);
+    g.addColorStop(0.48, `rgba(${p.c},${p.a * 0.32})`);
+    g.addColorStop(1, `rgba(${p.c},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y + 32, 116, 22, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawShoreWash(t, shoreTop, time) {
+  const w = state.w;
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  for (let i = 0; i < 4; i++) {
+    const y = shoreTop - 13 + i * 7 + Math.sin(t * 0.0012 + i) * 4;
+    const alpha = (0.07 + i * 0.018) * time.light;
+    ctx.strokeStyle = `rgba(238,253,255,${alpha})`;
+    ctx.lineWidth = 1.6 + i * 1.2;
+    ctx.beginPath();
+    for (let x = -30; x <= w + 30; x += 16) {
+      const yy = y + Math.sin(x * 0.018 + t * 0.002 + i) * (3 + i);
+      if (x === -30) ctx.moveTo(x, yy);
+      else ctx.lineTo(x, yy);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawWetSandCaustics(t, shoreTop, time) {
+  const w = state.w, h = state.h;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, shoreTop - 6, w, h - shoreTop);
+  ctx.clip();
+  ctx.globalCompositeOperation = 'screen';
+  ctx.globalAlpha = 0.16 * time.light;
+  ctx.strokeStyle = 'rgba(255,244,196,0.5)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 20; i++) {
+    const y = shoreTop + 12 + i * 7;
+    ctx.beginPath();
+    for (let x = -20; x <= w + 20; x += 16) {
+      const yy = y + Math.sin(x * 0.026 + t * 0.0024 + i) * 4 + Math.sin(x * 0.071 - t * 0.0018) * 1.4;
+      if (x === -20) ctx.moveTo(x, yy);
+      else ctx.lineTo(x, yy);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawShellsAndPebbles(t, shoreTop, time) {
+  const w = state.w, h = state.h;
+  ctx.save();
+  ctx.globalAlpha = 0.22 + time.light * 0.18;
+  for (let i = 0; i < 46; i++) {
+    const x = (i * 137.9) % w;
+    const y = shoreTop + 25 + ((i * 41.3) % Math.max(20, h - shoreTop - 36));
+    const s = 0.7 + (i % 7) * 0.18;
+    ctx.fillStyle = i % 4 === 0 ? '#f5dfb1' : i % 4 === 1 ? '#805e45' : i % 4 === 2 ? '#ceb27c' : '#5d4b3c';
+    ctx.beginPath();
+    ctx.ellipse(x, y, 2.8 * s, 1.5 * s, Math.sin(i * 2.1), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 0.18 + time.light * 0.22;
+  for (let i = 0; i < 5; i++) {
+    const x = (i * 263 + w * 0.18) % w;
+    const y = shoreTop + 44 + ((i * 37) % Math.max(20, h - shoreTop - 72));
+    ctx.fillStyle = i % 2 ? '#d37f58' : '#dbb56f';
+    ctx.beginPath();
+    for (let p = 0; p < 10; p++) {
+      const a = p / 10 * Math.PI * 2;
+      const r = p % 2 ? 4.2 : 8.5;
+      const px = x + Math.cos(a) * r;
+      const py = y + Math.sin(a) * r * 0.68;
+      if (p === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawBeachGear(x, y, s, t, time) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  drawContactShadow(0, 22, 108, 18, 0.19);
+
+  ctx.save();
+  ctx.rotate(-0.08);
+  const cooler = ctx.createLinearGradient(-72, -12, -18, 26);
+  cooler.addColorStop(0, '#cfe9ef');
+  cooler.addColorStop(0.55, '#6ba5b3');
+  cooler.addColorStop(1, '#254352');
+  ctx.fillStyle = cooler;
+  roundRect(-78, -16, 58, 36, 5);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fillRect(-73, -11, 48, 5);
+  ctx.strokeStyle = 'rgba(10,24,31,0.38)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-67, -17);
+  ctx.quadraticCurveTo(-49, -30, -30, -17);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.save();
+  ctx.rotate(0.13);
+  ctx.strokeStyle = '#6c4930';
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, 24); ctx.lineTo(22, -34); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(54, 24); ctx.lineTo(29, -34); ctx.stroke();
+  const fabric = ctx.createLinearGradient(3, -33, 50, 9);
+  fabric.addColorStop(0, '#f3d779');
+  fabric.addColorStop(0.5, '#d97858');
+  fabric.addColorStop(1, '#6b2f38');
+  ctx.fillStyle = fabric;
+  ctx.beginPath();
+  ctx.moveTo(3, -33);
+  ctx.quadraticCurveTo(29, -20 + Math.sin(t * 0.002) * 2, 52, -31);
+  ctx.lineTo(42, 7);
+  ctx.quadraticCurveTo(24, 16, 8, 5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(82, -4);
+  ctx.fillStyle = '#2e2418';
+  roundRect(-10, -20, 20, 34, 4);
+  ctx.fill();
+  ctx.fillStyle = state.time === 'night' ? 'rgba(255,205,98,0.9)' : 'rgba(255,225,140,0.42)';
+  roundRect(-6, -13, 12, 18, 5);
+  ctx.fill();
+  ctx.globalCompositeOperation = 'screen';
+  const glow = ctx.createRadialGradient(0, -4, 1, 0, -4, 42);
+  glow.addColorStop(0, state.time === 'night' ? 'rgba(255,198,79,0.5)' : 'rgba(255,226,150,0.12)');
+  glow.addColorStop(1, 'rgba(255,198,79,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(0, -4, 42, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = 'rgba(55,36,21,0.34)';
+  for (let i = 0; i < 5; i++) {
+    ctx.beginPath();
+    ctx.ellipse(-7 + i * 23, 34 + Math.sin(i) * 2, 18, 3, -0.04, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawFootprintsAndTideWrack(t, shoreTop, time) {
+  const w = state.w, h = state.h;
+  ctx.save();
+  ctx.globalAlpha = 0.17 + time.light * 0.14;
+  ctx.fillStyle = 'rgba(78,52,31,0.45)';
+  for (let i = 0; i < 11; i++) {
+    const x = w * 0.38 + i * 28;
+    const y = shoreTop + 42 + Math.sin(i * 0.9) * 8;
+    ctx.beginPath();
+    ctx.ellipse(x, y, 5, 2.3, -0.48, 0, Math.PI * 2);
+    ctx.ellipse(x + 10, y + 8, 5, 2.3, -0.48, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.strokeStyle = 'rgba(65,58,30,0.32)';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 26; i++) {
+    const x = (i * 83.5 + 37) % w;
+    const y = shoreTop + 18 + ((i * 29.7) % Math.max(20, h - shoreTop - 60));
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.quadraticCurveTo(x + 8, y - 3, x + 18, y + Math.sin(t * 0.001 + i) * 3);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawSandGrain(t, top, time) {
+  const w = state.w, h = state.h;
+  ctx.save();
+  ctx.globalAlpha = 0.13 * time.light;
+  for (let i = 0; i < 340; i++) {
+    const x = (i * 97.13) % w;
+    const y = top + 8 + ((i * 53.7) % (h - top - 8));
+    const r = 0.4 + ((i * 11) % 4) * 0.13;
+    ctx.fillStyle = i % 5 === 0 ? 'rgba(255,248,205,0.65)' : 'rgba(73,50,28,0.46)';
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawContactShadow(x, y, rx, ry, alpha=0.22) {
+  ctx.save();
+  const g = ctx.createRadialGradient(x, y, 1, x, y, rx);
+  g.addColorStop(0, `rgba(0,0,0,${alpha})`);
+  g.addColorStop(0.58, `rgba(0,0,0,${alpha * 0.38})`);
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawWoodGrain(x, y, w, h, time, density = 9) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  ctx.globalAlpha = 0.14 + time.light * 0.08;
+  ctx.strokeStyle = 'rgba(255,218,142,0.42)';
+  ctx.lineWidth = 0.8;
+  for (let i = 0; i < density; i++) {
+    const yy = y + 5 + (i / Math.max(1, density - 1)) * (h - 10);
+    ctx.beginPath();
+    for (let px = x - 6; px <= x + w + 6; px += 8) {
+      const py = yy + Math.sin(px * 0.08 + i * 1.7) * 1.8 + Math.sin(px * 0.023 + i) * 1.2;
+      if (px === x - 6) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 0.11;
+  ctx.fillStyle = '#0a0705';
+  for (let i = 0; i < 5; i++) {
+    const kx = x + 13 + ((i * 29) % Math.max(20, w - 20));
+    const ky = y + 11 + ((i * 17) % Math.max(16, h - 18));
+    ctx.beginPath();
+    ctx.ellipse(kx, ky, 8, 2.2, Math.sin(i) * 0.5, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawForegroundPlants(x, y, s, time) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  ctx.globalAlpha = 0.72 + time.light * 0.2;
+  drawContactShadow(4, 61, 54, 11, 0.2);
+  for (let i = 0; i < 9; i++) {
+    const a = -1.2 + i * 0.3;
+    const len = 44 + (i % 3) * 18;
+    ctx.strokeStyle = i % 2 ? '#234a35' : '#315d42';
+    ctx.lineWidth = 6 - Math.abs(i - 4) * 0.35;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, 60);
+    ctx.quadraticCurveTo(Math.cos(a) * len * 0.34, 28 + Math.sin(a) * 18, Math.cos(a) * len, 12 + Math.sin(a) * 28);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawBeachHouse(x, y, s, time) {
+  if (houseSprite.complete && houseSprite.naturalWidth) {
+    drawBeachHouseAsset(x, y, s, time);
+    return;
+  }
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  drawContactShadow(66, 69, 98, 17, 0.26);
+  ctx.shadowColor = 'rgba(0,0,0,0.24)';
+  ctx.shadowBlur = 14;
+  ctx.shadowOffsetY = 8;
+  const siding = ctx.createLinearGradient(0, 0, 130, 62);
+  siding.addColorStop(0, mix('#b87949', '#231713', 1 - time.light));
+  siding.addColorStop(0.5, mix('#8f5633', '#1f120c', 1 - time.light));
+  siding.addColorStop(1, mix('#6f3f27', '#120a07', 1 - time.light));
+  ctx.fillStyle = siding;
+  roundRect(0, 0, 130, 62, 2);
+  ctx.fill();
+  drawWoodGrain(0, 0, 130, 62, time, 11);
+  const side = ctx.createLinearGradient(130, 2, 162, 58);
+  side.addColorStop(0, mix('#65371f', '#120a07', 1 - time.light));
+  side.addColorStop(1, mix('#3d2416', '#050302', 1 - time.light));
+  ctx.fillStyle = side;
+  ctx.beginPath();
+  ctx.moveTo(130, 0);
+  ctx.lineTo(162, 17);
+  ctx.lineTo(162, 58);
+  ctx.lineTo(130, 62);
+  ctx.closePath();
+  ctx.fill();
+  drawWoodGrain(130, 8, 30, 48, time, 6);
+  ctx.fillStyle = mix('#7b2b1c', '#1c0c08', 1 - time.light);
+  ctx.beginPath();
+  ctx.moveTo(-12, 2);
+  ctx.lineTo(64, -42);
+  ctx.lineTo(142, 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = mix('#4b1b14', '#090403', 1 - time.light);
+  ctx.beginPath();
+  ctx.moveTo(64, -42);
+  ctx.lineTo(142, 2);
+  ctx.lineTo(172, 18);
+  ctx.lineTo(98, -30);
+  ctx.closePath();
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(35,20,11,0.38)';
+  for (let i = 0; i < 5; i++) ctx.fillRect(10 + i * 23, 4, 2, 58);
+  ctx.fillStyle = 'rgba(255,240,184,0.16)';
+  ctx.fillRect(3, 5, 124, 2);
+  ctx.strokeStyle = `rgba(255,237,172,${0.16 + time.light * 0.16})`;
+  ctx.lineWidth = 1.1;
+  ctx.beginPath();
+  ctx.moveTo(4, 1);
+  ctx.lineTo(126, 1);
+  ctx.stroke();
+  ctx.fillStyle = state.time === 'night' ? 'rgba(255,211,105,0.92)' : 'rgba(255,218,121,0.5)';
+  roundRect(49, 20, 27, 34, 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.24)';
+  ctx.fillRect(61, 20, 2, 34);
+  ctx.fillRect(49, 35, 27, 2);
+  ctx.strokeStyle = 'rgba(255,236,154,0.34)';
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.moveTo(54 + i * 5, 56);
+    ctx.lineTo(24 + i * 16, 83);
+    ctx.stroke();
+  }
+  drawPalm(138, 12, 0.85);
+  ctx.restore();
+}
+
+function drawBeachHouseAsset(x, y, s, time) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  drawContactShadow(72, 70, 116, 19, 0.28);
+  ctx.shadowColor = 'rgba(0,0,0,0.24)';
+  ctx.shadowBlur = 16;
+  ctx.shadowOffsetY = 8;
+  ctx.drawImage(houseSprite, -22, -58, 205, 171);
+  ctx.shadowBlur = 0;
+  ctx.globalCompositeOperation = 'screen';
+  const windowGlow = ctx.createRadialGradient(64, 42, 2, 64, 42, 70);
+  windowGlow.addColorStop(0, `rgba(255,213,107,${state.time === 'night' ? 0.34 : 0.10 + time.light * 0.05})`);
+  windowGlow.addColorStop(1, 'rgba(255,213,107,0)');
+  ctx.fillStyle = windowGlow;
+  ctx.beginPath();
+  ctx.ellipse(64, 54, 76, 18, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawPalm(x, y, s) {
+  if (palmSprite.complete && palmSprite.naturalWidth) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(s, s);
+    drawContactShadow(2, 63, 50, 10, 0.18);
+    ctx.drawImage(palmSprite, -54, -48, 118, 128);
+    ctx.restore();
+    return;
+  }
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  ctx.strokeStyle = '#44301d';
+  ctx.lineWidth = 8;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, 62);
+  ctx.quadraticCurveTo(6, 30, -4, 0);
+  ctx.stroke();
+  ctx.strokeStyle = '#23482d';
+  ctx.lineWidth = 7;
+  for (let i = 0; i < 7; i++) {
+    const a = -Math.PI * 0.95 + i * 0.35;
+    ctx.beginPath();
+    ctx.moveTo(-4, 0);
+    ctx.quadraticCurveTo(Math.cos(a) * 32, Math.sin(a) * 18, Math.cos(a) * 58, Math.sin(a) * 30);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function labLocomotion(w, h, t) {
+  const walk = (Math.sin(t * 0.0011 + state.lab.seed) + 1) * 0.5;
+  const sniff = (Math.sin(t * 0.0027 + 1.4) + 1) * 0.5;
+  const pace = Math.sin(t * 0.0022 + state.lab.seed * 0.37);
+  const lope = Math.sin(t * 0.0044 + state.lab.seed);
+  const baseX = w * 0.305 + (walk - 0.5) * Math.min(170, w * 0.1);
+  const baseY = h * 0.822 + Math.sin(t * 0.0017) * 5;
+  return {
+    x: baseX,
+    y: baseY,
+    s: 1.14 + sniff * 0.05,
+    gait: lope,
+    pace,
+    head: -0.08 - sniff * 0.18 + Math.sin(t * 0.0031) * 0.05,
+    tail: Math.sin(t * 0.006) * (0.8 + sniff * 0.4),
+    facing: pace < -0.82 ? -1 : 1,
+  };
+}
+
+function drawBlackLab(x, y, s, t, time, pose = null) {
+  if (labSprite.complete && labSprite.naturalWidth) {
+    drawBlackLabAsset(x, y, s, t, time, pose);
+    return;
+  }
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  const wag = Math.sin(t * 0.011) * 8;
+  drawContactShadow(2, 12, 62, 14, 0.32);
+  const fur = ctx.createLinearGradient(-38, -17, 46, 14);
+  fur.addColorStop(0, '#010102');
+  fur.addColorStop(0.42, '#09090b');
+  fur.addColorStop(0.62, '#171a1c');
+  fur.addColorStop(1, '#030304');
+  ctx.fillStyle = fur;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 35, 13, -0.08, 0, Math.PI * 2);
+  ctx.fill();
+  const backSheen = ctx.createLinearGradient(-22, -15, 31, -3);
+  backSheen.addColorStop(0, 'rgba(255,255,255,0.02)');
+  backSheen.addColorStop(0.55, 'rgba(190,215,220,0.18)');
+  backSheen.addColorStop(1, 'rgba(255,255,255,0.01)');
+  ctx.fillStyle = backSheen;
+  ctx.beginPath();
+  ctx.ellipse(4, -7, 26, 5, -0.13, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(33, -13, 13, 0, Math.PI * 2);
+  ctx.fill();
+  const muzzle = ctx.createRadialGradient(46, -8, 1, 46, -8, 15);
+  muzzle.addColorStop(0, '#202326');
+  muzzle.addColorStop(0.7, '#0b0c0e');
+  muzzle.addColorStop(1, '#020203');
+  ctx.fillStyle = muzzle;
+  ctx.beginPath();
+  ctx.ellipse(45, -8, 13, 8, 0.16, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#040405';
+  ctx.lineWidth = 7;
+  ctx.lineCap = 'round';
+  for (const leg of [-18, -3, 16, 28]) {
+    ctx.beginPath();
+    ctx.moveTo(leg, 8);
+    ctx.lineTo(leg - 4, 21);
+    ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.14)';
+  ctx.beginPath();
+  ctx.ellipse(12, -6, 13, 3, -0.05, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#030304';
+  ctx.beginPath();
+  ctx.ellipse(45, -9, 9, 7, 0.18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#0b0b0c';
+  ctx.beginPath();
+  ctx.ellipse(48, -4, 8, 4, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(30,30,32,0.9)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(38, -6);
+  ctx.quadraticCurveTo(43, -1, 51, -3);
+  ctx.stroke();
+  ctx.fillStyle = '#111';
+  ctx.beginPath();
+  ctx.ellipse(28, -22, 6, 11, -0.75, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#050506';
+  ctx.beginPath();
+  ctx.ellipse(39, -24, 5, 10, 0.42, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#c7d6df';
+  ctx.beginPath();
+  ctx.arc(37, -16, 1.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.62)';
+  ctx.beginPath();
+  ctx.arc(37.5, -16.5, 0.45, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#1b1b1d';
+  ctx.beginPath();
+  ctx.arc(52, -10, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#c6a54d';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(29, -4, 8, 0.1, Math.PI * 0.82);
+  ctx.stroke();
+  ctx.strokeStyle = '#070707';
+  ctx.lineWidth = 8;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-26, -4);
+  ctx.quadraticCurveTo(-45, -23 + wag * 0.35, -58, -12 + wag);
+  ctx.stroke();
+  ctx.globalCompositeOperation = 'screen';
+  ctx.strokeStyle = `rgba(180,210,220,${0.06 + time.light * 0.08})`;
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 7; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-24 + i * 9, -9 + Math.sin(i) * 2);
+    ctx.quadraticCurveTo(-13 + i * 8, -16, 8 + i * 4, -8 + Math.cos(i) * 2);
+    ctx.stroke();
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#f0c04a';
+  ctx.beginPath();
+  ctx.arc(31, 3, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(225,235,238,0.13)';
+  for (const paw of [-21, -6, 13, 25]) {
+    ctx.beginPath();
+    ctx.ellipse(paw - 5, 23, 6, 2.4, -0.08, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawBlackLabAsset(x, y, s, t, time, pose = {}) {
+  ctx.save();
+  ctx.translate(x, y);
+  if (pose.facing < 0) ctx.scale(-1, 1);
+  ctx.scale(s, s);
+  const breathe = 1 + Math.sin(t * 0.003) * 0.012;
+  const gait = pose.gait || 0;
+  const head = pose.head || 0;
+  const tail = pose.tail || 0;
+  const w = 154;
+  const h = 104;
+  drawContactShadow(8, 29, 82, 17, 0.3);
+  drawLabPawContacts(gait, time);
+  ctx.globalAlpha = 0.98;
+  ctx.save();
+  ctx.translate(0, Math.sin(t * 0.004) * 1.4);
+  ctx.scale(1 + (breathe - 1) * 0.7, 1 - (breathe - 1) * 0.45);
+  if (Math.abs(gait) < 0.18) {
+    ctx.drawImage(labSprite, -76, -72, w, h);
+  } else {
+    drawSegmentedLabSprite(w, h, gait, head, tail);
+  }
+  ctx.restore();
+  ctx.globalCompositeOperation = 'screen';
+  const rim = ctx.createLinearGradient(-70, -64, 78, 22);
+  rim.addColorStop(0, `rgba(255,210,121,${0.08 + time.light * 0.08})`);
+  rim.addColorStop(0.62, 'rgba(255,255,255,0)');
+  rim.addColorStop(1, `rgba(108,209,235,${0.08 + time.light * 0.06})`);
+  ctx.fillStyle = rim;
+  ctx.beginPath();
+  ctx.ellipse(2, -20, 76, 42, -0.03, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawSegmentedLabSprite(w, h, gait, head, tail) {
+  const iw = labSprite.naturalWidth;
+  const ih = labSprite.naturalHeight;
+  const drawPart = (sx, sy, sw, sh, dx, dy, dw, dh, rot = 0) => {
+    ctx.save();
+    ctx.translate(dx + dw * 0.5, dy + dh * 0.5);
+    ctx.rotate(rot);
+    ctx.drawImage(labSprite, sx * iw, sy * ih, sw * iw, sh * ih, -dw * 0.5, -dh * 0.5, dw, dh);
+    ctx.restore();
+  };
+  drawPart(0.04, 0.12, 0.36, 0.78, -76, -69 + gait * 0.9, w * 0.38, h * 0.96, -tail * 0.01);
+  drawPart(0.28, 0.10, 0.43, 0.78, -32, -71, w * 0.48, h, gait * 0.006);
+  drawPart(0.62, 0.08, 0.33, 0.76, 20, -71 + head * 8, w * 0.36, h * 0.95, head);
+  ctx.save();
+  ctx.globalAlpha = 0.72;
+  drawPart(0.18, 0.57, 0.62, 0.34, -47 + gait * 4, -20 + Math.abs(gait) * 2.4, w * 0.66, h * 0.43, gait * 0.02);
+  drawPart(0.23, 0.57, 0.57, 0.34, -41 - gait * 4, -20, w * 0.6, h * 0.43, -gait * 0.018);
+  ctx.restore();
+}
+
+function drawLabPawContacts(gait, time) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'multiply';
+  const contacts = [
+    [-37 + gait * 5, 29, 15, Math.max(0.12, 0.24 - gait * 0.07)],
+    [-13 - gait * 4, 31, 12, Math.max(0.1, 0.2 + gait * 0.04)],
+    [17 + gait * 3, 30, 14, Math.max(0.1, 0.2 - gait * 0.05)],
+    [35 - gait * 5, 29, 11, Math.max(0.1, 0.19 + gait * 0.06)],
+  ];
+  for (const [x, y, rx, alpha] of contacts) {
+    ctx.fillStyle = `rgba(16,12,9,${alpha * (0.72 + time.light * 0.15)})`;
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, 3.2, -0.06, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawBarAndAlhena(x, y, t, time) {
+  if (barSprite.complete && barSprite.naturalWidth && alhenaSprite.complete && alhenaSprite.naturalWidth) {
+    drawBarAndAlhenaAssets(x, y, t, time);
+    return;
+  }
+  const a = ALHENA[state.alhena % ALHENA.length];
+  ctx.save();
+  ctx.translate(x, y);
+  drawContactShadow(-8, 103, 122, 21, 0.38);
+  drawBarBacklight(time);
+  const barGrad = ctx.createLinearGradient(-80, 0, 80, 80);
+  barGrad.addColorStop(0, '#5b351e');
+  barGrad.addColorStop(1, '#1b100b');
+  ctx.fillStyle = barGrad;
+  roundRect(-94, 34, 170, 64, 5);
+  ctx.fill();
+  drawWoodGrain(-94, 36, 170, 60, time, 12);
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  for (let i = 0; i < 7; i++) ctx.fillRect(-83 + i * 24, 39, 2, 53);
+  ctx.fillStyle = '#122f32';
+  roundRect(-106, 20, 194, 15, 8);
+  ctx.fill();
+  ctx.strokeStyle = `rgba(161,238,226,${0.22 + time.light * 0.12})`;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-97, 22);
+  ctx.lineTo(78, 22);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  roundRect(-98, 22, 72, 5, 3);
+  ctx.fill();
+  drawBarWetVarnish(time);
+  ctx.fillStyle = 'rgba(255,221,120,0.64)';
+  ctx.font = '9px DM Sans';
+  ctx.fillText('ALHENA', -64, 66);
+  drawBarDetails(-92, 24);
+
+  ctx.save();
+  ctx.translate(1, -10);
+  ctx.scale(1.18, 1.18);
+  const breath = Math.sin(t * 0.003) * 1.6;
+  ctx.strokeStyle = a.skin;
+  ctx.lineWidth = 6;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-21, 17 + breath);
+  ctx.quadraticCurveTo(-42, 32 + breath, -52, 47);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(2, 18 + breath);
+  ctx.quadraticCurveTo(24, 30 + breath, 38, 44);
+  ctx.stroke();
+  const dressBase = ctx.createLinearGradient(-30, 18, 14, 70);
+  dressBase.addColorStop(0, mix(a.dress, '#ffffff', 0.13 * time.light));
+  dressBase.addColorStop(0.45, a.dress);
+  dressBase.addColorStop(1, mix(a.dress, '#071017', 0.42));
+  ctx.fillStyle = dressBase;
+  ctx.beginPath();
+  ctx.moveTo(-20, 22 + breath);
+  ctx.quadraticCurveTo(-10, -18 + breath, 4, 20 + breath);
+  ctx.lineTo(14, 68);
+  ctx.lineTo(-32, 68);
+  ctx.closePath();
+  ctx.fill();
+  drawFabricMicrofolds(-24, 25 + breath, 36, 43, a.dress, t, time);
+  ctx.strokeStyle = `rgba(255,255,255,${0.08 + time.light * 0.08})`;
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 5; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-20 + i * 8, 30 + breath);
+    ctx.quadraticCurveTo(-16 + i * 6, 48, -18 + i * 9, 66);
+    ctx.stroke();
+  }
+  const dressHi = ctx.createLinearGradient(-24, 15, 12, 68);
+  dressHi.addColorStop(0, 'rgba(255,255,255,0.28)');
+  dressHi.addColorStop(0.55, 'rgba(255,255,255,0.03)');
+  dressHi.addColorStop(1, 'rgba(0,0,0,0.2)');
+  ctx.fillStyle = dressHi;
+  ctx.beginPath();
+  ctx.moveTo(-14, 24);
+  ctx.quadraticCurveTo(-7, -4, 2, 22);
+  ctx.lineTo(9, 64);
+  ctx.lineTo(-10, 64);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = a.skin;
+  ctx.beginPath();
+  ctx.arc(-9, -12 + breath * 0.25, 15, 0, Math.PI * 2);
+  ctx.fill();
+  drawFacePlanes(-9, -12 + breath * 0.25, a, time);
+  ctx.fillStyle = mix(a.skin, '#3a1d16', 0.28);
+  ctx.beginPath();
+  ctx.ellipse(-10, -1 + breath * 0.2, 10, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  drawAlhenaShoulders(a, breath, time);
+  const faceLight = ctx.createRadialGradient(-15, -18, 1, -9, -12, 16);
+  faceLight.addColorStop(0, 'rgba(255,236,193,0.38)');
+  faceLight.addColorStop(0.55, 'rgba(255,236,193,0.08)');
+  faceLight.addColorStop(1, 'rgba(0,0,0,0.18)');
+  ctx.fillStyle = faceLight;
+  ctx.beginPath();
+  ctx.arc(-9, -12 + breath * 0.25, 15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.16)';
+  ctx.beginPath();
+  ctx.ellipse(-15, -16, 4, 7, -0.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = a.hair;
+  ctx.beginPath();
+  ctx.arc(-10, -19, 16, Math.PI, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(-25, -11, 6, 14, -0.15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(5, -11, 5, 13, 0.12, 0, Math.PI * 2);
+  ctx.fill();
+  drawHairStrandVolume(-10, -18, a.hair, t, time);
+  ctx.strokeStyle = `rgba(255,255,255,${0.05 + time.light * 0.05})`;
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 8; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-21 + i * 3, -25);
+    ctx.quadraticCurveTo(-25 + i * 4, -17, -22 + i * 3, -6);
+    ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(255,244,206,0.9)';
+  ctx.beginPath();
+  ctx.arc(-15, -11, 2, 0, Math.PI * 2);
+  ctx.arc(-4, -11, 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(41,25,20,0.78)';
+  ctx.beginPath();
+  ctx.arc(-14.5, -10.8, 0.7, 0, Math.PI * 2);
+  ctx.arc(-3.5, -10.8, 0.7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(100,54,42,0.32)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-9, -10);
+  ctx.lineTo(-10.6, -6);
+  ctx.stroke();
+  ctx.strokeStyle = '#e3b1a2';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.arc(-9, -5, 5, 0.1, Math.PI - 0.1);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,228,182,0.42)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(-9, 2, 20, Math.PI * 1.12, Math.PI * 1.88);
+  ctx.stroke();
+  drawCharacterOcclusion(time);
+  drawAlhenaRimSilhouette(time);
+  ctx.fillStyle = 'rgba(255,230,164,0.68)';
+  ctx.beginPath();
+  ctx.arc(-23, -8, 2, 0, Math.PI * 2);
+  ctx.arc(4, -8, 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-32, 68);
+  ctx.quadraticCurveTo(-12, 78 + Math.sin(t * 0.002) * 2, 14, 68);
+  ctx.stroke();
+  ctx.restore();
+  ctx.restore();
+}
+
+function drawBarAndAlhenaAssets(x, y, t, time) {
+  ctx.save();
+  ctx.translate(x, y);
+  drawContactShadow(-10, 104, 136, 22, 0.38);
+  drawBarBacklight(time);
+  ctx.shadowColor = 'rgba(0,0,0,0.24)';
+  ctx.shadowBlur = 14;
+  ctx.shadowOffsetY = 7;
+  const breath = Math.sin(t * 0.003) * 1.8;
+  ctx.save();
+  ctx.translate(-3, -1 + breath);
+  ctx.drawImage(alhenaSprite, -54, -86, 108, 162);
+  ctx.restore();
+  ctx.drawImage(barSprite, -124, 0, 236, 157);
+  ctx.shadowBlur = 0;
+  ctx.globalCompositeOperation = 'screen';
+  const rim = ctx.createLinearGradient(-70, -82, 78, 128);
+  rim.addColorStop(0, `rgba(255,221,158,${0.06 + time.light * 0.08})`);
+  rim.addColorStop(0.5, 'rgba(255,255,255,0)');
+  rim.addColorStop(1, `rgba(96,226,236,${0.07 + time.light * 0.06})`);
+  ctx.strokeStyle = rim;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-49, -76);
+  ctx.bezierCurveTo(-88, -16, -75, 66, -51, 114);
+  ctx.moveTo(47, -76);
+  ctx.bezierCurveTo(77, -6, 72, 68, 51, 114);
+  ctx.stroke();
+  drawBarWetVarnish(time);
+  ctx.restore();
+}
+
+function drawAlhenaShoulders(a, breath, time) {
+  ctx.save();
+  const skinShade = mix(a.skin, '#2d1812', 0.22);
+  ctx.fillStyle = skinShade;
+  ctx.beginPath();
+  ctx.moveTo(-28, 15 + breath);
+  ctx.quadraticCurveTo(-10, 28 + breath, 15, 15 + breath);
+  ctx.lineTo(19, 25 + breath);
+  ctx.quadraticCurveTo(-8, 39 + breath, -32, 25 + breath);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalCompositeOperation = 'screen';
+  ctx.strokeStyle = `rgba(255,225,180,${0.18 * time.light})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-25, 18 + breath);
+  ctx.quadraticCurveTo(-8, 26 + breath, 13, 18 + breath);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawAlhenaRimSilhouette(time) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  const rim = ctx.createLinearGradient(-33, -30, 24, 72);
+  rim.addColorStop(0, `rgba(255,230,175,${0.06 + time.light * 0.08})`);
+  rim.addColorStop(0.55, 'rgba(255,255,255,0)');
+  rim.addColorStop(1, `rgba(89,225,238,${0.08 + time.light * 0.06})`);
+  ctx.strokeStyle = rim;
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.moveTo(-27, -6);
+  ctx.quadraticCurveTo(-37, 24, -31, 68);
+  ctx.moveTo(7, -6);
+  ctx.quadraticCurveTo(23, 25, 15, 68);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawBarBacklight(time) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  const glow = ctx.createRadialGradient(-7, 30, 5, -7, 30, 142);
+  glow.addColorStop(0, `rgba(255,219,142,${0.08 + time.light * 0.1})`);
+  glow.addColorStop(0.5, `rgba(73,199,212,${0.045 + time.light * 0.04})`);
+  glow.addColorStop(1, 'rgba(73,199,212,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.ellipse(-5, 47, 138, 88, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawBarWetVarnish(time) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  const shine = ctx.createLinearGradient(-98, 22, 82, 40);
+  shine.addColorStop(0, 'rgba(255,255,255,0.02)');
+  shine.addColorStop(0.28, `rgba(255,238,188,${0.18 * time.light})`);
+  shine.addColorStop(0.44, 'rgba(255,255,255,0.025)');
+  shine.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = shine;
+  roundRect(-100, 22, 188, 10, 7);
+  ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.strokeStyle = 'rgba(10,7,4,0.32)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 5; i++) {
+    const y = 48 + i * 9;
+    ctx.beginPath();
+    ctx.moveTo(-87, y);
+    ctx.bezierCurveTo(-36, y - 4, 18, y + 5, 70, y - 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawFabricMicrofolds(x, y, w, h, color, t, time) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x + 4, y - 7);
+  ctx.quadraticCurveTo(x + w * 0.5, y - 22, x + w - 1, y - 3);
+  ctx.lineTo(x + w + 4, y + h);
+  ctx.lineTo(x - 7, y + h);
+  ctx.closePath();
+  ctx.clip();
+  for (let i = 0; i < 10; i++) {
+    const k = i / 9;
+    const px = x + 3 + k * w + Math.sin(t * 0.002 + i) * 1.2;
+    const grad = ctx.createLinearGradient(px - 4, y, px + 6, y + h);
+    grad.addColorStop(0, `rgba(255,255,255,${0.05 + time.light * 0.05})`);
+    grad.addColorStop(0.45, 'rgba(255,255,255,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.11)');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = i % 3 === 0 ? 1.5 : 0.8;
+    ctx.beginPath();
+    ctx.moveTo(px, y - 2);
+    ctx.bezierCurveTo(px - 5, y + h * 0.28, px + 7, y + h * 0.62, px + Math.sin(i) * 5, y + h + 2);
+    ctx.stroke();
+  }
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.fillStyle = mix(color, '#05070a', 0.62);
+  ctx.globalAlpha = 0.12;
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.38, y + h * 0.85, w * 0.62, h * 0.22, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawFacePlanes(x, y, a, time) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.fillStyle = 'rgba(75,39,32,0.14)';
+  ctx.beginPath();
+  ctx.ellipse(x + 5, y + 2, 8, 12, 0.18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalCompositeOperation = 'screen';
+  const cheek = ctx.createRadialGradient(x - 5, y - 5, 1, x - 5, y - 5, 11);
+  cheek.addColorStop(0, `rgba(255,234,185,${0.34 * time.light})`);
+  cheek.addColorStop(1, 'rgba(255,234,185,0)');
+  ctx.fillStyle = cheek;
+  ctx.beginPath();
+  ctx.arc(x - 5, y - 5, 12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.strokeStyle = mix(a.skin, '#2b1511', 0.45);
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(x - 7, y + 3);
+  ctx.quadraticCurveTo(x - 1, y + 7, x + 7, y + 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawHairStrandVolume(x, y, color, t, time) {
+  ctx.save();
+  ctx.strokeStyle = mix(color, '#ffffff', 0.18 * time.light);
+  ctx.lineWidth = 0.75;
+  ctx.globalAlpha = 0.5;
+  for (let i = 0; i < 18; i++) {
+    const a = -Math.PI + i * (Math.PI / 17);
+    const sx = x + Math.cos(a) * 13;
+    const sy = y + Math.sin(a) * 8;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.quadraticCurveTo(sx + Math.sin(t * 0.002 + i) * 3, sy + 10, sx + Math.cos(i) * 6, sy + 23);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawCharacterOcclusion(time) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'multiply';
+  const occ = ctx.createRadialGradient(-8, 23, 3, -8, 35, 45);
+  occ.addColorStop(0, 'rgba(8,5,4,0.02)');
+  occ.addColorStop(0.62, 'rgba(8,5,4,0.16)');
+  occ.addColorStop(1, 'rgba(8,5,4,0)');
+  ctx.fillStyle = occ;
+  ctx.beginPath();
+  ctx.ellipse(-8, 38, 52, 41, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalCompositeOperation = 'screen';
+  ctx.strokeStyle = `rgba(120,220,230,${0.08 + time.light * 0.04})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(9, -19);
+  ctx.quadraticCurveTo(20, 22, 15, 68);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawBarDetails(x, y) {
+  ctx.save();
+  ctx.translate(x, y);
+  for (let i = 0; i < 6; i++) {
+    const bx = 28 + i * 21;
+    const h = 16 + (i % 3) * 6;
+    ctx.fillStyle = i % 2 ? 'rgba(43,113,102,0.7)' : 'rgba(152,92,45,0.74)';
+    roundRect(bx, 0 - h, 8, h, 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,244,190,0.38)';
+    ctx.fillRect(bx + 2, -h + 3, 2, h - 5);
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.beginPath();
+  ctx.ellipse(146, -3, 8, 2.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(146, -3);
+  ctx.lineTo(146, -16);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(146, -20, 6, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawRod(t) {
+  const w = state.w, h = state.h;
+  const baseX = w - 70;
+  const baseY = h - 18;
+  const castLift = state.mode === 'waiting' ? Math.min(1, (performance.now() - state.lastCastAt) / 420) : 0;
+  const biteShake = state.mode === 'bite' ? Math.sin(t * 0.045) * 5 : 0;
+  const tipX = w * 0.74 - castLift * 92;
+  const tipY = h * 0.735 - castLift * 88 + biteShake;
+
+  ctx.save();
+  ctx.strokeLinecap = 'round';
+  ctx.shadowColor = 'rgba(0,0,0,0.22)';
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 5;
+  ctx.strokeStyle = '#4b271b';
+  ctx.lineWidth = 18;
+  ctx.beginPath();
+  ctx.moveTo(baseX, baseY);
+  ctx.lineTo(baseX + 16, baseY + 38);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  const rodGrad = ctx.createLinearGradient(baseX, baseY, tipX, tipY);
+  rodGrad.addColorStop(0, '#ffe19a');
+  rodGrad.addColorStop(1, '#59401e');
+  ctx.strokeStyle = rodGrad;
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(baseX - 7, baseY - 5);
+  ctx.quadraticCurveTo(w * 0.86, h * 0.79, tipX, tipY);
+  ctx.stroke();
+
+  ctx.fillStyle = '#b7e7f3';
+  ctx.beginPath();
+  ctx.arc(baseX - 18, baseY - 5, 13, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.46)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  if (state.bobber) {
+    ctx.strokeStyle = 'rgba(255,246,212,0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.quadraticCurveTo((tipX + state.bobber.x) * 0.5, tipY + 90, state.bobber.x, state.bobber.y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawBobber(t) {
+  if (!state.bobber) return;
+  const now = performance.now();
+  const b = state.bobber;
+  if (state.mode === 'waiting') b.dip = Math.sin(t * 0.007) * 3;
+  if (state.mode === 'bite') b.dip = 12 + Math.abs(Math.sin(t * 0.035)) * 13;
+  ctx.save();
+  ctx.translate(b.x, b.y + b.dip);
+  ctx.fillStyle = '#f4f7fa';
+  ctx.beginPath();
+  ctx.arc(0, 0, 10, Math.PI, 0);
+  ctx.fill();
+  ctx.fillStyle = '#d84c3d';
+  ctx.beginPath();
+  ctx.arc(0, 0, 10, 0, Math.PI);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(5,14,25,0.42)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  if (state.mode === 'waiting' && now > state.biteAt) bite(now);
+  if (state.mode === 'bite') {
+    const p = 1 - Math.max(0, state.biteEndsAt - now) / Math.max(1, state.biteEndsAt - state.biteAt);
+    setTension(42 + p * 58);
+    if (now > state.biteEndsAt) miss();
+  }
+}
+
+function drawRain(t, weather) {
+  if (weather.rain <= 0) return;
+  const w = state.w, h = state.h;
+  ctx.save();
+  ctx.globalAlpha = weather.rain;
+  ctx.strokeStyle = 'rgba(220,240,255,0.35)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 160; i++) {
+    const x = (i * 71 + t * 0.42) % (w + 80) - 40;
+    const y = (i * 139 + t * 0.9) % h;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - 10, y + 28);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function frame(t) {
+  const time = TIMES[state.time];
+  const weather = WEATHER[state.weather];
+  state.camera.x += (state.camera.tx - state.camera.x) * 0.035;
+  state.camera.y += (state.camera.ty - state.camera.y) * 0.035;
+  drawWaterShader(t, time, weather);
+  ctx.clearRect(0, 0, state.w, state.h);
+  drawSky(t, time, weather);
+  drawWater(t, time, weather);
+  drawShore(t, time);
+  drawRain(t, weather);
+  drawFilmGrade(t, time, weather);
+  requestAnimationFrame(frame);
+}
+
+function drawFilmGrade(t, time, weather) {
+  const w = state.w, h = state.h;
+  ctx.save();
+  ctx.pointerEvents = 'none';
+  const vignette = ctx.createRadialGradient(w * 0.52, h * 0.48, h * 0.2, w * 0.52, h * 0.48, h * 0.82);
+  vignette.addColorStop(0, 'rgba(255,255,255,0.018)');
+  vignette.addColorStop(0.66, 'rgba(0,0,0,0)');
+  vignette.addColorStop(1, `rgba(0,0,0,${0.16 + weather.haze * 0.16})`);
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, w, h);
+  ctx.globalAlpha = 0.018 + weather.haze * 0.014;
+  ctx.fillStyle = time.light > 0.6 ? '#fff7dd' : '#8fb7ff';
+  for (let i = 0; i < 280; i++) {
+    const x = (i * 73.17 + t * 0.013) % w;
+    const y = (i * 151.91 + t * 0.009) % h;
+    ctx.fillRect(x, y, 1, 1);
+  }
+  ctx.restore();
+}
+
+startBtn.addEventListener('click', () => {
+  state.started = true;
+  document.body.classList.add('started');
+  intro.classList.add('hidden');
+});
+
+function primaryAction() {
+  if (state.mode === 'idle') cast();
+  else if (state.mode === 'bite') reel();
+}
+
+canvas.addEventListener('pointerdown', event => {
+  if (!state.started) {
+    state.started = true;
+    document.body.classList.add('started');
+    intro.classList.add('hidden');
+    return;
+  }
+  const now = performance.now();
+  if (now - state.lastTapAt < 320) {
+    clearTimeout(state.tapTimer);
+    state.lastTapAt = 0;
+    toggleCinematic();
+    return;
+  }
+  state.lastTapAt = now;
+  if (event.pointerType === 'touch') {
+    clearTimeout(state.tapTimer);
+    state.tapTimer = setTimeout(() => {
+      state.lastTapAt = 0;
+      primaryAction();
+    }, 330);
+    return;
+  }
+  primaryAction();
+});
+
+window.addEventListener('pointermove', event => {
+  state.camera.tx = clamp01(event.clientX / Math.max(1, state.w)) * 2 - 1;
+  state.camera.ty = clamp01(event.clientY / Math.max(1, state.h)) * 2 - 1;
+}, { passive: true });
+
+castBtn.addEventListener('click', () => {
+  if (state.mode === 'idle') cast();
+  else if (state.mode === 'bite') reel();
+});
+
+clearBtn.addEventListener('click', clearLog);
+motionBtn.addEventListener('click', enableMotion);
+viewBtn.addEventListener('click', toggleCinematic);
+touchPrimaryBtn.addEventListener('click', primaryAction);
+touchViewBtn.addEventListener('click', toggleCinematic);
+touchMotionBtn.addEventListener('click', enableMotion);
+faceBtn.addEventListener('click', () => {
+  state.alhena = (state.alhena + 1) % ALHENA.length;
+  localStorage.setItem('paradise_alhena', String(state.alhena));
+  status('Alhena avatar variant changed. Real mesh variants come next.');
+});
+
+document.querySelectorAll('[data-time]').forEach(btn => btn.addEventListener('click', () => setTime(btn.dataset.time)));
+document.querySelectorAll('[data-weather]').forEach(btn => btn.addEventListener('click', () => setWeather(btn.dataset.weather)));
+
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    primaryAction();
+  }
+  if (e.code === 'KeyC') {
+    e.preventDefault();
+    toggleCinematic();
+  }
+});
+
+window.addEventListener('resize', resize);
+waterProgram = initWaterShader();
+resize();
+renderCatalog();
+updateControlState();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
