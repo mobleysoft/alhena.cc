@@ -4,12 +4,14 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
 // Set PLAYWRIGHT_MODULE to an installed Playwright module when not in node_modules.
-const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const engines = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const engine = process.env.PARADISE_BROWSER || 'chromium';
+assert.ok(['chromium', 'webkit'].includes(engine), 'supported verification engine');
 const base = process.env.PARADISE_URL || 'http://127.0.0.1:8794/';
 const output = process.env.PARADISE_REPORT_DIR || fileURLToPath(new URL('../verification/cove-current/', import.meta.url));
 await mkdir(output, { recursive: true });
-const browser = await chromium.launch({ headless: true, args: process.platform === 'darwin' ? ['--use-angle=metal', '--enable-gpu'] : [] });
-const report = { at: new Date().toISOString(), url: base, checks: [], screenshots: [], errors: [] };
+const browser = await engines[engine].launch({ headless: true, args: engine === 'chromium' && process.platform === 'darwin' ? ['--use-angle=metal', '--enable-gpu'] : [] });
+const report = { at: new Date().toISOString(), url: base, engine, checks: [], screenshots: [], errors: [] };
 const inspect = page => page.evaluate(() => window.__paradise.snapshot());
 async function capture(page, name) {
   await page.screenshot({ path: join(output, `${name}.png`) });

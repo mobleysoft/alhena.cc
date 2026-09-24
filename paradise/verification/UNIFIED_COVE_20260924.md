@@ -50,5 +50,19 @@ character locomotion and the paid Deep Water entitlement flow remain work.
 The broader visual-quality goal is still active; this is a coherent deployed
 foundation, not a claim of AAA parity.
 
-Production deployment and browser verification must be recorded separately
-after the safe-deploy wrapper completes.
+## Production evidence
+
+Source commit: `cca4b6f96d2b32d4a19094a455f6aac5a44fb683`.
+Cloudflare Worker version: `f29df52a-872a-466a-8b25-ee30a7402a5c`.
+The safe-deploy wrapper completed on September 24. The root and all five
+first-party JS/CSS assets returned HTTP 200 and matched local SHA-256 hashes.
+
+`cove-live-20260924/report.json` records the full Chromium production pass;
+`cove-webkit-live-20260924/report.json` records the same pass in WebKit. Both
+passed desktop fishing, persistence, weather and emulated portrait/landscape
+touch checks with no captured browser or same-origin HTTP errors. Both have
+nine production screenshots. Landing views measured about 60 fps on this Mac.
+WebKit automation is not verification on a physical iPhone.
+
+The browser verifier now accepts `PARADISE_BROWSER=webkit` as well as its
+default Chromium engine. No public runtime change was required for WebKit.
