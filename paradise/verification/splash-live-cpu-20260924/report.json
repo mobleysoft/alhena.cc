@@ -1,0 +1,91 @@
+{
+  "at": "2026-09-24T23:47:22.098Z",
+  "url": "https://paradise.alhena.cc/?fluid=cpu",
+  "engine": "chromium",
+  "errors": [],
+  "screenshots": [
+    "cast-impact.png",
+    "strike-impact.png"
+  ],
+  "impact": {
+    "active": 45,
+    "crowns": 1,
+    "emitted": 45,
+    "returned": 0,
+    "expired": 0,
+    "bursts": 1,
+    "feedback": 0,
+    "peak": 45,
+    "capacity": 160,
+    "rendered": 45,
+    "renderedCrowns": 1,
+    "reducedMotion": false
+  },
+  "settled": {
+    "active": 0,
+    "crowns": 0,
+    "emitted": 45,
+    "returned": 45,
+    "expired": 0,
+    "bursts": 1,
+    "feedback": 16,
+    "peak": 45,
+    "capacity": 160,
+    "rendered": 0,
+    "renderedCrowns": 0,
+    "reducedMotion": false
+  },
+  "fluid": {
+    "backend": "cpu",
+    "reason": "CPU requested",
+    "resolution": 128,
+    "ticks": 174,
+    "published": 174,
+    "pending": false,
+    "queuedSteps": 0,
+    "impulseCount": 17,
+    "peak": 0.09269385039806366
+  },
+  "strike": {
+    "active": 55,
+    "crowns": 1,
+    "emitted": 100,
+    "returned": 45,
+    "expired": 0,
+    "bursts": 2,
+    "feedback": 16,
+    "peak": 55,
+    "capacity": 160,
+    "rendered": 55,
+    "renderedCrowns": 1,
+    "reducedMotion": false
+  },
+  "reduced": {
+    "spray": {
+      "active": 0,
+      "crowns": 0,
+      "emitted": 0,
+      "returned": 0,
+      "expired": 0,
+      "bursts": 0,
+      "feedback": 0,
+      "peak": 0,
+      "capacity": 160,
+      "rendered": 0,
+      "renderedCrowns": 0,
+      "reducedMotion": true
+    },
+    "fluid": {
+      "backend": "cpu",
+      "reason": "CPU requested",
+      "resolution": 128,
+      "ticks": 115,
+      "published": 115,
+      "pending": false,
+      "queuedSteps": 0,
+      "impulseCount": 1,
+      "peak": 0
+    }
+  },
+  "ok": true
+}
