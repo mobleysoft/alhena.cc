@@ -3,6 +3,42 @@ import assert from 'node:assert/strict';
 import { spectrum, groundHeight, shortWaveHeight, SHORT_WAVES } from '../public/island/ocean.js';
 import { catchCount, chooseFish, readCatches, recordCatch } from '../public/island/catalog.js';
 import { createState, stepField, sampleField, createRippleField, RIPPLE } from '../public/island/ripple-field.js';
+import { createQuadruped, solveTwoBone, distance, LEG } from '../public/island/locomotion.js';
+
+test('two-bone IK preserves segment lengths and clamps unreachable targets',()=>{
+  for(const target of [[0,0,0],[0,-.6,.2],[0,2,0],[1,2,3]]){
+    const hip=[0,0,0],pose=solveTwoBone(hip,target,.36,.36,[0,0,1]);
+    assert.ok(pose.knee.every(Number.isFinite)&&pose.foot.every(Number.isFinite));
+    assert.ok(Math.abs(distance(hip,pose.knee)-.36)<1e-8);
+    assert.ok(Math.abs(distance(pose.knee,pose.foot)-.36)<1e-8);
+  }
+});
+test('quadruped plants stance paws without sliding, with at least three contacts',()=>{
+  for(const ground of [()=>0,groundHeight,(x,z)=>.07*x+.04*z]){
+    const gait=createQuadruped(ground);let previous=gait.snapshot(),maxReach=0,maxClearance=0;
+    for(let frame=0;frame<60*48;frame++){
+      const pose=gait.update(1/60);
+      assert.ok(pose.feet.filter(f=>f.stance).length>=3);
+      for(let i=0;i<4;i++){
+        const f=pose.feet[i],p=previous.feet[i];maxReach=Math.max(maxReach,f.reachError);
+        if(f.stance&&p.stance)assert.ok(distance(f.target,p.target)<1e-8,'planted world-space target must not skate');
+        const clearance=f.target[1]-ground(f.target[0],f.target[2])-LEG.pad;
+        assert.ok(clearance>=-1e-9);maxClearance=Math.max(maxClearance,clearance);
+      }
+      previous=pose;
+    }
+    assert.ok(previous.stepCount>25);assert.ok(maxClearance>.1);
+    assert.ok(maxReach<.001,`leg must reach planted target: ${maxReach}`);
+  }
+});
+test('quadruped settles on attention and does not travel in reduced motion',()=>{
+  const gait=createQuadruped(groundHeight);
+  for(let i=0;i<120;i++)gait.update(1/60,{active:true});
+  const a=gait.snapshot();assert.equal(a.mode,'watching');assert.ok(a.speed<.001);
+  const reduced=createQuadruped(groundHeight),start=reduced.snapshot();
+  for(let i=0;i<120;i++)reduced.update(1/60,{reducedMotion:true});
+  assert.ok(distance(start.root,reduced.snapshot().root)<1e-8);assert.equal(reduced.snapshot().stepCount,0);
+});
 
 test('finite-difference water is stable, propagates disturbances and dissipates energy',()=>{
   const n=64;let a=createState(()=>-2,n),b=new Float32Array(a.length);

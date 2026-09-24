@@ -5,6 +5,12 @@ PlayCanvas iframe, or independent background renderer.
 
 - `models.js`: rounded clay/vinyl miniatures, articulated dog and Alhena,
   seabed, cottage, bar, jetty, palms, lighting props, clickable promotion board.
+- `locomotion.js`: terrain-aware quadruped controller and two-bone IK.
+  Planted paws retain world-space positions; only one paw swings at a time.
+  Turn speed, foot urgency and a small body crouch keep targets reachable.
+  The dog pauses to watch strikes, then resumes after a catch; Alhena blinks
+  and acknowledges catches with a short wave. This is procedural kinematic
+  animation, not a rigid-body animal simulation or a skinned-mesh asset.
 - `ocean.js`: the legacy PandoraChat 32-component JONSWAP spectrum, finite
   difference normals, displaced geometry, reflection/refraction render passes,
   absorption by depth and shoreline foam. A continuous variable-density mesh
@@ -49,3 +55,8 @@ accepts `PARADISE_URL`, and writes screenshots plus a JSON report to
 the test host, compares WGSL against CPU integration (including queued steps),
 reads the rendered caustic buffer, exercises casts, and checks forced CPU
 fallback. A compiling shader or a backend label alone does not pass this test.
+
+`node paradise/scripts/verify-actors.mjs` measures actual rendered paw
+positions against IK and terrain over 22 seconds, including stance slip,
+reach, three-foot contact, walking/sniffing states and reduced motion. It
+supports `PARADISE_BROWSER=webkit` as well as Chromium.

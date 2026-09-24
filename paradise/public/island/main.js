@@ -226,7 +226,7 @@ function animate(now){
   requestAnimationFrame(animate);if(document.hidden)return;
   const dt=Math.min((now-lastFrame)/1000,.25);lastFrame=now;accumulator+=dt;
   while(accumulator>=1/60){elapsed+=1/60;ocean.update(elapsed);updateFishing(1/60);accumulator-=1/60;}
-  timeUniform.value=elapsed;island.update(reducedMotion?0:elapsed,dt,weatherKey==='storm'?2:1);
+  timeUniform.value=elapsed;island.update(reducedMotion?0:elapsed,dt,weatherKey==='storm'?2:1,{phase,target:bobber.visible?bobber.position.toArray():[.5,0,19],reducedMotion});
   for(let i=0;i<fish.length;i++){const f=fish[i];const attracted=phase==='hunt'||phase==='strike'||phase==='fight';
     const cx=attracted&&i<4?bobber.position.x:Math.sin(i*1.5)*9,cz=attracted&&i<4?bobber.position.z:15+i%4*2;
     f.g.position.set(cx+Math.sin(elapsed*.3+i*2)*2.1,-.65-Math.sin(elapsed*.5+i)*.12,cz+Math.cos(elapsed*.3+i*2)*.8);
@@ -252,5 +252,5 @@ function animate(now){
   if(!$('begin').dataset.ready){$('begin').dataset.ready='true';$('begin').disabled=false;$('begin').textContent='Take a little time  \u2197';$('loading').textContent='Your island is ready';document.body.dataset.ready='true';}
 }
 // Read-only evidence for browser verification; gameplay is exercised through real controls.
-window.__paradise={optics:()=>ocean.causticEvidence(),snapshot:()=>({build:document.body.dataset.paradiseBuild,renderer:'Three.js WebGL2',waveComponents:32,fluid:ocean.fluid.snapshot(),caustics:'surface-refracted-ray-grid',phase,entered,catches:catchCount(catches),time:timeKey,weather:weatherKey,fps:Math.round(fps),canvases:document.querySelectorAll('canvas').length,frames:document.querySelectorAll('iframe').length,bobber:bobber.position.toArray(),surface:ocean.height(bobber.position.x,bobber.position.z),tension,reelProgress,motionEnabled})};
+window.__paradise={actors:()=>island.actors(),optics:()=>ocean.causticEvidence(),snapshot:()=>({build:document.body.dataset.paradiseBuild,renderer:'Three.js WebGL2',waveComponents:32,fluid:ocean.fluid.snapshot(),caustics:'surface-refracted-ray-grid',phase,entered,catches:catchCount(catches),time:timeKey,weather:weatherKey,fps:Math.round(fps),canvases:document.querySelectorAll('canvas').length,frames:document.querySelectorAll('iframe').length,bobber:bobber.position.toArray(),surface:ocean.height(bobber.position.x,bobber.position.z),tension,reelProgress,motionEnabled})};
 requestAnimationFrame(animate);

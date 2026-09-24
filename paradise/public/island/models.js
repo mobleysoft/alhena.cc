@@ -1,6 +1,7 @@
 import * as THREE from './vendor/three.module.min.js';
 import { groundHeight, makeSandMaterial } from './ocean.js';
 import { mergeGeometries } from './vendor/BufferGeometryUtils.js';
+import { createQuadruped, LEG, LEGS } from './locomotion.js';
 
 const clay = (color, roughness=.7) => new THREE.MeshStandardMaterial({color,roughness,metalness:0});
 const mat = {
@@ -82,14 +83,15 @@ function person(parent) {
   box(body,.41,.77,.045,mat.cream,0,.72,.25,.045);
   const head=group(body,0,1.64,0);oval(head,.32,.37,.29,mat.skin);
   oval(head,.35,.25,.3,mat.hair,0,.19,-.025);oval(head,.2,.21,.2,mat.hair,0,.34,-.25);
-  for(const sx of [-1,1]) {oval(head,.065,.11,.07,mat.skin,sx*.3,-.03,0);oval(head,.026,.038,.017,mat.dark,sx*.108,.015,.272);oval(head,.035,.043,.012,mat.pink,sx*.18,-.09,.256);}
+  const eyes=[];
+  for(const sx of [-1,1]) {oval(head,.065,.11,.07,mat.skin,sx*.3,-.03,0);const eye=group(head,sx*.108,.015,.272);oval(eye,.026,.038,.017,mat.dark);eyes.push(eye);oval(head,.035,.043,.012,mat.pink,sx*.18,-.09,.256);}
   oval(head,.043,.055,.037,mat.skin,0,-.055,.29);
   const smile=mesh(head,new THREE.TorusGeometry(.071,.009,6,14,Math.PI),mat.coral,0,-.12,.266);smile.rotation.z=Math.PI;
   const arms=[];
   for(const side of [-1,1]){const arm=group(body,side*.29,1.12,0);arm.rotation.z=side*.23;
     oval(arm,.115,.3,.12,mat.skin,0,-.2,0);oval(arm,.103,.26,.1,mat.skin,0,-.56,.1);oval(arm,.105,.12,.1,mat.skin,0,-.77,.14);arms.push(arm);}
   for(const x of [-.18,.18]){cylinder(g,.07,.07,.64,mat.skin,x,.61,0);oval(g,.13,.09,.22,mat.wood,x,.27,.05);}
-  return {g,head,arms,body};
+  return {g,head,arms,body,eyes};
 }
 
 function beachBar(parent,x,z) {
@@ -112,19 +114,26 @@ function beachBar(parent,x,z) {
 }
 
 function lab(parent) {
-  const g=group(parent), body=group(g,0,.73,0);
+  const g=group(parent), body=group(g,0,.76,0);
   oval(body,.38,.4,.75,mat.black);oval(body,.36,.47,.38,mat.black,0,.02,.43);
   const neck=group(body,0,.3,.52), head=group(neck,0,.22,.12);
   oval(head,.33,.33,.36,mat.black);oval(head,.22,.16,.28,mat.black,0,-.07,.3);oval(head,.15,.1,.08,mat.dark,0,-.04,.55);
-  for(const side of [-1,1]){const ear=oval(head,.14,.28,.13,mat.black,side*.28,-.06,-.02);ear.rotation.z=side*.24;
+  const ears=[];
+  for(const side of [-1,1]){const ear=oval(head,.14,.28,.13,mat.black,side*.28,-.06,-.02);ear.rotation.z=side*.24;ears.push(ear);
     oval(head,.035,.036,.023,mat.gold,side*.175,.05,.27);oval(head,.019,.024,.014,mat.dark,side*.18,.051,.288);}
   const collar=mesh(neck,new THREE.TorusGeometry(.235,.038,9,28),mat.coral,0,.02,.015);collar.rotation.x=Math.PI/2;
   oval(neck,.067,.08,.02,mat.gold,0,-.08,.255);
   const legs=[];
-  for(const sx of [-.24,.24])for(const zz of [-.5,.45]) {const hip=group(g,sx,.69,zz);oval(hip,.115,.24,.12,mat.black,0,-.15,0);
-    const knee=group(hip,0,-.33,.03);oval(knee,.087,.2,.085,mat.black,0,-.12,0);oval(knee,.12,.07,.18,mat.black,0,-.31,.08);legs.push({hip,knee,phase:(sx<0?0:Math.PI)+(zz<0?Math.PI:0)});}
+  for(const spec of LEGS) {
+    const hip=group(body,spec.x,-.04,spec.z);oval(hip,spec.z<0?.14:.115,LEG.upper*.58,.12,mat.black,0,-LEG.upper/2,0);
+    const knee=group(hip,0,-LEG.upper,0);oval(knee,.088,.085,.087,mat.black);
+    oval(knee,.078,LEG.lower*.56,.08,mat.black,0,-LEG.lower/2,0);
+    const paw=group(knee,0,-LEG.lower,0);oval(paw,.12,LEG.pad,.16,mat.black,0,0,.025);
+    for(const toe of [-1,0,1])oval(paw,.034,.033,.065,mat.black,toe*.058,-.013,.13);
+    legs.push({hip,knee,paw,id:spec.id});
+  }
   const tail=group(body,0,.12,-.63);tube(tail,[[0,0,0],[0,.02,-.28],[.13,.18,-.6],[.2,.4,-.78]],.065,mat.black);
-  g.rotation.y=-.6;return {g,body,head,legs,tail};
+  g.rotation.y=-.6;return {g,body,head,neck,ears,legs,tail};
 }
 
 function jetty(parent) {
@@ -196,18 +205,40 @@ export function createIsland(scene,timeUniform,optics) {
   }collect(world);
   for(const node of originals)node.removeFromParent();
   for(const b of batches.values()){const combined=mergeGeometries(b.geometries);if(combined){const m=mesh(world,combined,b.material);m.castShadow=b.cast;}b.geometries.forEach(g=>g.dispose());}
-  let travel=0;
+  const gait=createQuadruped(groundHeight),down=new THREE.Vector3(0,-1,0),up=new THREE.Vector3(0,1,0);
+  const upperQ=new THREE.Quaternion(),lowerQ=new THREE.Quaternion(),bodyInverse=new THREE.Quaternion(),padQ=new THREE.Quaternion(),yawQ=new THREE.Quaternion();
+  const hipPoint=new THREE.Vector3(),kneePoint=new THREE.Vector3(),footPoint=new THREE.Vector3(),normal=new THREE.Vector3();
+  let previousPhase='idle',greeting=0,pose=gait.snapshot();
   return {world,dog,bar,cottage,palms,board,lamp,ground,dock,
-    update(t,dt,wind=1) {
-      const walk=.5+.5*Math.sin(t*.18),moving=walk>.42;
-      if(moving)travel+=dt*.18;
-      const x=-1.6+Math.sin(travel)*1.3,z=7+Math.cos(travel)*.45;
-      dog.g.position.set(x,groundHeight(x,z),z);dog.g.rotation.y=Math.atan2(Math.cos(travel)*1.3,-Math.sin(travel)*.45);
-      dog.body.position.y=.73+(moving?Math.sin(t*5)*.015:Math.sin(t*1.7)*.005);
-      dog.head.rotation.x=Math.sin(t*.8)*.075;dog.tail.rotation.z=Math.sin(t*5)*.28;
-      dog.legs.forEach(l=>{l.hip.rotation.x=moving?Math.sin(t*4+l.phase)*.28:0;l.knee.rotation.x=moving?Math.max(0,-Math.sin(t*4+l.phase))*.25:0;});
-      bar.actor.head.rotation.y=Math.sin(t*.35)*.18;bar.actor.body.rotation.z=Math.sin(t*.8)*.014;
-      bar.actor.arms[1].rotation.x=-.35+Math.sin(t*.65)*.16;
+    actors() {
+      return {...gait.snapshot(),renderedFeet:dog.legs.map(leg=>({id:leg.id,position:leg.paw.getWorldPosition(new THREE.Vector3()).toArray()})),greeting};
+    },
+    update(t,dt,wind=1,{phase='idle',target=[.5,0,19],reducedMotion=false}={}) {
+      if(phase==='landed'&&previousPhase!=='landed')greeting=2.8;previousPhase=phase;greeting=Math.max(0,greeting-dt);
+      const active=['strike','fight'].includes(phase)||greeting>0,follow=1-Math.exp(-dt*7);
+      pose=gait.update(dt,{active,reducedMotion});dog.g.position.fromArray(pose.root);dog.g.rotation.y=pose.yaw;
+      dog.body.position.y=.76+pose.bodyBob;dog.g.updateMatrixWorld(true);dog.body.getWorldQuaternion(bodyInverse).invert();
+      dog.legs.forEach((leg,i)=>{
+        const f=pose.feet[i];dog.body.worldToLocal(hipPoint.fromArray(f.hip));dog.body.worldToLocal(kneePoint.fromArray(f.knee));dog.body.worldToLocal(footPoint.fromArray(f.foot));
+        leg.hip.position.copy(hipPoint);upperQ.setFromUnitVectors(down,kneePoint.clone().sub(hipPoint).normalize());
+        lowerQ.setFromUnitVectors(down,footPoint.clone().sub(kneePoint).normalize());leg.hip.quaternion.copy(upperQ);
+        leg.knee.quaternion.copy(upperQ).invert().multiply(lowerQ);
+        padQ.setFromUnitVectors(up,normal.fromArray(f.normal));yawQ.setFromAxisAngle(up,f.heading);padQ.multiply(yawQ).premultiply(bodyInverse);
+        leg.paw.quaternion.copy(lowerQ).invert().multiply(padQ);
+      });
+      const look=Math.atan2(target[0]-pose.root[0],target[2]-pose.root[2])-pose.yaw;
+      const yaw=active?THREE.MathUtils.clamp(Math.atan2(Math.sin(look),Math.cos(look)),-.65,.65):Math.sin(t*.7)*.08;
+      dog.head.rotation.y+=(yaw-dog.head.rotation.y)*follow;
+      dog.head.rotation.x+=((pose.mode==='sniffing'?.5+Math.sin(t*5)*.06:.02)-dog.head.rotation.x)*follow;
+      dog.neck.rotation.x+=((pose.mode==='sniffing'?.18:0)-dog.neck.rotation.x)*follow;
+      dog.tail.rotation.z=reducedMotion?0:Math.sin(t*(active?7:3.5))*(active?.32:.16);
+      dog.ears.forEach((ear,i)=>{ear.rotation.x=reducedMotion?0:Math.sin(t*4+i)*pose.speed*.2;});
+      bar.actor.head.rotation.y+=( (active?-.22:Math.sin(t*.35)*.12)-bar.actor.head.rotation.y)*follow;
+      bar.actor.body.rotation.z=reducedMotion?0:Math.sin(t*.8)*.01;
+      const greet=!reducedMotion&&greeting>0;
+      bar.actor.arms[1].rotation.z+=((greet?1.9+Math.sin(t*9)*.12:.23)-bar.actor.arms[1].rotation.z)*follow;
+      bar.actor.arms[1].rotation.x+=((greet?-.2:-.35+Math.sin(t*.65)*.12)-bar.actor.arms[1].rotation.x)*follow;
+      const blink=reducedMotion?1:1-.94*Math.max(0,1-Math.abs(t%4.7-.12)/.12);bar.actor.eyes.forEach(eye=>eye.scale.y=blink);
       palms.forEach((p,i)=>p.fronds.forEach((f,j)=>f.rotation.x=Math.sin(t*.6+i+j)*.028*wind));
     },
   };

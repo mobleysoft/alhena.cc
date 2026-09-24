@@ -63,6 +63,7 @@ try {
   await capture(page, 'desktop-strike');
   await page.locator('#cast').click();
   assert.equal((await inspect(page)).phase, 'fight');
+  await page.waitForFunction(()=>window.__paradise.actors().mode==='watching');
   const reel = await page.locator('#cast').boundingBox();
   await page.mouse.move(reel.x + reel.width / 2, reel.y + reel.height / 2);
   let held = false;
@@ -80,8 +81,14 @@ try {
   const caught = await inspect(page);
   assert.equal(caught.phase, 'landed');
   assert.equal(caught.catches, 1);
+  assert.ok(await page.evaluate(()=>window.__paradise.actors().greeting>0),'Alhena acknowledges the catch');
   report.checks.push('cast, wave-tracking buoyancy, strike, tension fight, catch');
+  await page.locator('#menu-button').click();await page.locator('#view').click();await page.locator('#close-settings').click();
+  await page.waitForTimeout(1300);
   await capture(page, 'desktop-catch');
+  await page.waitForFunction(()=>window.__paradise.actors().greeting===0);
+  assert.notEqual(await page.evaluate(()=>window.__paradise.actors().mode),'watching');
+  report.checks.push('dog watches the strike; Alhena greets the catch; reactions settle');
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForSelector('body[data-ready="true"]');
   assert.equal((await inspect(page)).catches, 1);

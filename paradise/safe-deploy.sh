@@ -42,5 +42,8 @@ sd_verify_response_body \
 sd_verify_response_body \
   "https://paradise.alhena.cc/island/ocean.js" \
   'causticEvidence'
+sd_verify_response_body \
+  "https://paradise.alhena.cc/island/locomotion.js" \
+  'solveTwoBone'
 
 sd_banner_done "alhena-paradise-worker"
