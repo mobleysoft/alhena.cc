@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#07131b">
-<title>Paradise V3 - Shader Ocean Composite</title>
+<title>Paradise — Fishing</title>
 <style>
 :root {
   --paper: #f7edce;
@@ -455,7 +455,7 @@ body.clean .cinematic-toggle:focus-visible {
 <aside class="hud">
   <div class="kicker">Paradise / Deep Water Prototype</div>
   <h1>Paradise Fishing.</h1>
-  <p>Hunt silhouettes, survive the strike, and feather line tension through the fight. Deep Water License unlocks midnight storms and legendary boss fish.</p>
+  <p>Cast a line, wait for a bite, and reel it in — every catch joins your catalog below. Calm water holds the common stuff; brave a storm and you might land something rarer.</p>
   <div class="row">
     <button class="active" data-time="dawn">Dawn</button>
     <button data-time="noon">Noon</button>
@@ -2625,16 +2625,18 @@ const controlState = {
   lastMotionMagnitude: 0,
   lastMotionDelta: 0,
 };
-const fishSpecies = [
-  'Glass Minnow',
-  'Blue Runner',
-  'Sunlit Pompano',
-  'Moon Tang',
-  'Reef Snapper',
-  'Storm Jack',
-  'Golden Needlefish',
-  'Alhena Ray',
-];
+// Species pool depends on the real weather state driving the wave shader
+// (weatherKey -> uWind/uChop above) rather than being a random roll
+// disconnected from the water the player is actually looking at: calm
+// water keeps to common shallow fish, storm brings in the rarer/bigger
+// species. Roadmap (not built this pass): also gate by timeKey once a
+// real day/night cycle exists, not just the current dawn/noon/dusk skin.
+const FISH_BY_WEATHER = {
+  calm:   ['Glass Minnow', 'Blue Runner', 'Sunlit Pompano', 'Reef Snapper'],
+  breeze: ['Blue Runner', 'Sunlit Pompano', 'Moon Tang', 'Reef Snapper', 'Golden Needlefish'],
+  storm:  ['Moon Tang', 'Golden Needlefish', 'Storm Jack', 'Alhena Ray'],
+};
+const fishSpecies = FISH_BY_WEATHER.breeze;
 const viewTargets = [
   { label: 'Director', pos: new THREE.Vector3(0.8, 3.35, 15.0), look: new THREE.Vector3(2.2, 0.72, 4.5) },
   { label: 'Wide', pos: new THREE.Vector3(0, 5.1, 19.5), look: new THREE.Vector3(0, 0.85, -24) },
@@ -2733,16 +2735,27 @@ function triggerBite(source = 'bite') {
   setPhase('strike', `${source} / hook now`);
 }
 function recordCatch(forceIndex = null) {
-  const speciesIndex = forceIndex ?? Math.floor((performance.now() * 0.013 + playState.catches.length * 2.7) % fishSpecies.length);
-  const name = fishSpecies[speciesIndex % fishSpecies.length];
+  const pool = FISH_BY_WEATHER[weatherKey] || fishSpecies;
+  const speciesIndex = forceIndex ?? Math.floor(Math.random() * pool.length);
+  const name = pool[speciesIndex % pool.length];
   const catchItem = { name, time: timeKey, weather: weatherKey, at: Date.now() };
   playState.catches.unshift(catchItem);
   playState.catches = playState.catches.slice(0, 8);
+  saveCatchCatalog();
   triggerCatchBurst();
   triggerWaterImpulse(0.82, 0.48);
   setPhase('hunt', 'landed / cast again');
   renderCatchLog();
   return catchItem;
+}
+function saveCatchCatalog() {
+  try { localStorage.setItem('paradise_catches', JSON.stringify(playState.catches)); } catch (e) { /* storage unavailable, catalog just won't persist */ }
+}
+function loadCatchCatalog() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('paradise_catches') || '[]');
+    if (Array.isArray(saved)) playState.catches = saved.slice(0, 8);
+  } catch (e) { /* corrupt/missing, start with an empty catalog */ }
 }
 function resetCast() {
   playState.cast = false;
@@ -2961,6 +2974,7 @@ addEventListener('pointercancel', () => {
 });
 refreshPlayHud();
 updateMotionButton();
+loadCatchCatalog();
 renderCatchLog();
 window.__paradiseDebug = {
   playState,
@@ -3437,14 +3451,13 @@ function animate() {
         readout.textContent = 'fish jump / release reel';
       }
       if (playState.tension > 0.98) {
-        playState.lineSnapped = true;
-        playState.cast = false;
-        playState.bite = false;
-        playState.tension = 0;
+        // Cozy, no-fail-state design: a fish that fights hard enough to
+        // max out tension is landed (tired out), never lost. There is no
+        // way to lose a hooked fish in this game.
+        const catchItem = recordCatch();
+        readout.textContent = `landed ${catchItem.name}`;
         triggerWaterImpulse(0.76, 0.55);
-        readout.textContent = 'line snapped / cast again';
         vibrate([60, 40, 60]);
-        refreshPlayHud();
       } else if (elapsed > playState.fightUntil && playState.tension > 0.30 && playState.tension < 0.90) {
         const catchItem = recordCatch();
         readout.textContent = `landed ${catchItem.name}`;

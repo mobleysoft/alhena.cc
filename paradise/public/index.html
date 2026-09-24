@@ -480,11 +480,8 @@ body.started .touch-controls {
   <div class="intro-card">
     <div class="intro-kicker">Alhena presents</div>
     <div class="intro-title">Paradise</div>
-    <p class="intro-copy">A shoreline fishing prototype centered on the PandoraChat spectral ocean pass: JONSWAP-inspired waves, analytical normals, Fresnel reflection, weather, cast/reel interaction, Alhena, and the black lab.</p>
-    <button class="start" id="start">Launch best V3 build</button>
-    <a class="rebuild-link" href="/game/?view=ocean&quality=cinematic">Legacy canvas prototype</a>
-    <br>
-    <a class="rebuild-link" href="/game-v3/">V3 authored 3D rebuild gate</a>
+    <p class="intro-copy">A small, cozy ocean at the edge of Alhena. Cast a line, wait for a bite, and see what you pull up — no accounts, no ads, nothing to lose.</p>
+    <button class="start" id="start">Start Fishing</button>
   </div>
 </section>
 
@@ -610,6 +607,11 @@ const ALHENA = [
   { skin: '#95604a', hair: '#704021', dress: '#4ca6a1' },
 ];
 
+// First playable core loop: cast -> wait -> bite -> reel -> catalog,
+// with rarer fish weighted in by storm/overcast weather (chooseFish()
+// below). Roadmap, deliberately not built this pass: a real day/weather
+// cycle (currently a fixed time/weather picker, not a clock), NPCs,
+// home-base progression, and a field guide beyond the plain catch count.
 const FISH = [
   { name: 'glass minnow', rarity: 36, color: '#d7f8ff' },
   { name: 'tide perch', rarity: 24, color: '#86d896' },
@@ -618,7 +620,7 @@ const FISH = [
   { name: 'goldfin jack', rarity: 7, color: '#f1c45d' },
   { name: 'storm eel', rarity: 4, color: '#a86bc8' },
   { name: 'opal marlin', rarity: 2, color: '#e9fbff' },
-  { name: 'James starfish', rarity: 1, color: '#ff9b68' },
+  { name: 'alhena starfish', rarity: 1, color: '#ff9b68' },
 ];
 
 const state = {
@@ -3101,7 +3103,9 @@ function drawFilmGrade(t, time, weather) {
 }
 
 startBtn.addEventListener('click', () => {
-  location.href = '/game-v3/three/?time=dawn&weather=breeze';
+  state.started = true;
+  document.body.classList.add('started');
+  intro.classList.add('hidden');
 });
 
 function primaryAction() {
