@@ -5,6 +5,7 @@ import { createQuadruped, LEG, LEGS } from './locomotion.js';
 import { createFrondGeometry, createTrunkGeometry, frondSpine } from './foliage.js';
 import { prepareStaticGeometry } from './static-geometry.js';
 import { createCoastalGarden } from './coastal-garden.js';
+import { createHost } from './host.js';
 
 const clay = (color, roughness=.7) => new THREE.MeshStandardMaterial({color,roughness,metalness:0});
 const mat = {
@@ -79,24 +80,6 @@ function palm(parent,x,z,height=6,rotation=0) {
   return {g,fronds};
 }
 
-function person(parent) {
-  const g=group(parent), body=group(g,0,.85,0);
-  const skirt=new THREE.LatheGeometry([new THREE.Vector2(.46,0),new THREE.Vector2(.5,.08),new THREE.Vector2(.43,.25),new THREE.Vector2(.28,.85),new THREE.Vector2(.29,1)],32);
-  mesh(body,skirt,mat.jade);oval(body,.31,.46,.22,mat.jade,0,1.0,0);
-  box(body,.41,.77,.045,mat.cream,0,.72,.25,.045);
-  const head=group(body,0,1.64,0);oval(head,.32,.37,.29,mat.skin);
-  oval(head,.35,.25,.3,mat.hair,0,.19,-.025);oval(head,.2,.21,.2,mat.hair,0,.34,-.25);
-  const eyes=[];
-  for(const sx of [-1,1]) {oval(head,.065,.11,.07,mat.skin,sx*.3,-.03,0);const eye=group(head,sx*.108,.015,.272);oval(eye,.026,.038,.017,mat.dark);eyes.push(eye);oval(head,.035,.043,.012,mat.pink,sx*.18,-.09,.256);}
-  oval(head,.043,.055,.037,mat.skin,0,-.055,.29);
-  const smile=mesh(head,new THREE.TorusGeometry(.071,.009,6,14,Math.PI),mat.coral,0,-.12,.266);smile.rotation.z=Math.PI;
-  const arms=[];
-  for(const side of [-1,1]){const arm=group(body,side*.29,1.12,0);arm.rotation.z=side*.23;
-    oval(arm,.115,.3,.12,mat.skin,0,-.2,0);oval(arm,.103,.26,.1,mat.skin,0,-.56,.1);oval(arm,.105,.12,.1,mat.skin,0,-.77,.14);arms.push(arm);}
-  for(const x of [-.18,.18]){cylinder(g,.07,.07,.64,mat.skin,x,.61,0);oval(g,.13,.09,.22,mat.wood,x,.27,.05);}
-  return {g,head,arms,body,eyes};
-}
-
 function beachBar(parent,x,z) {
   const g=group(parent,x,groundHeight(x,z),z);g.rotation.y=-.18;
   box(g,5,.2,3.6,mat.lightWood,0,.1,0);
@@ -111,7 +94,7 @@ function beachBar(parent,x,z) {
   }
   for(let i=0;i<4;i++){const xp=-1.35+i*.38;cylinder(g,.06,.07,.35,i%2?mat.glass:mat.coral,xp,1.67,.5);cylinder(g,.035,.035,.1,mat.gold,xp,1.89,.5);}
   cylinder(g,.19,.16,.24,mat.cream,.8,1.64,.65);mesh(g,new THREE.TorusGeometry(.1,.028,7,16),mat.cream,1,1.65,.65);
-  const actor=person(g);actor.g.position.set(-2.15,-.23,1.7);
+  const actor=createHost(g);actor.g.position.set(-2.15,-.23,1.7);
   for(const xp of [-1.2,1.2]){const seat=group(g,xp,0,2);cylinder(seat,.34,.34,.14,mat.coral,0,1,0);for(const d of [-1,1])for(const e of [-1,1])cylinder(seat,.045,.045,.92,mat.wood,d*.21,.48,e*.21);}
   return {g,actor};
 }
@@ -206,7 +189,7 @@ export function createIsland(scene,timeUniform,optics) {
   let previousPhase='idle',greeting=0,pose=gait.snapshot();
   return {world,dog,bar,cottage,palms,board,lamp,ground,dock,
     actors() {
-      return {...gait.snapshot(),renderedFeet:dog.legs.map(leg=>({id:leg.id,position:leg.paw.getWorldPosition(new THREE.Vector3()).toArray()})),greeting};
+      return {...gait.snapshot(),renderedFeet:dog.legs.map(leg=>({id:leg.id,position:leg.paw.getWorldPosition(new THREE.Vector3()).toArray()})),greeting,host:bar.actor.evidence()};
     },
     update(t,dt,wind=1,{phase='idle',target=[.5,0,19],reducedMotion=false}={}) {
       if(phase==='landed'&&previousPhase!=='landed')greeting=2.8;previousPhase=phase;greeting=Math.max(0,greeting-dt);

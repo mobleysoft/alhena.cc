@@ -26,6 +26,14 @@ PlayCanvas iframe, or independent background renderer.
   The dog pauses to watch strikes, then resumes after a catch; Alhena blinks
   and acknowledges catches with a short wave. This is procedural kinematic
   animation, not a rigid-body animal simulation or a skinned-mesh asset.
+- `host.js`: Alhena's authored clay miniature. A closed sculpted face integrates
+  the nose, jaw, cheek and eye-socket contours; a swept/fluted hair cap, pleated
+  dress, curved solid apron, tapered brows/smile, buttons and sandals replace
+  the plain oval head, hair blobs and rectangular apron. Seven material-batched
+  meshes retain the same head/arm/eye groups for existing blink and greeting
+  animation. Geometry is cached between instances; all materials share the
+  cove's jade/linen/warm-clay palette. This is a stylized authored character,
+  not a scan, a face-data import, or a human-anatomy simulation.
 - `ocean.js`: the legacy PandoraChat 32-component JONSWAP spectrum, finite
   difference normals, displaced geometry, reflection/refraction render passes,
   absorption by depth and shoreline foam. A continuous variable-density mesh
@@ -123,6 +131,14 @@ geometry, welded surface closure, weights, asset sharing and actual skinned
 vertex movement. `node paradise/scripts/verify-fish.mjs` renders an eight-fish
 contact sheet, measures GPU animation pixel changes, then checks the real
 fourteen-fish school and captures fishing/strike views in the actual ocean.
+
+Host: `node --test paradise/scripts/test-host.mjs` verifies closed finite
+primary meshes, integrated facial relief, the retained articulated interface,
+shared geometry and the 25,000-triangle/7-mesh budget. The browser check,
+`node paradise/scripts/verify-host.mjs`, captures front/three-quarter/portrait
+views, checks actual GPU draw calls, and verifies blinking, head motion,
+casting and reduced motion in the real scene. It uses the same Playwright,
+browser, URL and output environment variables as the other verifiers.
 
 Rendering background: [GPU Gems, Volume Rendering Techniques](https://developer.nvidia.com/gpugems/gpugems/part-vi-beyond-triangles/chapter-39-volume-rendering-techniques)
 describes slice reconstruction and accumulation along viewing rays. This

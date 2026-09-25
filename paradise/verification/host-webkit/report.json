@@ -1,0 +1,73 @@
+{
+  "at": "2026-09-25T07:29:02.800Z",
+  "url": "http://127.0.0.1:8798/",
+  "engine": "webkit",
+  "errors": [],
+  "fixture": {
+    "meshes": 7,
+    "triangles": 24096,
+    "headYaw": 0,
+    "blink": 1,
+    "greetingArm": 0.23,
+    "calls": [
+      7,
+      7,
+      5
+    ]
+  },
+  "motion": {
+    "minBlink": 0.16444444444435036,
+    "maxBlink": 1,
+    "yawRange": 0.054632491772367814,
+    "frames": 282,
+    "host": {
+      "meshes": 7,
+      "triangles": 24096,
+      "headYaw": 0.06521622656386386,
+      "blink": 1,
+      "greetingArm": 0.23
+    }
+  },
+  "active": {
+    "build": "unified-cove-20260924",
+    "renderer": "Three.js WebGL2",
+    "waveComponents": 32,
+    "fluid": {
+      "backend": "webgpu",
+      "reason": null,
+      "resolution": 128,
+      "ticks": 596,
+      "published": 596,
+      "pending": false,
+      "queuedSteps": 4,
+      "impulseCount": 16,
+      "peak": 0.058533936738967896
+    },
+    "caustics": "surface-refracted-ray-grid",
+    "phase": "hunt",
+    "entered": true,
+    "catches": 0,
+    "time": "sunset",
+    "weather": "breeze",
+    "fps": 52,
+    "canvases": 1,
+    "frames": 0,
+    "bobber": [
+      0.5,
+      0.15523473025403686,
+      19
+    ],
+    "surface": 0.17140103605032267,
+    "tension": 0,
+    "reelProgress": 0,
+    "motionEnabled": false
+  },
+  "reduced": {
+    "meshes": 7,
+    "triangles": 24096,
+    "headYaw": 0,
+    "blink": 1,
+    "greetingArm": 0.23
+  },
+  "ok": true
+}

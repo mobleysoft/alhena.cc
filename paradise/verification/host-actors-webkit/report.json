@@ -1,0 +1,27 @@
+{
+  "at": "2026-09-25T07:36:16.649Z",
+  "url": "http://127.0.0.1:8798/",
+  "engine": "webkit",
+  "errors": [],
+  "screenshots": [
+    "walking.png",
+    "turning.png",
+    "sniffing.png"
+  ],
+  "motion": {
+    "frames": 834,
+    "states": {
+      "walking": 578,
+      "rest": 64,
+      "sniffing": 192
+    },
+    "maxRenderedError": 2.406626086818585e-15,
+    "maxStanceSlip": 3.6905523389740094e-15,
+    "maxGroundError": 1.609823385706477e-15,
+    "maxReachError": 0,
+    "minContacts": 3,
+    "steps": 63
+  },
+  "reducedMotion": true,
+  "ok": true
+}
