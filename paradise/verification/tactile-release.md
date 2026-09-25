@@ -47,3 +47,23 @@ Deployment must use the clean release clone's `paradise/safe-deploy.sh`, which
 now includes the new unit tests and a live module check. Before promotion,
 Wrangler identity was verified as the intended Johnmobley99 Cloudflare account.
 Public source hashes and the full browser flow must be checked after deploy.
+
+## Verified public result
+
+- Source commit: `b1e1bea014a5320663862821066035de4db3466b`.
+- Guarded deployment passed all 52 tests from a clean main-branch release
+  clone, retained ASSETS, and uploaded only `models.js`, `tactile-materials.js`
+  and the island README among public files.
+- Cloudflare version `32bd9135-2bc6-42bd-95b5-e354232a6ea7` was confirmed at
+  100% traffic, deployment timestamp `2026-09-25T10:08:08.557Z`.
+- `tactile-live-source/source-hashes.json`: all 21 checked root/runtime/vendor
+  files returned HTTP 200 and matched their committed SHA-256 hashes.
+- `tactile-live-flow/report.json`: public Chromium full fishing flow, reactions,
+  persisted catch, night/storm and both touch layouts passed without captured
+  browser errors. Public landing and portrait-fishing screenshots were
+  inspected. Mean sampled buoyancy error was 0.0458 world units.
+- The owned local preview on port 8798 was stopped and the port checked empty.
+
+This is a verified art/material improvement, not completion of the overarching
+AAA-quality or fully overturning-wave goal. It introduces no purchase claims,
+physics changes, or changes to the unrelated canonical `island/shore.js` file.
