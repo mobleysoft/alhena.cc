@@ -33,3 +33,28 @@ is not part of this release. The unfinished breaking-wave laboratory is also
 excluded. Browser mobile emulation does not prove real phone performance or
 motion/haptic hardware behavior. This is a visual refinement, not a claim that
 the full AAA or 3D breaking-wave target is complete.
+
+## Deployment evidence
+
+- Source commit: `69ed0a449b86aa865ccda5bcc2a87b847aa832b1`, fast-forwarded
+  into canonical main before release.
+- Cloudflare Worker: `alhena-paradise-worker`, authenticated account
+  `johnmobley99@gmail.com`; version `00374ad0-8d24-4632-8c68-23798d3daebd`.
+- Deployment `fd69e05b-2df0-46de-aa63-798b047f997b`, 100% traffic, confirmed
+  through the Cloudflare deployments API, created 2026-09-25T04:18:28Z.
+- The clean-main `safe-deploy.sh` passed preflight and all 21 unit tests. It
+  uploaded six changed assets. Its immediate foliage post-check returned an
+  empty response twice, so the wrapper correctly exited nonzero rather than
+  declaring success. No blind redeploy was performed.
+- A subsequent `verify-release.mjs` check against the public domain returned
+  HTTP 200 and exact SHA-256 matches for all 14 active runtime assets, including
+  the two new modules and rain. Evidence: `tactile-foliage-live-source/`.
+- The full real-UI Chromium check against `https://paradise.alhena.cc/` passed,
+  including catch persistence and both mobile orientations, with zero runtime
+  errors. Evidence and screenshots: `tactile-foliage-live/`. Live desktop landing
+  and mobile landscape fishing screenshots were visually reviewed. Initial
+  frame rate was 60 on this M4 Mac, not a hardware-phone measurement.
+
+Only this verified release is claimed live. The isolated fluid laboratory
+checkpoint `2bea6c0` is not merged or deployed. Canonical main's unrelated
+untracked shoreline work was preserved untouched.
