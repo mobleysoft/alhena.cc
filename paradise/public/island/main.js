@@ -85,7 +85,7 @@ function environment(){
   skyUniforms.uSun.value.copy(sun.position).normalize();ocean.uniforms.uSun.value.copy(skyUniforms.uSun.value);
   ocean.uniforms.uSky.value.copy(skyUniforms.uHorizon.value);ocean.uniforms.uColor.value.set(e.water);ocean.uniforms.uWarmth.value.set(e.sun);ocean.uniforms.uLight.value=e.light*level;
   ocean.uniforms.uSpecular.value=(timeKey==='night'?.07:1)*(storm?.35:1);
-  ocean.setWeather(weather[weatherKey].wind,weather[weatherKey].chop);island.lamp.intensity=timeKey==='night'?12:2;
+  ocean.setWeather(weather[weatherKey].wind,weather[weatherKey].chop);island.lighting.setEnvironment(timeKey,weatherKey);
   splashes.setColor(ocean.uniforms.uColor.value);rain.setColor(ocean.uniforms.uColor.value);
   document.body.classList.toggle('night',timeKey==='night');document.body.dataset.time=timeKey;document.body.dataset.weather=weatherKey;
   for(const b of document.querySelectorAll('[data-time]'))b.classList.toggle('active',b.dataset.time===timeKey);
@@ -271,4 +271,5 @@ function animate(now){
 window.__paradise={volume:()=>ocean.volumeEvidence(),rain:()=>rain.snapshot(),spray:()=>splashes.snapshot(),actors:()=>island.actors(),optics:()=>ocean.causticEvidence(),snapshot:()=>({build:document.body.dataset.paradiseBuild,renderer:'Three.js WebGL2',waveComponents:32,fluid:ocean.fluid.snapshot(),caustics:'surface-refracted-ray-grid',phase,entered,catches:catchCount(catches),time:timeKey,weather:weatherKey,fps:Math.round(fps),canvases:document.querySelectorAll('canvas').length,frames:document.querySelectorAll('iframe').length,bobber:bobber.position.toArray(),surface:ocean.height(bobber.position.x,bobber.position.z),tension,reelProgress,motionEnabled})};
 window.__paradise.surface=()=>ocean.surfaceEvidence();
 window.__paradise.fish=()=>fish.map(f=>f.evidence());
+window.__paradise.lighting=()=>island.lighting.evidence();
 requestAnimationFrame(animate);

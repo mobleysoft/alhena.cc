@@ -5,6 +5,13 @@ PlayCanvas iframe, or independent background renderer.
 
 - `models.js`: rounded clay/vinyl miniatures, articulated dog and Alhena,
   seabed, cottage, bar, jetty, palms, lighting props, clickable promotion board.
+- `evening-light.js`: warm curtained cottage glazing, modeled brass/jade porch
+  and pier lanterns, a bar pendant and capped festoon bulbs. Four bounded local
+  point lights provide real surface illumination; the festoons share one light
+  rather than thirteen per-bulb lights. Time/weather controls drive emission and
+  light strength; daylight restores unlit glazing. No extra shadow maps or
+  fullscreen glow overlays are used. The curtain pattern is authored frosted
+  glazing, not a modeled cottage interior or a global-illumination solution.
 - `foliage.js`: deterministic, closed folded palm leaflets with vertex-color
   gradients, shared frond geometry and tapered curved trunks. Growth rings
   follow the trunk surface instead of floating as separate cylinders. These
@@ -143,3 +150,9 @@ browser, URL and output environment variables as the other verifiers.
 Rendering background: [GPU Gems, Volume Rendering Techniques](https://developer.nvidia.com/gpugems/gpugems/part-vi-beyond-triangles/chapter-39-volume-rendering-techniques)
 describes slice reconstruction and accumulation along viewing rays. This
 implementation is authored for this scene, not copied from that chapter.
+
+Evening lighting: `node --test paradise/scripts/test-evening-light.mjs` checks
+deterministic glazing, independent materials, time/weather levels and bounded
+fixture/light counts. `node paradise/scripts/verify-evening-light.mjs` exercises
+real controls, captures noon/sunset/night/storm frames, tests night casting and
+reduced-motion lighting, and records browser errors and sampled frame rates.

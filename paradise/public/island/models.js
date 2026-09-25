@@ -6,6 +6,7 @@ import { createFrondGeometry, createTrunkGeometry, frondSpine } from './foliage.
 import { prepareStaticGeometry } from './static-geometry.js';
 import { createCoastalGarden } from './coastal-garden.js';
 import { createHost } from './host.js';
+import { createEveningLights, createWindowMaterial } from './evening-light.js';
 
 const clay = (color, roughness=.7) => new THREE.MeshStandardMaterial({color,roughness,metalness:0});
 const mat = {
@@ -13,7 +14,6 @@ const mat = {
   green:clay('#496e50'), leaf:clay('#698753'), mint:clay('#89ae9a'), jade:clay('#397d74'), gold:clay('#d6b870',.4),
   dark:clay('#203233'), black:clay('#252d2b',.49), skin:clay('#bc8661'), hair:clay('#353228'), pink:clay('#d88b80'),
   glass:new THREE.MeshStandardMaterial({color:'#2d6b65',roughness:.18,metalness:.2}),
-  lamp:new THREE.MeshStandardMaterial({color:'#ffeac1',emissive:'#ffd29a',emissiveIntensity:1.1,roughness:.45}),
 };
 const geoCache=new Map();
 function rounded(w,h,d,r=.08) {
@@ -43,7 +43,7 @@ function label(parent,text,w,h,x,y,z,bg='#f4ead1',color='#36564c') {
   return mesh(parent,new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:texture,roughness:.8}),x,y,z);
 }
 
-function house(parent,x,z) {
+function house(parent,x,z,windowMaterial) {
   const g=group(parent,x,groundHeight(x,z),z);g.rotation.y=.18;
   box(g,4.9,.25,4.6,mat.lightWood,0,.12,0);
   box(g,4.1,2.8,3.5,mat.cream,0,1.57,-.2,.15);
@@ -51,7 +51,7 @@ function house(parent,x,z) {
   box(g,.95,1.95,.12,mat.jade,.85,1.26,1.62);
   cylinder(g,.045,.045,.05,mat.gold,1.16,1.29,1.72).rotation.x=Math.PI/2;
   for(const xw of [-1.2]) {
-    box(g,1.25,1.15,.1,mat.wood,xw,1.87,1.66);box(g,1.05,.96,.13,mat.glass,xw,1.87,1.73);
+    box(g,1.25,1.15,.1,mat.wood,xw,1.87,1.66);mesh(g,new THREE.PlaneGeometry(1.05,.96),windowMaterial,xw,1.87,1.80);
     box(g,.045,1,.04,mat.cream,xw,1.87,1.81);box(g,1.07,.05,.04,mat.cream,xw,1.87,1.81);
     for(const d of [-.88,.88]) {box(g,.4,1.28,.1,mat.mint,xw+d,1.87,1.7);for(let i=0;i<6;i++)box(g,.32,.05,.04,mat.jade,xw+d,1.39+i*.18,1.77,.01);}
     box(g,1.36,.3,.46,mat.coral,xw,1.14,1.86);for(let i=0;i<7;i++)oval(g,.17,.24,.18,mat.green,xw-.5+i*.17,1.38,1.89);
@@ -156,7 +156,8 @@ export function createIsland(scene,timeUniform,optics) {
     p.setXYZ(i,x,groundHeight(x,z),z);
   }groundGeo.computeVertexNormals();
   const ground=mesh(world,groundGeo,makeSandMaterial(timeUniform,optics));ground.castShadow=false;
-  const cottage=house(world,-5,3), bar=beachBar(world,4.5,3.1), dock=jetty(world);
+  const windowMaterial=createWindowMaterial();
+  const cottage=house(world,-5,3,windowMaterial), bar=beachBar(world,4.5,3.1), dock=jetty(world);
   const dog=lab(world);dog.g.position.set(-.4,groundHeight(-.4,7),7);
   const palms=[palm(world,-8,2,6.8,.8),palm(world,-7,6,5.9,-.3),palm(world,8,3,6.7,.6)];
   umbrella(world,-4.7,-.5);
@@ -165,12 +166,11 @@ export function createIsland(scene,timeUniform,optics) {
     const h=groundHeight(x,z);if(h<.15)continue;const s=.04+(i%3)*.025;oval(world,s,.025,s*.73,mat.cream,x,h+.016,z);}
   const cablePoints=[[-3,3.5,1],[-.1,2.7,1.9],[3,3.5,1]];tube(world,cablePoints,.015,mat.wood);
   for(const x of [-3,3])cylinder(world,.05,.06,3.3,mat.wood,x,1.95,1);
-  for(let i=0;i<13;i++){const x=-2.8+i*.46,y=2.7+.8*(x/3)**2;oval(world,.055,.09,.055,mat.lamp,x,y,1.8-(x/3)**2*.8);}
   // The promotion board is part of the place, and links only on deliberate clicks.
   const sign=group(world,7,groundHeight(7,.3),.3);sign.rotation.y=-.4;
   for(const x of [-.65,.65])box(sign,.08,1.65,.09,mat.wood,x,.8,0);
   box(sign,1.75,.88,.11,mat.lightWood,0,1.3,0);const board=label(sign,'ALHENA',1.56,.68,0,1.3,.061);board.userData.link='https://alhena.cc';
-  const lamp=new THREE.PointLight('#ffcc8e',6,12,2);lamp.position.set(4.5,3.5,3.8);scene.add(lamp);
+  const lighting=createEveningLights(world,{cottage,bar:bar.g,dock,windowMaterial});
   // Static props share material batches; the articulated rigs retain their transforms.
   const dynamic=new Set([dog.g,bar.actor.g,ground,board,...palms.flatMap(p=>p.fronds)]);
   world.updateMatrixWorld(true);const batches=new Map(),originals=[];
@@ -187,7 +187,7 @@ export function createIsland(scene,timeUniform,optics) {
   const upperQ=new THREE.Quaternion(),lowerQ=new THREE.Quaternion(),bodyInverse=new THREE.Quaternion(),padQ=new THREE.Quaternion(),yawQ=new THREE.Quaternion();
   const hipPoint=new THREE.Vector3(),kneePoint=new THREE.Vector3(),footPoint=new THREE.Vector3(),normal=new THREE.Vector3();
   let previousPhase='idle',greeting=0,pose=gait.snapshot();
-  return {world,dog,bar,cottage,palms,board,lamp,ground,dock,
+  return {world,dog,bar,cottage,palms,board,lighting,ground,dock,
     actors() {
       return {...gait.snapshot(),renderedFeet:dog.legs.map(leg=>({id:leg.id,position:leg.paw.getWorldPosition(new THREE.Vector3()).toArray()})),greeting,host:bar.actor.evidence()};
     },
