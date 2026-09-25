@@ -48,3 +48,23 @@ They are miniature interpretations, not biological reconstructions. This pass
 does not solve full 3D overturning waves, two-way fluid coupling, or paid Deep
 Water entitlements. It does not establish the whole experience as AAA quality.
 The unrelated untracked canonical `shore.js` experiment is untouched.
+
+## Public release
+
+- Source commit `5759815ca18ee3e58a310ca23bbea8a4c5b1f07b`, fast-forwarded
+  into canonical main and deployed from a separate clean release clone.
+- Guarded deployment passed all 34 unit tests and public response checks.
+- Cloudflare version `f433e7dc-7f01-4d31-b015-12d23b060283`, deployment
+  `96e59434-3b0f-4c5a-aadb-d2dd3444fc48`, 100% traffic, created
+  `2026-09-25T05:32:52.09758Z`, independently confirmed through the API.
+- All 17 runtime files return HTTP 200 and match the release SHA-256 exactly:
+  `fish-live-source/source-hashes.json`.
+- Public GPU contact sheet and real-school animation checks pass with no
+  errors: `fish-live/models/`. Live fishing/strike screenshots were inspected;
+  recorded fishing-view FPS is 58 on this M4, not a phone performance claim.
+- Public end-to-end regression passes all six checks without runtime/console
+  errors, including catch persistence and both mobile orientations:
+  `fish-live/flow/report.json`. This was a complete UI-driven run against the
+  production URL, not a substitute localhost result.
+- The owned localhost preview server was stopped and no port 8796 listener
+  remains. No persistent process or model was installed.
