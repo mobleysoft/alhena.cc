@@ -1,0 +1,54 @@
+{
+  "at": "2026-09-25T05:12:59.224Z",
+  "url": "https://paradise.alhena.cc/",
+  "engine": "chromium",
+  "checks": [
+    "cast, wave-tracking buoyancy, strike, tension fight, catch",
+    "dog watches the strike; Alhena greets the catch; reactions settle"
+  ],
+  "screenshots": [
+    "desktop-landing.png",
+    "desktop-fishing.png",
+    "desktop-strike.png",
+    "desktop-catch.png"
+  ],
+  "errors": [],
+  "initial": {
+    "build": "unified-cove-20260924",
+    "renderer": "Three.js WebGL2",
+    "waveComponents": 32,
+    "fluid": {
+      "backend": "webgpu",
+      "reason": null,
+      "resolution": 128,
+      "ticks": 161,
+      "published": 161,
+      "pending": false,
+      "queuedSteps": 0,
+      "impulseCount": 0,
+      "peak": 0
+    },
+    "caustics": "surface-refracted-ray-grid",
+    "phase": "idle",
+    "entered": false,
+    "catches": 0,
+    "time": "sunset",
+    "weather": "breeze",
+    "fps": 60,
+    "canvases": 1,
+    "frames": 0,
+    "bobber": [
+      0,
+      0,
+      0
+    ],
+    "surface": 0,
+    "tension": 0,
+    "reelProgress": 0,
+    "motionEnabled": false
+  },
+  "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+  "buoyancyMeanError": 0.06634585387351072,
+  "ok": false,
+  "failure": "page.reload: net::ERR_CONNECTION_CLOSED\nCall log:\n\u001b[2m  - waiting for navigation until \"networkidle\"\u001b[22m\n\n    at /Users/johnmobley/sandboxes/paradise-release-20260925/paradise/scripts/verify-cove.mjs:92:14"
+}

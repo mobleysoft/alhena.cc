@@ -55,3 +55,28 @@ object shadows, or a WebGPU rendering-engine migration. Geometry can still
 under-resolve displacement far offshore even though its normals no longer
 interpolate coarse short-wave samples. The pre-existing `shore.js` experiment
 in the canonical working tree was not modified or included.
+
+## Deployment
+
+- Source commit `bf0137a662dfa4c20821e4a06de7f2f35fe60185`, merged by
+  fast-forward into canonical main and shipped from a separate clean clone.
+- The guarded deploy passed all 30 unit tests and every post-deploy public
+  response check. Authenticated account: `johnmobley99@gmail.com`.
+- Worker version `1a62400e-5209-42f6-9413-5def1b6da447`, deployment
+  `e8a46341-89cd-44f3-af90-cc1952e1423f`, 100% traffic, created
+  `2026-09-25T05:11:58.491557Z`; confirmed independently through the API.
+- All 16 active runtime files return HTTP 200 and match the release SHA-256
+  hashes exactly: `surface-live-source/source-hashes.json`.
+- Public-site GPU normal, reflection-coverage and caustic-fade tests pass,
+  with no runtime errors and 60 FPS at the initial fishing snapshot:
+  `surface-live-optics/`. The live fishing screenshot was inspected.
+- The first public full-flow attempt completed the catch and actor checks,
+  then navigation failed at reload with `net::ERR_CONNECTION_CLOSED`, without
+  a runtime/console error. The report/screenshots are preserved in
+  `surface-live-attempt-1/`; an immediate independent GET returned HTTP 200.
+  This failure is not counted as a passing persistence test.
+- The completed second public full-flow attempt passes all six checks,
+  including reload persistence, weather/time and both mobile orientations,
+  with no runtime/console errors: `surface-live/report.json`.
+- The owned localhost preview server on port 8796 was stopped and absence
+  of its listening socket confirmed. No daemon or model was installed.
