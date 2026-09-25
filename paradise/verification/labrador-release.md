@@ -43,7 +43,23 @@ preserved outside the repo in `mascom/logs/paradise-labrador-scratch-20260925`.
 The clean release clone must pass the guarded deploy script, now including the
 new tests and a public Labrador-module check. Live version before promotion:
 `26a6193b-90da-4c5d-8f91-4951e072e8d9`, verified at 100% traffic on the intended
-Cloudflare account. Public source and runtime verification are pending below.
+Cloudflare account.
+
+## Observed production result
+
+- Source commit: `75a49b8880d50676864d39bb3ddb468fc675d31c`.
+- Guarded deployment reran all 48 tests from the clean main-branch release
+  clone, retained the ASSETS binding, and uploaded only `models.js` and the new
+  `labrador.js` among public assets.
+- Cloudflare version `3fd34e64-14aa-42f2-886f-9e51588a7e3b` confirmed at 100%
+  traffic, deployment timestamp `2026-09-25T09:12:11.956035Z`.
+- `labrador-live-source/source-hashes.json`: all 20 root/runtime/vendor files
+  returned HTTP 200 and matched the committed source SHA-256 hashes.
+- `labrador-live-flow/report.json`: Chromium passed the real public fishing
+  loop, character reactions, saved catch, weather and both touch layouts, with
+  no captured errors. Landing, night/storm and portrait fishing screenshots
+  were inspected. Sampled buoyancy error was 0.06395 world units.
+- The owned preview server on port 8798 was stopped and the port checked empty.
 
 The overarching visual goal remains incomplete. Full overturning surf,
 physical-phone validation, commercial entitlement and other fidelity work are
