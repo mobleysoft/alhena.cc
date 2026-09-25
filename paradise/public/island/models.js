@@ -8,10 +8,12 @@ import { createCoastalGarden } from './coastal-garden.js';
 import { createHost } from './host.js';
 import { createEveningLights, createWindowMaterial } from './evening-light.js';
 import { createLabrador } from './labrador.js';
+import { tactileMaterial, tactileGeometry, createAwningPanelGeometry } from './tactile-materials.js';
 
 const clay = (color, roughness=.7) => new THREE.MeshStandardMaterial({color,roughness,metalness:0});
 const mat = {
-  cream:clay('#f4ead1'), coral:clay('#bb6952'), roof:clay('#d48b6a'), wood:clay('#967552'), lightWood:clay('#c8a476'),
+  cream:clay('#f4ead1'), coral:clay('#bb6952'), roof:tactileMaterial('#d48b6a','ceramic'), wood:tactileMaterial('#967552','wood'), lightWood:tactileMaterial('#c8a476','wood'),
+  linen:tactileMaterial('#f4ead1','linen',.92), linenMint:tactileMaterial('#89ae9a','linen',.92), linenCoral:tactileMaterial('#bb6952','linen',.92),
   green:clay('#496e50'), leaf:clay('#698753'), mint:clay('#89ae9a'), jade:clay('#397d74'), gold:clay('#d6b870',.4),
   dark:clay('#203233'), black:clay('#252d2b',.49), skin:clay('#bc8661'), hair:clay('#353228'), pink:clay('#d88b80'),
   glass:new THREE.MeshStandardMaterial({color:'#2d6b65',roughness:.18,metalness:.2}),
@@ -26,6 +28,7 @@ function rounded(w,h,d,r=.08) {
   geo.translate(0,0,-d/2+r); geoCache.set(key,geo); return geo;
 }
 function mesh(parent,geo,material,x=0,y=0,z=0) {
+  if(material.userData.tactile&&!geo.userData.metricUV)geo=tactileGeometry(geo);
   const obj=new THREE.Mesh(geo,material); obj.position.set(x,y,z); obj.castShadow=true; obj.receiveShadow=true; parent.add(obj); return obj;
 }
 function box(parent,w,h,d,material,x=0,y=0,z=0,r=.07) { return mesh(parent,rounded(w,h,d,r),material,x,y,z); }
@@ -88,10 +91,10 @@ function beachBar(parent,x,z) {
   for(let i=0;i<15;i++)box(g,.11,1.03,.045,mat.mint,-1.71+i*.244,.78,1.08,.025);
   box(g,4.15,.17,1.55,mat.cream,0,1.42,.45,.08);
   label(g,'ALHENA',1.9,.48,0,.91,1.12,'#397d74','#f4ead1');
-  for(const xp of [-2.05,2.05]) cylinder(g,.065,.07,3.3,mat.wood,xp,1.76,-.6);
+  for(const xp of [-2.05,2.05]) cylinder(g,.065,.07,3.22,mat.wood,xp,1.72,-.6);
   for(let i=0;i<12;i++) {
-    const canopy=box(g,.4,.09,3.05,i%2?mat.cream:mat.mint,-2.2+i*.4,3.47,-.1,.035);canopy.rotation.x=.1;
-    box(g,.4,.25,.09,i%2?mat.cream:mat.mint,-2.2+i*.4,3.17,1.42,.04);
+    mesh(g,createAwningPanelGeometry(i),i%2?mat.linen:mat.linenMint);
+    mesh(g,createAwningPanelGeometry(i,true),i%2?mat.linen:mat.linenMint);
   }
   for(let i=0;i<4;i++){const xp=-1.35+i*.38;cylinder(g,.06,.07,.35,i%2?mat.glass:mat.coral,xp,1.67,.5);cylinder(g,.035,.035,.1,mat.gold,xp,1.89,.5);}
   cylinder(g,.19,.16,.24,mat.cream,.8,1.64,.65);mesh(g,new THREE.TorusGeometry(.1,.028,7,16),mat.cream,1,1.65,.65);
@@ -116,11 +119,11 @@ function umbrella(parent,x,z) {
   const g=group(parent,x,groundHeight(x,z),z);cylinder(g,.048,.048,3,mat.lightWood,0,1.5,0);
   for(let i=0;i<10;i++) {
     const geo=new THREE.SphereGeometry(1.5,7,6,i*Math.PI/5,Math.PI/5,0,Math.PI/2);
-    geo.scale(1,.38,1);const m=mesh(g,geo,i%2?mat.cream:mat.coral,0,2.9,0);m.material=m.material.clone();m.material.side=THREE.DoubleSide;
+    geo.scale(1,.38,1);const m=mesh(g,geo,i%2?mat.linen:mat.linenCoral,0,2.9,0);m.material=m.material.clone();m.material.side=THREE.DoubleSide;
   }
   oval(g,.07,.09,.07,mat.gold,0,3.5,0);
   for(const offset of [-.75,.75]){const chair=group(g,offset,0,.5);chair.rotation.y=.15;
-    box(chair,.65,.1,1.4,mat.cream,0,.4,0);const back=box(chair,.65,1,.07,mat.mint,0,.93,-.62);back.rotation.x=-.25;
+    box(chair,.65,.1,1.4,mat.linen,0,.4,0);const back=box(chair,.65,1,.07,mat.linenMint,0,.93,-.62);back.rotation.x=-.25;
     for(const xp of [-.28,.28])for(const zz of [-.52,.52])cylinder(chair,.035,.035,.4,mat.wood,xp,.2,zz);}
   return g;
 }

@@ -5,6 +5,14 @@ PlayCanvas iframe, or independent background renderer.
 
 - `models.js`: rounded clay/vinyl miniatures, articulated dog and Alhena,
   seabed, cottage, bar, jetty, palms, lighting props, clickable promotion board.
+- `tactile-materials.js`: authored periodic timber, terracotta and linen maps
+  used by the existing physical materials. Metric UVs keep fibers aligned with
+  individual planks and posts through static batching. Six shared 256px maps
+  use approximately 2 MiB including mipmaps; height and roughness share one
+  packed texture per surface. The bar canopy is now closed, curved fabric with
+  a scalloped hem, rather than rigid plank strips. Fabric is authored geometry,
+  not a cloth simulation. No photo assets, overlays or external texture fetches
+  are introduced; scene lighting determines the visible surface response.
 - `evening-light.js`: warm curtained cottage glazing, modeled brass/jade porch
   and pier lanterns, a bar pendant and capped festoon bulbs. Four bounded local
   point lights provide real surface illumination; the festoons share one light
@@ -156,3 +164,11 @@ deterministic glazing, independent materials, time/weather levels and bounded
 fixture/light counts. `node paradise/scripts/verify-evening-light.mjs` exercises
 real controls, captures noon/sunset/night/storm frames, tests night casting and
 reduced-motion lighting, and records browser errors and sampled frame rates.
+
+Tactile surfaces: `node --test paradise/scripts/test-tactile-materials.mjs`
+checks periodic data, shared/bounded textures, metric UVs through static
+batching, closed outward cloth panels and matching seams. The browser check,
+`node paradise/scripts/verify-tactile-materials.mjs`, renders the same geometry
+and lighting with maps enabled/disabled, compares actual GPU pixels, captures
+close-up galleries, then verifies the real landing page and casting. The full
+fishing and mobile regression remains `verify-cove.mjs`.

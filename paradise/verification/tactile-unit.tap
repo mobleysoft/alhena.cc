@@ -1,0 +1,318 @@
+TAP version 13
+# (node:6198) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/johnmobley/sandboxes/paradise-tactile-materials/paradise/public/island/ocean.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /Users/johnmobley/sandboxes/paradise-tactile-materials/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: the island, shoreline and inner cove retain their authored elevations
+ok 1 - the island, shoreline and inner cove retain their authored elevations
+  ---
+  duration_ms: 15.539917
+  ...
+# Subtest: offshore grade is continuous, bounded and still reaches the deep seafloor
+ok 2 - offshore grade is continuous, bounded and still reaches the deep seafloor
+  ---
+  duration_ms: 18.121583
+  ...
+# Subtest: overview rays no longer jump behind the outer shelf
+ok 3 - overview rays no longer jump behind the outer shelf
+  ---
+  duration_ms: 31.230708
+  ...
+# (node:6199) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/johnmobley/sandboxes/paradise-tactile-materials/paradise/public/island/ocean.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /Users/johnmobley/sandboxes/paradise-tactile-materials/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: ballistic spray returns to water with bounded, non-recursive impulses
+ok 4 - ballistic spray returns to water with bounded, non-recursive impulses
+  ---
+  duration_ms: 12.309
+  ...
+# Subtest: spray pool is bounded and rejects dry or invalid impacts
+ok 5 - spray pool is bounded and rejects dry or invalid impacts
+  ---
+  duration_ms: 61.331833
+  ...
+# Subtest: spray follows a moving water surface and expires if the surface disappears
+ok 6 - spray follows a moving water surface and expires if the surface disappears
+  ---
+  duration_ms: 11.933417
+  ...
+# Subtest: two-bone IK preserves segment lengths and clamps unreachable targets
+ok 7 - two-bone IK preserves segment lengths and clamps unreachable targets
+  ---
+  duration_ms: 0.291541
+  ...
+# Subtest: quadruped plants stance paws without sliding, with at least three contacts
+ok 8 - quadruped plants stance paws without sliding, with at least three contacts
+  ---
+  duration_ms: 176.103042
+  ...
+# Subtest: quadruped settles on attention and does not travel in reduced motion
+ok 9 - quadruped settles on attention and does not travel in reduced motion
+  ---
+  duration_ms: 2.328416
+  ...
+# Subtest: finite-difference water is stable, propagates disturbances and dissipates energy
+ok 10 - finite-difference water is stable, propagates disturbances and dissipates energy
+  ---
+  duration_ms: 246.288375
+  ...
+# Subtest: shoreline mask remains dry; published field matches the sampled surface
+ok 11 - shoreline mask remains dry; published field matches the sampled surface
+  ---
+  duration_ms: 45.579209
+  ...
+# Subtest: 32 finite wave components retain PandoraChat dispersion and spectrum
+ok 12 - 32 finite wave components retain PandoraChat dispersion and spectrum
+  ---
+  duration_ms: 0.519917
+  ...
+# Subtest: shore transitions continuously into a deep seabed
+ok 13 - shore transitions continuously into a deep seabed
+  ---
+  duration_ms: 2.510125
+  ...
+# Subtest: small wind waves are bounded, weather-driven and use gravity-capillary dispersion
+ok 14 - small wind waves are bounded, weather-driven and use gravity-capillary dispersion
+  ---
+  duration_ms: 1.386333
+  ...
+# Subtest: legacy catch counts are preserved exactly and imported once
+ok 15 - legacy catch counts are preserved exactly and imported once
+  ---
+  duration_ms: 2.475167
+  ...
+# Subtest: malformed or blocked browser storage cannot stop the island
+ok 16 - malformed or blocked browser storage cannot stop the island
+  ---
+  duration_ms: 0.338292
+  ...
+# Subtest: a full storage quota does not hide a readable legacy journal
+ok 17 - a full storage quota does not hide a readable legacy journal
+  ---
+  duration_ms: 0.130875
+  ...
+# Subtest: weather and time influence rare-fish distribution
+ok 18 - weather and time influence rare-fish distribution
+  ---
+  duration_ms: 1.413417
+  ...
+# (node:6200) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/johnmobley/sandboxes/paradise-tactile-materials/paradise/public/island/evening-light.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /Users/johnmobley/sandboxes/paradise-tactile-materials/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: evening illumination follows time and weather, with a bounded daylight baseline
+ok 19 - evening illumination follows time and weather, with a bounded daylight baseline
+  ---
+  duration_ms: 1.269166
+  ...
+# Subtest: curtained glazing is deterministic, finite and keeps independent material state
+ok 20 - curtained glazing is deterministic, finite and keeps independent material state
+  ---
+  duration_ms: 11.490334
+  ...
+# Subtest: modeled fixtures use four non-shadow local lights and restore exact day state
+ok 21 - modeled fixtures use four non-shadow local lights and restore exact day state
+  ---
+  duration_ms: 23.953292
+  ...
+# (node:6201) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/johnmobley/sandboxes/paradise-tactile-materials/paradise/public/island/fish.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /Users/johnmobley/sandboxes/paradise-tactile-materials/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: eight deterministic sculpted hulls have finite geometry, colors, and normalized skin weights
+ok 22 - eight deterministic sculpted hulls have finite geometry, colors, and normalized skin weights
+  ---
+  duration_ms: 250.490583
+  ...
+# Subtest: all sculpted parts are closed with outward winding and nondegenerate faces
+ok 23 - all sculpted parts are closed with outward winding and nondegenerate faces
+  ---
+  duration_ms: 204.995125
+  ...
+# Subtest: school shares eight geometries and one material, but not skeletons
+ok 24 - school shares eight geometries and one material, but not skeletons
+  ---
+  duration_ms: 26.651875
+  ...
+# Subtest: skin bends actual tail vertices, keeps head stable, and bounds reduced-motion animation
+ok 25 - skin bends actual tail vertices, keeps head stable, and bounds reduced-motion animation
+  ---
+  duration_ms: 1.615916
+  ...
+# (node:6202) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/johnmobley/sandboxes/paradise-tactile-materials/paradise/public/island/foliage.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /Users/johnmobley/sandboxes/paradise-tactile-materials/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: palm fronds are deterministic bounded meshes with closed leaflets
+ok 26 - palm fronds are deterministic bounded meshes with closed leaflets
+  ---
+  duration_ms: 41.873917
+  ...
+# Subtest: trunks taper along their curved centerline with finite normals
+ok 27 - trunks taper along their curved centerline with finite normals
+  ---
+  duration_ms: 18.613542
+  ...
+# Subtest: static batching retains painted vertex colors and does not mutate its source
+ok 28 - static batching retains painted vertex colors and does not mutate its source
+  ---
+  duration_ms: 28.672792
+  ...
+# (node:6203) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/johnmobley/sandboxes/paradise-tactile-materials/paradise/public/island/coastal-garden.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /Users/johnmobley/sandboxes/paradise-tactile-materials/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: sculpted assets have finite bounded geometry, colors and seam normals
+ok 29 - sculpted assets have finite bounded geometry, colors and seam normals
+  ---
+  duration_ms: 48.40225
+  ...
+# Subtest: coastal garden uses shared meshes, bounded materials and dry planting
+ok 30 - coastal garden uses shared meshes, bounded materials and dry planting
+  ---
+  duration_ms: 17.020333
+  ...
+# Subtest: decorative clusters leave the jetty and walking dog circuit clear
+ok 31 - decorative clusters leave the jetty and walking dog circuit clear
+  ---
+  duration_ms: 181.420541
+  ...
+# (node:6204) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/johnmobley/sandboxes/paradise-tactile-materials/paradise/public/island/host.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /Users/johnmobley/sandboxes/paradise-tactile-materials/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: sculpted face, hair, dress and apron are deterministic, finite and bounded
+ok 32 - sculpted face, hair, dress and apron are deterministic, finite and bounded
+  ---
+  duration_ms: 117.698167
+  ...
+# Subtest: all four primary sculptures are closed, consistently wound, nondegenerate solids
+ok 33 - all four primary sculptures are closed, consistently wound, nondegenerate solids
+  ---
+  duration_ms: 33.841417
+  ...
+# Subtest: host keeps the existing articulated interface with seven batched meshes
+ok 34 - host keeps the existing articulated interface with seven batched meshes
+  ---
+  duration_ms: 28.925208
+  ...
+# Subtest: face has an integrated nose and cheek relief rather than an added sphere
+ok 35 - face has an integrated nose and cheek relief rather than an added sphere
+  ---
+  duration_ms: 4.002959
+  ...
+# (node:6205) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/johnmobley/sandboxes/paradise-tactile-materials/paradise/public/island/labrador.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /Users/johnmobley/sandboxes/paradise-tactile-materials/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: Labrador sculptures are deterministic, bounded closed solids
+ok 36 - Labrador sculptures are deterministic, bounded closed solids
+  ---
+  duration_ms: 545.859583
+  ...
+# Subtest: one-material Labrador keeps four independent two-bone legs and cached geometry
+ok 37 - one-material Labrador keeps four independent two-bone legs and cached geometry
+  ---
+  duration_ms: 133.388208
+  ...
+# Subtest: continuous torso has a deeper chest and a tucked-up waist; muzzle is part of skull
+ok 38 - continuous torso has a deeper chest and a tucked-up waist; muzzle is part of skull
+  ---
+  duration_ms: 118.492041
+  ...
+# Subtest: all four skinned soles follow their paw bone under body and joint transforms
+ok 39 - all four skinned soles follow their paw bone under body and joint transforms
+  ---
+  duration_ms: 10.16
+  ...
+# (node:6206) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/johnmobley/sandboxes/paradise-tactile-materials/paradise/public/island/rain.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /Users/johnmobley/sandboxes/paradise-tactile-materials/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: rain meets the moving sea, stays bounded, and fades when the storm passes
+ok 40 - rain meets the moving sea, stays bounded, and fades when the storm passes
+  ---
+  duration_ms: 90.50625
+  ...
+# Subtest: dry land never receives water rings; emerging land retires existing rings
+ok 41 - dry land never receives water rings; emerging land retires existing rings
+  ---
+  duration_ms: 42.343583
+  ...
+# Subtest: reduced motion disables decorative rain and invalid timesteps do not corrupt state
+ok 42 - reduced motion disables decorative rain and invalid timesteps do not corrupt state
+  ---
+  duration_ms: 1.093708
+  ...
+# (node:6209) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/johnmobley/sandboxes/paradise-tactile-materials/paradise/public/island/tactile-materials.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /Users/johnmobley/sandboxes/paradise-tactile-materials/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: periodic authored maps are finite, bounded, mipmapped and shared
+ok 43 - periodic authored maps are finite, bounded, mipmapped and shared
+  ---
+  duration_ms: 99.712916
+  ...
+# Subtest: metric UVs preserve original geometry, follow each plank and survive static merging
+ok 44 - metric UVs preserve original geometry, follow each plank and survive static merging
+  ---
+  duration_ms: 3.268458
+  ...
+# Subtest: all cloth panels are closed outward meshes with matching stripe seams
+ok 45 - all cloth panels are closed outward meshes with matching stripe seams
+  ---
+  duration_ms: 28.434041
+  ...
+# Subtest: awning has a draped profile, an actual thickness and a scalloped hem
+ok 46 - awning has a draped profile, an actual thickness and a scalloped hem
+  ---
+  duration_ms: 0.226125
+  ...
+# (node:6210) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/johnmobley/sandboxes/paradise-tactile-materials/paradise/public/island/water-light.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /Users/johnmobley/sandboxes/paradise-tactile-materials/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: homogeneous light integration agrees with the analytic solution at every step count
+ok 47 - homogeneous light integration agrees with the analytic solution at every step count
+  ---
+  duration_ms: 3.741
+  ...
+# Subtest: light paths respect occlusion and colored extinction without negative or invalid radiance
+ok 48 - light paths respect occlusion and colored extinction without negative or invalid radiance
+  ---
+  duration_ms: 0.912333
+  ...
+# Subtest: four light slices use bounded geometry with no triangle crossing between atlas tiles
+ok 49 - four light slices use bounded geometry with no triangle crossing between atlas tiles
+  ---
+  duration_ms: 31.442042
+  ...
+# Subtest: depth reconstruction returns the actual world point, including translated cameras
+ok 50 - depth reconstruction returns the actual world point, including translated cameras
+  ---
+  duration_ms: 0.637125
+  ...
+# (node:6211) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/johnmobley/sandboxes/paradise-tactile-materials/paradise/public/island/ocean.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /Users/johnmobley/sandboxes/paradise-tactile-materials/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: angle-addition samples reproduce the legacy finite differences
+ok 51 - angle-addition samples reproduce the legacy finite differences
+  ---
+  duration_ms: 4.246834
+  ...
+# Subtest: reflection targets retain aspect ratio without exceeding one megapixel
+ok 52 - reflection targets retain aspect ratio without exceeding one megapixel
+  ---
+  duration_ms: 0.650417
+  ...
+1..52
+# tests 52
+# suites 0
+# pass 52
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 934.535667

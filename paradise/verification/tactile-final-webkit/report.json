@@ -1,0 +1,54 @@
+{
+  "at": "2026-09-25T10:03:44.810Z",
+  "url": "http://127.0.0.1:8798/",
+  "engine": "webkit",
+  "errors": [],
+  "fixture": {
+    "materials": 15,
+    "textures": 6,
+    "calls": [
+      23,
+      17,
+      52
+    ],
+    "changedPixels": 305714,
+    "changedFraction": 0.2653767361111111,
+    "meanChannelDelta": 1.9711391782407408,
+    "textureBytesWithMipmaps": 2097151.9999999998
+  },
+  "scene": {
+    "build": "unified-cove-20260924",
+    "renderer": "Three.js WebGL2",
+    "waveComponents": 32,
+    "fluid": {
+      "backend": "webgpu",
+      "reason": null,
+      "resolution": 128,
+      "ticks": 136,
+      "published": 135,
+      "pending": true,
+      "queuedSteps": 0,
+      "impulseCount": 0,
+      "peak": 0
+    },
+    "caustics": "surface-refracted-ray-grid",
+    "phase": "idle",
+    "entered": false,
+    "catches": 0,
+    "time": "sunset",
+    "weather": "breeze",
+    "fps": 55,
+    "canvases": 1,
+    "frames": 0,
+    "bobber": [
+      0,
+      0,
+      0
+    ],
+    "surface": 0,
+    "tension": 0,
+    "reelProgress": 0,
+    "motionEnabled": false
+  },
+  "ok": true
+}
