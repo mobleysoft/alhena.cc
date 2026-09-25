@@ -1,0 +1,446 @@
+{
+  "at": "2026-09-25T05:28:35.300Z",
+  "url": "http://127.0.0.1:8796/",
+  "engine": "chromium",
+  "errors": [],
+  "gpu": {
+    "calls": 8,
+    "triangles": 72448,
+    "changedPixels": 43408,
+    "fish": [
+      {
+        "name": "Silver mullet",
+        "variant": 0,
+        "skinned": true,
+        "bones": 6,
+        "vertices": 4810,
+        "triangles": 9056,
+        "tail": [
+          -0.03607981874666723,
+          0.21774519979953766,
+          -0.8776566940965914
+        ],
+        "head": [
+          0,
+          0,
+          0.5
+        ]
+      },
+      {
+        "name": "Blue runner",
+        "variant": 1,
+        "skinned": true,
+        "bones": 6,
+        "vertices": 4810,
+        "triangles": 9056,
+        "tail": [
+          -0.12463866339686358,
+          0.24188409745693207,
+          -0.8641389722740902
+        ],
+        "head": [
+          0,
+          0,
+          0.5
+        ]
+      },
+      {
+        "name": "Spotted sea bass",
+        "variant": 2,
+        "skinned": true,
+        "bones": 6,
+        "vertices": 4810,
+        "triangles": 9056,
+        "tail": [
+          0.16405688798070464,
+          0.20806866884231567,
+          -0.8525945305494577
+        ],
+        "head": [
+          0,
+          0,
+          0.5
+        ]
+      },
+      {
+        "name": "Golden bream",
+        "variant": 3,
+        "skinned": true,
+        "bones": 6,
+        "vertices": 4810,
+        "triangles": 9056,
+        "tail": [
+          -0.049742039724557346,
+          0.20772546529769897,
+          -0.8760386828653769
+        ],
+        "head": [
+          0,
+          0,
+          0.5
+        ]
+      },
+      {
+        "name": "Reef snapper",
+        "variant": 4,
+        "skinned": true,
+        "bones": 6,
+        "vertices": 4810,
+        "triangles": 9056,
+        "tail": [
+          -0.11331148697389615,
+          0.19773392379283905,
+          -0.8624678079232554
+        ],
+        "head": [
+          0,
+          0,
+          0.5
+        ]
+      },
+      {
+        "name": "Moon wrasse",
+        "variant": 5,
+        "skinned": true,
+        "bones": 6,
+        "vertices": 4810,
+        "triangles": 9056,
+        "tail": [
+          0.16533200865369388,
+          0.1486784815788269,
+          -0.8477036457549679
+        ],
+        "head": [
+          0,
+          0,
+          0.5
+        ]
+      },
+      {
+        "name": "Atlantic mackerel",
+        "variant": 6,
+        "skinned": true,
+        "bones": 6,
+        "vertices": 4810,
+        "triangles": 9056,
+        "tail": [
+          -0.06323624245819363,
+          0.25399088859558105,
+          -0.8790255693072238
+        ],
+        "head": [
+          0,
+          0,
+          0.5
+        ]
+      },
+      {
+        "name": "Amberjack",
+        "variant": 7,
+        "skinned": true,
+        "bones": 6,
+        "vertices": 4810,
+        "triangles": 9056,
+        "tail": [
+          -0.10391614447604686,
+          0.23785337805747986,
+          -0.868030333171467
+        ],
+        "head": [
+          0,
+          0,
+          0.5
+        ]
+      }
+    ]
+  },
+  "school": [
+    {
+      "name": "Silver mullet",
+      "variant": 0,
+      "skinned": true,
+      "bones": 6,
+      "vertices": 4810,
+      "triangles": 9056,
+      "tail": [
+        -0.038566308027789376,
+        0.21774519979953777,
+        -0.8755531004218682
+      ],
+      "head": [
+        0,
+        0,
+        0.5000000000000009
+      ]
+    },
+    {
+      "name": "Blue runner",
+      "variant": 1,
+      "skinned": true,
+      "bones": 6,
+      "vertices": 4810,
+      "triangles": 9056,
+      "tail": [
+        0.12369099424505595,
+        0.24188409745693212,
+        -0.8643436914912022
+      ],
+      "head": [
+        0,
+        0,
+        0.5000000000000001
+      ]
+    },
+    {
+      "name": "Spotted sea bass",
+      "variant": 2,
+      "skinned": true,
+      "bones": 6,
+      "vertices": 4810,
+      "triangles": 9056,
+      "tail": [
+        -0.16590966343355484,
+        0.20806866884231567,
+        -0.8499816189908813
+      ],
+      "head": [
+        0,
+        0,
+        0.49999999999999645
+      ]
+    },
+    {
+      "name": "Golden bream",
+      "variant": 3,
+      "skinned": true,
+      "bones": 6,
+      "vertices": 4810,
+      "triangles": 9056,
+      "tail": [
+        0.15829879751421316,
+        0.207725465297699,
+        -0.856642945030293
+      ],
+      "head": [
+        -1.7763568394002505e-15,
+        0,
+        0.4999999999999982
+      ]
+    },
+    {
+      "name": "Reef snapper",
+      "variant": 4,
+      "skinned": true,
+      "bones": 6,
+      "vertices": 4810,
+      "triangles": 9056,
+      "tail": [
+        -0.09860619048629715,
+        0.197733923792839,
+        -0.869681027094789
+      ],
+      "head": [
+        3.552713678800501e-15,
+        0,
+        0.5
+      ]
+    },
+    {
+      "name": "Moon wrasse",
+      "variant": 5,
+      "skinned": true,
+      "bones": 6,
+      "vertices": 4810,
+      "triangles": 9056,
+      "tail": [
+        0.0064083788586089,
+        0.1486784815788269,
+        -0.8711849697963816
+      ],
+      "head": [
+        0,
+        0,
+        0.5000000000000001
+      ]
+    },
+    {
+      "name": "Atlantic mackerel",
+      "variant": 6,
+      "skinned": true,
+      "bones": 6,
+      "vertices": 4810,
+      "triangles": 9056,
+      "tail": [
+        0.08972350469423063,
+        0.25399088859558105,
+        -0.8718837998897062
+      ],
+      "head": [
+        -3.552713678800501e-15,
+        0,
+        0.5
+      ]
+    },
+    {
+      "name": "Amberjack",
+      "variant": 7,
+      "skinned": true,
+      "bones": 6,
+      "vertices": 4810,
+      "triangles": 9056,
+      "tail": [
+        -0.15407446883910939,
+        0.23785337805747991,
+        -0.8570705758846537
+      ],
+      "head": [
+        0,
+        0,
+        0.5000000000000014
+      ]
+    },
+    {
+      "name": "Silver mullet",
+      "variant": 0,
+      "skinned": true,
+      "bones": 6,
+      "vertices": 4810,
+      "triangles": 9056,
+      "tail": [
+        -0.13110441129569672,
+        0.21774519979953766,
+        -0.8652519546090573
+      ],
+      "head": [
+        1.7763568394002505e-15,
+        -1.1102230246251565e-16,
+        0.5
+      ]
+    },
+    {
+      "name": "Blue runner",
+      "variant": 1,
+      "skinned": true,
+      "bones": 6,
+      "vertices": 4810,
+      "triangles": 9056,
+      "tail": [
+        0.049543094331525594,
+        0.24188409745693207,
+        -0.8790815339401075
+      ],
+      "head": [
+        3.552713678800501e-15,
+        0,
+        0.5000000000000018
+      ]
+    },
+    {
+      "name": "Spotted sea bass",
+      "variant": 2,
+      "skinned": true,
+      "bones": 6,
+      "vertices": 4810,
+      "triangles": 9056,
+      "tail": [
+        0.048118530319357866,
+        0.20806866884231567,
+        -0.8718221052198629
+      ],
+      "head": [
+        2.6645352591003757e-15,
+        0,
+        0.49999999999999645
+      ]
+    },
+    {
+      "name": "Golden bream",
+      "variant": 3,
+      "skinned": true,
+      "bones": 6,
+      "vertices": 4810,
+      "triangles": 9056,
+      "tail": [
+        -0.12948880769172358,
+        0.20772546529769903,
+        -0.8600179990848782
+      ],
+      "head": [
+        1.776356839400251e-15,
+        0,
+        0.5000000000000001
+      ]
+    },
+    {
+      "name": "Reef snapper",
+      "variant": 4,
+      "skinned": true,
+      "bones": 6,
+      "vertices": 4810,
+      "triangles": 9056,
+      "tail": [
+        0.1679627620625581,
+        0.19773392379283894,
+        -0.8505294634802194
+      ],
+      "head": [
+        0,
+        -1.1102230246251565e-16,
+        0.5
+      ]
+    },
+    {
+      "name": "Moon wrasse",
+      "variant": 5,
+      "skinned": true,
+      "bones": 6,
+      "vertices": 4810,
+      "triangles": 9056,
+      "tail": [
+        -0.15235321318608278,
+        0.14867848157882688,
+        -0.8524190030446237
+      ],
+      "head": [
+        0,
+        0,
+        0.5000000000000037
+      ]
+    }
+  ],
+  "active": {
+    "build": "unified-cove-20260924",
+    "renderer": "Three.js WebGL2",
+    "waveComponents": 32,
+    "fluid": {
+      "backend": "webgpu",
+      "reason": null,
+      "resolution": 128,
+      "ticks": 352,
+      "published": 352,
+      "pending": false,
+      "queuedSteps": 0,
+      "impulseCount": 15,
+      "peak": 0.035973671823740005
+    },
+    "caustics": "surface-refracted-ray-grid",
+    "phase": "hunt",
+    "entered": true,
+    "catches": 0,
+    "time": "sunset",
+    "weather": "breeze",
+    "fps": 58,
+    "canvases": 1,
+    "frames": 0,
+    "bobber": [
+      0.5,
+      -0.29326084506588723,
+      19
+    ],
+    "surface": -0.30128263415827367,
+    "tension": 0,
+    "reelProgress": 0,
+    "motionEnabled": false
+  },
+  "ok": true
+}

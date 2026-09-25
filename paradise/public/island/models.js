@@ -238,11 +238,3 @@ export function createIsland(scene,timeUniform,optics) {
     },
   };
 }
-
-export function makeFish(scene,index=0) {
-  const g=group(scene),m=clay(['#427e78','#628d86','#7c9983','#c49562'][index%4],.4);
-  oval(g,.105,.17,.44,m);
-  const tail=group(g,0,0,-.43);const tailMesh=mesh(tail,new THREE.ConeGeometry(.19,.3,3),m,0,0,-.09);tailMesh.rotation.x=-Math.PI/2;tailMesh.scale.z=.25;
-  for(const sx of [-1,1])oval(g,.025,.033,.025,mat.dark,sx*.085,.055,.23);
-  return {g,tail};
-}

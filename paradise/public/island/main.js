@@ -2,7 +2,8 @@ import * as THREE from './vendor/three.module.min.js';
 import { createOcean, groundHeight } from './ocean.js';
 import { createSplashes } from './splash.js';
 import { createRain } from './rain.js';
-import { createIsland, makeFish } from './models.js';
+import { createIsland } from './models.js';
+import { makeFish } from './fish.js';
 import { readCatches, recordCatch, catchCount, chooseFish } from './catalog.js';
 
 const $=id=>document.getElementById(id);
@@ -246,7 +247,7 @@ function animate(now){
     const cx=attracted&&i<4?bobber.position.x:Math.sin(i*1.5)*9,cz=attracted&&i<4?bobber.position.z:15+i%4*2;
     f.g.position.set(cx+Math.sin(elapsed*.3+i*2)*2.1,-.65-Math.sin(elapsed*.5+i)*.12,cz+Math.cos(elapsed*.3+i*2)*.8);
     f.g.position.y+=ocean.height(f.g.position.x,f.g.position.z);
-    f.g.rotation.y=Math.atan2(Math.cos(elapsed*.3+i*2)*2.1,-Math.sin(elapsed*.3+i*2)*.8);f.tail.rotation.y=Math.sin(elapsed*8+i)*.23;
+    f.g.rotation.y=Math.atan2(Math.cos(elapsed*.3+i*2)*2.1,-Math.sin(elapsed*.3+i*2)*.8);f.update(elapsed,{reducedMotion});
     if(phase==='fight'&&i===0&&Math.sin((elapsed-phaseAt)*1.55)>.9)f.g.position.set(bobber.position.x,.35+Math.sin(elapsed*8)*.2,bobber.position.z);
   }
   rain.update(dt,weatherKey==='storm');
@@ -269,4 +270,5 @@ function animate(now){
 // Read-only evidence for browser verification; gameplay is exercised through real controls.
 window.__paradise={volume:()=>ocean.volumeEvidence(),rain:()=>rain.snapshot(),spray:()=>splashes.snapshot(),actors:()=>island.actors(),optics:()=>ocean.causticEvidence(),snapshot:()=>({build:document.body.dataset.paradiseBuild,renderer:'Three.js WebGL2',waveComponents:32,fluid:ocean.fluid.snapshot(),caustics:'surface-refracted-ray-grid',phase,entered,catches:catchCount(catches),time:timeKey,weather:weatherKey,fps:Math.round(fps),canvases:document.querySelectorAll('canvas').length,frames:document.querySelectorAll('iframe').length,bobber:bobber.position.toArray(),surface:ocean.height(bobber.position.x,bobber.position.z),tension,reelProgress,motionEnabled})};
 window.__paradise.surface=()=>ocean.surfaceEvidence();
+window.__paradise.fish=()=>fish.map(f=>f.evidence());
 requestAnimationFrame(animate);

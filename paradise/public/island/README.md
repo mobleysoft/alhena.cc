@@ -13,6 +13,13 @@ PlayCanvas iframe, or independent background renderer.
   rosettes replacing the ring of sphere props. Geometry variants and two shared
   materials are merged by the existing static batching path; planting stays
   above the waterline and clears the jetty and dog circuit.
+- `fish.js`: eight authored miniature species with shaped closed hulls,
+  rounded fins, gill/stripe/spot vertex colors and inset eyes. Each fish is one
+  skinned mesh with six bones; a traveling body/tail bend and pectoral flutter
+  replace the rigid cone tail. Fourteen fish share eight cached geometries and
+  one material. These are stylized interpretations, not scanned anatomy or
+  hydrodynamic swimming. Existing school paths and weighted catches are
+  unchanged; the visible fish do not determine which species is caught.
 - `locomotion.js`: terrain-aware quadruped controller and two-bone IK.
   Planted paws retain world-space positions; only one paw swings at a time.
   Turn speed, foot urgency and a small body crouch keep targets reachable.
@@ -68,8 +75,10 @@ rigid-body fluid coupling, and a commercial Deep Water entitlement flow remain
 unimplemented.
 
 Third-party source: Three.js 0.164.1 and its BufferGeometryUtils, vendored from
-the official npm distribution. See `vendor/THREE-LICENSE.txt` (MIT). Scene
-geometry and materials are authored in code. Google Fonts is optional;
+the official npm distribution. See `vendor/THREE-LICENSE.txt` (MIT).
+BufferGeometryUtils imports the vendored Three module directly so browser
+and Node tests use the same implementation without an import-map dependency.
+Scene geometry and materials are authored in code. Google Fonts is optional;
 the CSS has local fallback fonts. No model/image-generation API is called.
 
 Verification: `node paradise/scripts/test-cove.mjs` and
@@ -108,6 +117,12 @@ The old interpolated-normal path remains available as `?normals=vertex` for
 comparison. Read-only `?water-debug=1` through `5` display normals, reflection,
 refraction color, optical path length and transmitted radiance respectively.
 These diagnostics do not alter fishing or wave physics.
+
+Fish: `node --test paradise/scripts/test-fish.mjs` checks deterministic finite
+geometry, welded surface closure, weights, asset sharing and actual skinned
+vertex movement. `node paradise/scripts/verify-fish.mjs` renders an eight-fish
+contact sheet, measures GPU animation pixel changes, then checks the real
+fourteen-fish school and captures fishing/strike views in the actual ocean.
 
 Rendering background: [GPU Gems, Volume Rendering Techniques](https://developer.nvidia.com/gpugems/gpugems/part-vi-beyond-triangles/chapter-39-volume-rendering-techniques)
 describes slice reconstruction and accumulation along viewing rays. This
