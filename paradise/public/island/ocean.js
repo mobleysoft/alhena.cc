@@ -1,5 +1,6 @@
 import * as THREE from './vendor/three.module.min.js';
 import { createRippleField, RIPPLE } from './ripple-field.js';
+import { createWaterLight, waterLightGLSL } from './water-light.js';
 
 const TAU = Math.PI * 2;
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -71,7 +72,7 @@ export function createOcean(renderer, scene) {
   rippleTexture.minFilter=rippleTexture.magFilter=THREE.LinearFilter;rippleTexture.needsUpdate=true;
   const fluid=createRippleField(groundHeight,{preferGPU:new URLSearchParams(location.search).get('fluid')!=='cpu',onChange:data=>{rippleTexture.image.data=data;rippleTexture.needsUpdate=true;}});
   const size = new THREE.Vector2(); renderer.getDrawingBufferSize(size);
-  const refractTarget = new THREE.WebGLRenderTarget(size.x, size.y, { depthBuffer: true });
+  const refractTarget = new THREE.WebGLRenderTarget(size.x, size.y, { depthBuffer: true, depthTexture: new THREE.DepthTexture(size.x, size.y) });
   const reflectTarget = new THREE.WebGLRenderTarget(Math.max(256, size.x >> 1), Math.max(256, size.y >> 1));
   const uniforms = {
     uTime: { value: 0 }, uChop: { value: chop },
@@ -83,7 +84,9 @@ export function createOcean(renderer, scene) {
     uColor: { value: new THREE.Color('#329d91') }, uSky: { value: new THREE.Color('#c9e1d3') },
     uWarmth: { value: new THREE.Color('#ffdeb0') }, uLight: { value: 1 }, uSpecular: { value: 1 },
     uReflectionMatrix: { value: new THREE.Matrix4() },
+    uRefractionDepth: { value: refractTarget.depthTexture }, uInverseViewProjection: { value: new THREE.Matrix4() },
   };
+  const volume = createWaterLight(renderer, heightGLSL, uniforms);
   const material = new THREE.ShaderMaterial({
     uniforms,
     vertexShader: `${heightGLSL}
@@ -113,6 +116,14 @@ export function createOcean(renderer, scene) {
       uniform vec3 uSun;
       uniform float uLight;
       uniform float uSpecular;
+      uniform sampler2D uRefractionDepth;
+      uniform mat4 uInverseViewProjection;
+      ${waterLightGLSL}
+      vec3 refractedHit(vec2 uv) {
+        float d = texture2D(uRefractionDepth, uv).r;
+        vec4 world = uInverseViewProjection * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+        return world.xyz / world.w;
+      }
       void main() {
         float h = vWorld.y;
         float depth = h - ground(vWorld.xz);
@@ -127,11 +138,14 @@ export function createOcean(renderer, scene) {
         float fresnel = .02 + .98 * pow(1.0 - max(dot(n,v), 0.0), 5.0);
         vec2 screen = gl_FragCoord.xy / uResolution;
         vec2 distortion = n.xz * .008 * min(depth, 1.0);
-        vec3 bed = texture2D(uRefraction, clamp(screen + distortion, .002, .998)).rgb;
+        vec2 bedUv = clamp(screen + distortion, .002, .998);
+        vec3 hit = refractedHit(bedUv);
+        // Distortion must not pull an above-water prop into the underwater ray.
+        if(hit.y > h + .02 || dot(hit-vWorld,-v) < 0.0) { bedUv = screen; hit = refractedHit(bedUv); }
+        vec3 bed = texture2D(uRefraction, bedUv).rgb;
         vec2 mirrorUv = vMirror.xy / vMirror.w + distortion * 1.2;
         vec3 reflection = texture2D(uReflection, clamp(mirrorUv, .002, .998)).rgb;
-        vec3 absorption = exp(-depth * vec3(.92,.19,.12));
-        vec3 transmitted = bed * absorption + uColor * uLight * (1.0 - absorption) * .42;
+        vec3 transmitted = waterRadiance(vWorld,hit,bed);
         vec3 col = mix(transmitted, reflection, min(.9, fresnel + .1));
         float sun = pow(max(dot(reflect(-uSun,n), v), 0.0), 170.0);
         col += sun * uWarmth * uLight * uSpecular * 1.6;
@@ -190,7 +204,7 @@ export function createOcean(renderer, scene) {
   const view = new THREE.Vector3(), target = new THREE.Vector3();
   const clip = new THREE.Plane(new THREE.Vector3(0, 1, 0), -.02);
   return {
-    mesh, uniforms, fluid,
+    mesh, uniforms, fluid, volumeEvidence: () => volume.evidence(),
     optics:{caustics:{value:causticTarget.texture},light:uniforms.uLight,sun:uniforms.uSun},
     causticEvidence() {
       const pixels=new Uint16Array(causticSize*causticSize*4);
@@ -217,10 +231,12 @@ export function createOcean(renderer, scene) {
       if(time-causticTime>1/30){
         const color=renderer.getClearColor(new THREE.Color()),alpha=renderer.getClearAlpha();
         renderer.setClearColor(0,0);renderer.setRenderTarget(causticTarget);renderer.render(causticScene,causticCamera);
+        volume.render();
         renderer.setClearColor(color,alpha);causticTime=time;
       }
       mesh.visible=false;
       renderer.setRenderTarget(refractTarget); renderer.render(scene,camera);
+      uniforms.uInverseViewProjection.value.multiplyMatrices(camera.matrixWorld,camera.projectionMatrixInverse);
       mirrorCamera.copy(camera); mirrorCamera.position.y *= -1;
       camera.getWorldDirection(view); target.copy(camera.position).add(view); target.y *= -1;
       mirrorCamera.up.set(0,-1,0); mirrorCamera.lookAt(target); mirrorCamera.updateMatrixWorld();

@@ -21,7 +21,7 @@ sd_require_config_lines "$CONFIG" \
   'binding = "ASSETS"||Cloudflare Assets binding serving Paradise game files'
 
 echo "Pre-deploy checks passed: on main, clean tree, required Paradise asset binding present."
-node --test scripts/test-cove.mjs scripts/test-rain.mjs scripts/test-foliage.mjs scripts/test-garden.mjs
+node --test scripts/test-cove.mjs scripts/test-rain.mjs scripts/test-foliage.mjs scripts/test-garden.mjs scripts/test-water-light.mjs
 
 sd_deploy "$CONFIG" "$@"
 
@@ -57,5 +57,8 @@ sd_verify_response_body \
 sd_verify_response_body \
   "https://paradise.alhena.cc/island/coastal-garden.js" \
   'createCoastalGarden'
+sd_verify_response_body \
+  "https://paradise.alhena.cc/island/water-light.js" \
+  'waterRadiance'
 
 sd_banner_done "alhena-paradise-worker"

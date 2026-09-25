@@ -27,6 +27,12 @@ PlayCanvas iframe, or independent background renderer.
   A sunlight-ray grid refracts through this same height field onto the seabed;
   projected area contraction determines caustic brightness. This replaces the
   former painted sine-net caustics.
+- `water-light.js`: four depth slices of surface-refracted sunlight packed into
+  a 512x512 half-float atlas. The water shader integrates single scattering in
+  eight steps along its depth-reconstructed view ray, stopping at the actual
+  opaque seabed or fish. Colored extinction uses optical path length instead
+  of vertical depth. Geometry, sunlight, waves and ripple data are shared with
+  the existing ocean; no separate ray-texture overlay or downloaded sky is used.
 - `ripple-field.js`: a 128x128 finite-difference height/velocity simulation on
   WebGPU compute, with the same integrator as a CPU fallback. Casts, nibbles,
   twitches and strikes inject momentum. Wet/dry masking reflects waves at the
@@ -48,9 +54,13 @@ PlayCanvas iframe, or independent background renderer.
 Renderer: Three.js WebGL2; ripple computation: WebGPU where available. This
 is not yet a Three.js WebGPURenderer migration. The caustic pass approximates
 seabed intersection twice and does not trace submerged-object occlusion.
-The height field is not a full 3D fluid solver: overturning/breaking waves,
-volumetric underwater lighting, two-way rigid-body fluid coupling, and a
-commercial Deep Water entitlement flow remain unimplemented.
+The light volume is a bounded real-time approximation, not a path tracer:
+four interpolated depth slices, screen-space refraction endpoints, artist-set
+optical coefficients, and a homogeneous medium. It does not include multiple
+scattering or submerged-object shadows inside the light volume. The height
+field is not a full 3D fluid solver: overturning/breaking waves, two-way
+rigid-body fluid coupling, and a commercial Deep Water entitlement flow remain
+unimplemented.
 
 Third-party source: Three.js 0.164.1 and its BufferGeometryUtils, vendored from
 the official npm distribution. See `vendor/THREE-LICENSE.txt` (MIT). Scene
@@ -77,3 +87,14 @@ Rain verification: `node --test paradise/scripts/test-rain.mjs` and
 `node paradise/scripts/verify-rain.mjs` (same Playwright environment variables).
 The latter checks desktop/mobile, moonlight, storm-to-calm transitions and
 reduced motion.
+
+Underwater lighting: `node --test paradise/scripts/test-water-light.mjs` and
+`node paradise/scripts/verify-water-light.mjs`. The browser check renders GPU
+fixtures, confirms unit concentration under a flat water surface, and compares
+actual shader radiance to a numerical reference at eight optical path lengths.
+It supports Chromium and WebKit. `?volume=off` disables in-scattered radiance
+for visual comparison without changing wave physics or the refraction endpoint.
+
+Rendering background: [GPU Gems, Volume Rendering Techniques](https://developer.nvidia.com/gpugems/gpugems/part-vi-beyond-triangles/chapter-39-volume-rendering-techniques)
+describes slice reconstruction and accumulation along viewing rays. This
+implementation is authored for this scene, not copied from that chapter.
