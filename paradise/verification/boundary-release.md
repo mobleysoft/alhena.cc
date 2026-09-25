@@ -51,7 +51,24 @@ worktree `sandboxes/paradise-ocean-boundaries`. Cloudflare identity was checked
 as Johnmobley99@gmail.com, and the preceding live version was confirmed as
 `5a42a1c3-beac-4561-a247-9ce9fd503abb` at 100% traffic.
 
-Production deployment and public-source/browser results will be appended after
-they are actually observed. Full overturning surf, higher-fidelity dog anatomy,
-physical-phone checks and commercial entitlement remain outside this fix and
-unproven. The broad visual goal is not complete.
+## Observed production result
+
+- Source commit: `c4f0d3fc91527fb253549288e632a54b98e24f20`.
+- Deployed through `paradise/safe-deploy.sh` from the clean main-branch release
+  clone. All 44 tests reran successfully; ASSETS remained bound. Only the
+  changed public `island/ocean.js` asset required upload.
+- Version `26a6193b-90da-4c5d-8f91-4951e072e8d9`, confirmed by Cloudflare's
+  deployment list at 100% traffic, `2026-09-25T08:46:22.353616Z`.
+- `boundary-live-source/source-hashes.json`: all 19 root/runtime/vendor files
+  returned HTTP 200 and matched the release's SHA-256 hashes.
+- `boundary-live-flow/report.json`: Chromium passed the actual public-site
+  fishing loop, saved catch, character reactions, night/storm controls and
+  portrait/landscape touch layouts, with no captured errors. Buoyancy mean
+  error 0.06341 world units. Night/storm and portrait screenshots were inspected.
+- Temporary preview server on port 8798 was stopped after verification.
+
+Full overturning surf, higher-fidelity dog anatomy, physical-phone checks and
+commercial entitlement remain outside this fix and unproven. The broad visual
+goal is not complete. No code from the separate wave lab was promoted, and the
+canonical repo's unrelated untracked `paradise/public/island/shore.js` was not
+edited or deployed.
