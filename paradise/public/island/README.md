@@ -5,6 +5,10 @@ PlayCanvas iframe, or independent background renderer.
 
 - `models.js`: rounded clay/vinyl miniatures, articulated dog and Alhena,
   seabed, cottage, bar, jetty, palms, lighting props, clickable promotion board.
+- `foliage.js`: deterministic, closed folded palm leaflets with vertex-color
+  gradients, shared frond geometry and tapered curved trunks. Growth rings
+  follow the trunk surface instead of floating as separate cylinders. These
+  are authored miniature meshes, not downloaded photo cutouts or simulation.
 - `locomotion.js`: terrain-aware quadruped controller and two-bone IK.
   Planted paws retain world-space positions; only one paw swings at a time.
   Turn speed, foot urgency and a small body crouch keep targets reachable.

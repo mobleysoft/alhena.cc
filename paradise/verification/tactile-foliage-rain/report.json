@@ -1,0 +1,34 @@
+{
+  "url": "http://127.0.0.1:8796/?fluid=cpu",
+  "checks": [
+    "desktop: storm, moonlight, calm transition, no overflow",
+    "mobile: storm, moonlight, calm transition, no overflow",
+    "reduced-motion: storm, moonlight, calm transition, no overflow"
+  ],
+  "errors": [],
+  "samples": [
+    {
+      "name": "desktop",
+      "intensity": 0.9275602429657486,
+      "contacts": 233,
+      "dryContacts": 16,
+      "drops": 557,
+      "rings": 64,
+      "reducedMotion": false,
+      "capacity": 64,
+      "renderedRings": 64
+    },
+    {
+      "name": "mobile",
+      "intensity": 0.9179150013761013,
+      "contacts": 208,
+      "dryContacts": 18,
+      "drops": 551,
+      "rings": 64,
+      "reducedMotion": false,
+      "capacity": 64,
+      "renderedRings": 64
+    }
+  ],
+  "ok": true
+}

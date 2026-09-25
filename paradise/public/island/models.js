@@ -2,6 +2,8 @@ import * as THREE from './vendor/three.module.min.js';
 import { groundHeight, makeSandMaterial } from './ocean.js';
 import { mergeGeometries } from './vendor/BufferGeometryUtils.js';
 import { createQuadruped, LEG, LEGS } from './locomotion.js';
+import { createFrondGeometry, createTrunkGeometry, frondSpine } from './foliage.js';
+import { prepareStaticGeometry } from './static-geometry.js';
 
 const clay = (color, roughness=.7) => new THREE.MeshStandardMaterial({color,roughness,metalness:0});
 const mat = {
@@ -25,6 +27,9 @@ function mesh(parent,geo,material,x=0,y=0,z=0) {
 }
 function box(parent,w,h,d,material,x=0,y=0,z=0,r=.07) { return mesh(parent,rounded(w,h,d,r),material,x,y,z); }
 const sphereGeo=new THREE.SphereGeometry(1,24,16);
+const foliageMaterial=new THREE.MeshStandardMaterial({color:'#ffffff',vertexColors:true,roughness:.62,side:THREE.DoubleSide});
+const trunkMaterial=new THREE.MeshStandardMaterial({color:'#ffffff',vertexColors:true,roughness:.86});
+const frondGeometries=Array.from({length:4},(_,i)=>createFrondGeometry(i));
 function oval(parent,sx,sy,sz,material,x=0,y=0,z=0) {const m=mesh(parent,sphereGeo,material,x,y,z);m.scale.set(sx,sy,sz);return m;}
 function cylinder(parent,rt,rb,h,material,x=0,y=0,z=0) {return mesh(parent,new THREE.CylinderGeometry(rt,rb,h,20),material,x,y,z);}
 function tube(parent,points,r,material) {return mesh(parent,new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points.map(p=>new THREE.Vector3(...p))),20,r,7,false),material);}
@@ -61,16 +66,13 @@ function house(parent,x,z) {
 
 function palm(parent,x,z,height=6,rotation=0) {
   const base=groundHeight(x,z), g=group(parent,x,base,z);g.rotation.y=rotation;
-  tube(g,[[0,0,0],[-.3,height*.35,.1],[-.1,height*.7,.2],[.5,height,.15]],.19,mat.wood);
-  for(let i=1;i<9;i++){const band=cylinder(g,.199,.202,.035,mat.lightWood,-.2+Math.max(0,i-5)*.15,height*i/10,.13);band.rotation.z=-.1;}
+  mesh(g,createTrunkGeometry(height),trunkMaterial);
   const crown=group(g,.5,height,.15), fronds=[];
   for(let j=0;j<8;j++) {
-    const arm=group(crown);arm.rotation.y=j*Math.PI/4;
-    const geo=new THREE.PlaneGeometry(1,1,8,14), pos=geo.attributes.position;
-    for(let i=0;i<pos.count;i++){const u=pos.getX(i)*2,v=pos.getY(i)+.5;const width=Math.sin(v*Math.PI)*.7;
-      pos.setXYZ(i,u*width,.9*Math.sin(v*Math.PI)-v*.85-u*u*.1,v*3.15);}
-    geo.computeVertexNormals(); const leafMat=(j%2?mat.green:mat.leaf).clone();leafMat.side=THREE.DoubleSide;
-    mesh(arm,geo,leafMat);tube(arm,[[0,0,0],[0,.54,1],[0,.25,2],[0,-.84,3.15]],.024,mat.mint);fronds.push(arm);
+    const arm=group(crown);arm.rotation.y=j*Math.PI/4+.035*Math.sin(j*2);
+    arm.scale.setScalar(.93+.09*Math.sin(j*2.4+rotation));
+    mesh(arm,frondGeometries[j%4],foliageMaterial);
+    tube(arm,Array.from({length:9},(_,i)=>frondSpine(i/8).toArray()),.018,mat.leaf);fronds.push(arm);
   }
   for(let j=0;j<3;j++)oval(crown,.2,.26,.2,mat.wood,Math.sin(j*2)*.27,-.12,Math.cos(j*2)*.27);
   return {g,fronds};
@@ -198,9 +200,7 @@ export function createIsland(scene,timeUniform,optics) {
     if(node.isMesh && !Array.isArray(node.material)){
       const key=node.material.uuid+':'+node.castShadow;
       if(!batches.has(key))batches.set(key,{material:node.material,cast:node.castShadow,geometries:[]});
-      const geometry=node.geometry.clone().applyMatrix4(node.matrixWorld);
-      for(const name of Object.keys(geometry.attributes))if(!['position','normal','uv'].includes(name))geometry.deleteAttribute(name);
-      batches.get(key).geometries.push(geometry.index?geometry.toNonIndexed():geometry);originals.push(node);
+      batches.get(key).geometries.push(prepareStaticGeometry(node));originals.push(node);
     }for(const child of node.children)collect(child);
   }collect(world);
   for(const node of originals)node.removeFromParent();
