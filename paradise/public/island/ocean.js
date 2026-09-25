@@ -25,9 +25,12 @@ export const SHORT_WAVES=Object.freeze([.8,1.1,1.65,2.2].map((length,i)=>{
   return Object.freeze({kx:Math.cos(angle)*k,kz:Math.sin(angle)*k,amplitude:[.008,.010,.016,.019][i],frequency:Math.sqrt(9.81*k+.000074*k**3)});
 }));
 export const shortWaveHeight=(x,z,t,wind=12)=>SHORT_WAVES.reduce((h,w)=>h+w.amplitude*Math.sin(w.kx*x+w.kz*z-w.frequency*t),0)*Math.min(1.6,Math.max(.4,wind/12));
+// A steep outer shelf self-occludes in the overview camera, abruptly changing
+// the underwater optical path. Keep the cove intact, then grade the seabed out.
+export const OFFSHORE_SHELF = Object.freeze({ start: 1.3, end: 8, drop: 16 });
 export function groundHeight(x, z) {
   const r = Math.hypot(x / 12.8, (z - 3.3) / 9.2);
-  return 1.18 - 3.9 * smooth(.48, 1.22, r) - 16 * smooth(1.3, 4.8, r)
+  return 1.18 - 3.9 * smooth(.48, 1.22, r) - OFFSHORE_SHELF.drop * smooth(OFFSHORE_SHELF.start, OFFSHORE_SHELF.end, r)
     + .10 * Math.sin(x * .55) * Math.cos(z * .47) * (1 - smooth(.45, .95, r));
 }
 
@@ -51,7 +54,7 @@ export function spectrum(wind) {
 const groundGLSL = `
 float ground(vec2 p) {
   float r = length(vec2(p.x / 12.8, (p.y - 3.3) / 9.2));
-  return 1.18 - 3.9 * smoothstep(.48, 1.22, r) - 16.0 * smoothstep(1.3,4.8,r)
+  return 1.18 - 3.9 * smoothstep(.48, 1.22, r) - ${OFFSHORE_SHELF.drop.toFixed(6)} * smoothstep(${OFFSHORE_SHELF.start.toFixed(6)},${OFFSHORE_SHELF.end.toFixed(6)},r)
     + .10 * sin(p.x * .55) * cos(p.y * .47) * (1.0 - smoothstep(.45, .95, r));
 }`;
 export const heightGLSL = `

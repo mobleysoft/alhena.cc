@@ -21,7 +21,7 @@ sd_require_config_lines "$CONFIG" \
   'binding = "ASSETS"||Cloudflare Assets binding serving Paradise game files'
 
 echo "Pre-deploy checks passed: on main, clean tree, required Paradise asset binding present."
-node --test scripts/test-cove.mjs scripts/test-rain.mjs scripts/test-foliage.mjs scripts/test-garden.mjs scripts/test-water-light.mjs scripts/test-water-surface.mjs scripts/test-fish.mjs scripts/test-host.mjs scripts/test-evening-light.mjs
+node --test scripts/test-cove.mjs scripts/test-rain.mjs scripts/test-foliage.mjs scripts/test-garden.mjs scripts/test-water-light.mjs scripts/test-water-surface.mjs scripts/test-fish.mjs scripts/test-host.mjs scripts/test-evening-light.mjs scripts/test-bathymetry.mjs
 
 sd_deploy "$CONFIG" "$@"
 

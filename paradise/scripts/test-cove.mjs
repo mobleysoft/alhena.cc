@@ -119,8 +119,9 @@ test('32 finite wave components retain PandoraChat dispersion and spectrum',()=>
 });
 test('shore transitions continuously into a deep seabed',()=>{
   assert.ok(groundHeight(0,3.3)>1);
-  assert.ok(groundHeight(45,3.3)<-10);
-  for(let x=0;x<80;x+=.01){assert.ok(Math.abs(groundHeight(x+.01,3.3)-groundHeight(x,3.3))<.03);}
+  // The deep bed is now farther offshore so it cannot silhouette through the cove.
+  assert.ok(groundHeight(70,3.3)<-10);
+  for(let x=0;x<110;x+=.01){assert.ok(Math.abs(groundHeight(x+.01,3.3)-groundHeight(x,3.3))<.03);}
 });
 test('small wind waves are bounded, weather-driven and use gravity-capillary dispersion',()=>{
   const limit=SHORT_WAVES.reduce((sum,w)=>sum+w.amplitude,0)*1.6;

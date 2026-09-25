@@ -1,0 +1,231 @@
+{
+  "at": "2026-09-25T08:43:14.482Z",
+  "base": "http://127.0.0.1:8798/",
+  "engine": "webkit",
+  "errors": [],
+  "views": [
+    {
+      "name": "normal",
+      "state": {
+        "build": "unified-cove-20260924",
+        "renderer": "Three.js WebGL2",
+        "waveComponents": 32,
+        "fluid": {
+          "backend": "webgpu",
+          "reason": null,
+          "resolution": 128,
+          "ticks": 109,
+          "published": 105,
+          "pending": true,
+          "queuedSteps": 0,
+          "impulseCount": 0,
+          "peak": 0
+        },
+        "caustics": "surface-refracted-ray-grid",
+        "phase": "idle",
+        "entered": false,
+        "catches": 0,
+        "time": "night",
+        "weather": "calm",
+        "fps": 42,
+        "canvases": 1,
+        "frames": 0,
+        "bobber": [
+          0,
+          0,
+          0
+        ],
+        "surface": 0,
+        "tension": 0,
+        "reelProgress": 0,
+        "motionEnabled": false
+      }
+    },
+    {
+      "name": "no-volume",
+      "state": {
+        "build": "unified-cove-20260924",
+        "renderer": "Three.js WebGL2",
+        "waveComponents": 32,
+        "fluid": {
+          "backend": "webgpu",
+          "reason": null,
+          "resolution": 128,
+          "ticks": 105,
+          "published": 104,
+          "pending": true,
+          "queuedSteps": 0,
+          "impulseCount": 0,
+          "peak": 0
+        },
+        "caustics": "surface-refracted-ray-grid",
+        "phase": "idle",
+        "entered": false,
+        "catches": 0,
+        "time": "night",
+        "weather": "calm",
+        "fps": 45,
+        "canvases": 1,
+        "frames": 0,
+        "bobber": [
+          0,
+          0,
+          0
+        ],
+        "surface": 0,
+        "tension": 0,
+        "reelProgress": 0,
+        "motionEnabled": false
+      }
+    },
+    {
+      "name": "reflection",
+      "state": {
+        "build": "unified-cove-20260924",
+        "renderer": "Three.js WebGL2",
+        "waveComponents": 32,
+        "fluid": {
+          "backend": "webgpu",
+          "reason": null,
+          "resolution": 128,
+          "ticks": 103,
+          "published": 103,
+          "pending": false,
+          "queuedSteps": 3,
+          "impulseCount": 0,
+          "peak": 0
+        },
+        "caustics": "surface-refracted-ray-grid",
+        "phase": "idle",
+        "entered": false,
+        "catches": 0,
+        "time": "night",
+        "weather": "calm",
+        "fps": 47,
+        "canvases": 1,
+        "frames": 0,
+        "bobber": [
+          0,
+          0,
+          0
+        ],
+        "surface": 0,
+        "tension": 0,
+        "reelProgress": 0,
+        "motionEnabled": false
+      }
+    },
+    {
+      "name": "bed",
+      "state": {
+        "build": "unified-cove-20260924",
+        "renderer": "Three.js WebGL2",
+        "waveComponents": 32,
+        "fluid": {
+          "backend": "webgpu",
+          "reason": null,
+          "resolution": 128,
+          "ticks": 106,
+          "published": 102,
+          "pending": true,
+          "queuedSteps": 0,
+          "impulseCount": 0,
+          "peak": 0
+        },
+        "caustics": "surface-refracted-ray-grid",
+        "phase": "idle",
+        "entered": false,
+        "catches": 0,
+        "time": "night",
+        "weather": "calm",
+        "fps": 46,
+        "canvases": 1,
+        "frames": 0,
+        "bobber": [
+          0,
+          0,
+          0
+        ],
+        "surface": 0,
+        "tension": 0,
+        "reelProgress": 0,
+        "motionEnabled": false
+      }
+    },
+    {
+      "name": "depth",
+      "state": {
+        "build": "unified-cove-20260924",
+        "renderer": "Three.js WebGL2",
+        "waveComponents": 32,
+        "fluid": {
+          "backend": "webgpu",
+          "reason": null,
+          "resolution": 128,
+          "ticks": 106,
+          "published": 106,
+          "pending": false,
+          "queuedSteps": 0,
+          "impulseCount": 0,
+          "peak": 0
+        },
+        "caustics": "surface-refracted-ray-grid",
+        "phase": "idle",
+        "entered": false,
+        "catches": 0,
+        "time": "night",
+        "weather": "calm",
+        "fps": 47,
+        "canvases": 1,
+        "frames": 0,
+        "bobber": [
+          0,
+          0,
+          0
+        ],
+        "surface": 0,
+        "tension": 0,
+        "reelProgress": 0,
+        "motionEnabled": false
+      }
+    },
+    {
+      "name": "transmitted",
+      "state": {
+        "build": "unified-cove-20260924",
+        "renderer": "Three.js WebGL2",
+        "waveComponents": 32,
+        "fluid": {
+          "backend": "webgpu",
+          "reason": null,
+          "resolution": 128,
+          "ticks": 104,
+          "published": 104,
+          "pending": false,
+          "queuedSteps": 0,
+          "impulseCount": 0,
+          "peak": 0
+        },
+        "caustics": "surface-refracted-ray-grid",
+        "phase": "idle",
+        "entered": false,
+        "catches": 0,
+        "time": "night",
+        "weather": "calm",
+        "fps": 51,
+        "canvases": 1,
+        "frames": 0,
+        "bobber": [
+          0,
+          0,
+          0
+        ],
+        "surface": 0,
+        "tension": 0,
+        "reelProgress": 0,
+        "motionEnabled": false
+      }
+    }
+  ],
+  "ok": true
+}
