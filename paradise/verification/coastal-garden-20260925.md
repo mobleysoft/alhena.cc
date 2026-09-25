@@ -36,3 +36,23 @@ This is a coastal art refinement, not completion of the overall AAA-quality
 goal. Full overturning waves and volumetric underwater lighting are still
 unproven/unimplemented; the independent fluid laboratory and the canonical
 tree's untracked `shore.js` are explicitly excluded from this release.
+
+## Release evidence
+
+- Source commit: `749ea52c9986acdd3d4b1b6adff619eea935098c`, fast-forwarded
+  into canonical main. Deployed from a clean main release clone, not the
+  shared working tree.
+- `paradise/safe-deploy.sh` passed clean-tree/binding checks, all 24 unit
+  tests and every public post-deploy body check, including the new garden.
+- Cloudflare Worker: `alhena-paradise-worker`; authenticated account:
+  `johnmobley99@gmail.com`.
+- Version: `0e3d06f2-e0a2-4d43-9f1d-28c451f12ba7`.
+- Deployment: `5db26a65-b9b5-4cd4-ad37-0c4e5aac69b5`, 100% traffic,
+  created `2026-09-25T04:34:47.212057Z`, independently confirmed via API.
+- All 15 active runtime files return HTTP 200 and match the release source
+  byte-for-byte by SHA-256. Evidence: `coastal-garden-live-source/`.
+- The live landing screenshot was visually reviewed and includes the new
+  clusters. The owned localhost preview server was stopped after verification.
+- The full public-site Chromium interaction suite passes with zero runtime
+  errors, including catch persistence and portrait/landscape touch layouts.
+  Evidence: `coastal-garden-live/`.
