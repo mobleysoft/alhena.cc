@@ -1,0 +1,251 @@
+TAP version 13
+# (node:3652) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/johnmobley/sandboxes/paradise-evening-lights/paradise/public/island/ocean.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /Users/johnmobley/sandboxes/paradise-evening-lights/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: ballistic spray returns to water with bounded, non-recursive impulses
+ok 1 - ballistic spray returns to water with bounded, non-recursive impulses
+  ---
+  duration_ms: 5.621917
+  ...
+# Subtest: spray pool is bounded and rejects dry or invalid impacts
+ok 2 - spray pool is bounded and rejects dry or invalid impacts
+  ---
+  duration_ms: 6.885041
+  ...
+# Subtest: spray follows a moving water surface and expires if the surface disappears
+ok 3 - spray follows a moving water surface and expires if the surface disappears
+  ---
+  duration_ms: 11.135458
+  ...
+# Subtest: two-bone IK preserves segment lengths and clamps unreachable targets
+ok 4 - two-bone IK preserves segment lengths and clamps unreachable targets
+  ---
+  duration_ms: 0.508458
+  ...
+# Subtest: quadruped plants stance paws without sliding, with at least three contacts
+ok 5 - quadruped plants stance paws without sliding, with at least three contacts
+  ---
+  duration_ms: 111.721542
+  ...
+# Subtest: quadruped settles on attention and does not travel in reduced motion
+ok 6 - quadruped settles on attention and does not travel in reduced motion
+  ---
+  duration_ms: 1.425583
+  ...
+# Subtest: finite-difference water is stable, propagates disturbances and dissipates energy
+ok 7 - finite-difference water is stable, propagates disturbances and dissipates energy
+  ---
+  duration_ms: 155.476917
+  ...
+# Subtest: shoreline mask remains dry; published field matches the sampled surface
+ok 8 - shoreline mask remains dry; published field matches the sampled surface
+  ---
+  duration_ms: 34.676083
+  ...
+# Subtest: 32 finite wave components retain PandoraChat dispersion and spectrum
+ok 9 - 32 finite wave components retain PandoraChat dispersion and spectrum
+  ---
+  duration_ms: 0.383083
+  ...
+# Subtest: shore transitions continuously into a deep seabed
+ok 10 - shore transitions continuously into a deep seabed
+  ---
+  duration_ms: 1.22225
+  ...
+# Subtest: small wind waves are bounded, weather-driven and use gravity-capillary dispersion
+ok 11 - small wind waves are bounded, weather-driven and use gravity-capillary dispersion
+  ---
+  duration_ms: 0.698125
+  ...
+# Subtest: legacy catch counts are preserved exactly and imported once
+ok 12 - legacy catch counts are preserved exactly and imported once
+  ---
+  duration_ms: 0.765083
+  ...
+# Subtest: malformed or blocked browser storage cannot stop the island
+ok 13 - malformed or blocked browser storage cannot stop the island
+  ---
+  duration_ms: 0.315209
+  ...
+# Subtest: a full storage quota does not hide a readable legacy journal
+ok 14 - a full storage quota does not hide a readable legacy journal
+  ---
+  duration_ms: 0.121208
+  ...
+# Subtest: weather and time influence rare-fish distribution
+ok 15 - weather and time influence rare-fish distribution
+  ---
+  duration_ms: 0.740625
+  ...
+# (node:3654) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/johnmobley/sandboxes/paradise-evening-lights/paradise/public/island/evening-light.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /Users/johnmobley/sandboxes/paradise-evening-lights/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: evening illumination follows time and weather, with a bounded daylight baseline
+ok 16 - evening illumination follows time and weather, with a bounded daylight baseline
+  ---
+  duration_ms: 0.905041
+  ...
+# Subtest: curtained glazing is deterministic, finite and keeps independent material state
+ok 17 - curtained glazing is deterministic, finite and keeps independent material state
+  ---
+  duration_ms: 3.010292
+  ...
+# Subtest: modeled fixtures use four non-shadow local lights and restore exact day state
+ok 18 - modeled fixtures use four non-shadow local lights and restore exact day state
+  ---
+  duration_ms: 9.940625
+  ...
+# (node:3655) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/johnmobley/sandboxes/paradise-evening-lights/paradise/public/island/fish.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /Users/johnmobley/sandboxes/paradise-evening-lights/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: eight deterministic sculpted hulls have finite geometry, colors, and normalized skin weights
+ok 19 - eight deterministic sculpted hulls have finite geometry, colors, and normalized skin weights
+  ---
+  duration_ms: 131.208291
+  ...
+# Subtest: all sculpted parts are closed with outward winding and nondegenerate faces
+ok 20 - all sculpted parts are closed with outward winding and nondegenerate faces
+  ---
+  duration_ms: 144.554875
+  ...
+# Subtest: school shares eight geometries and one material, but not skeletons
+ok 21 - school shares eight geometries and one material, but not skeletons
+  ---
+  duration_ms: 19.63675
+  ...
+# Subtest: skin bends actual tail vertices, keeps head stable, and bounds reduced-motion animation
+ok 22 - skin bends actual tail vertices, keeps head stable, and bounds reduced-motion animation
+  ---
+  duration_ms: 1.527125
+  ...
+# (node:3656) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/johnmobley/sandboxes/paradise-evening-lights/paradise/public/island/foliage.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /Users/johnmobley/sandboxes/paradise-evening-lights/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: palm fronds are deterministic bounded meshes with closed leaflets
+ok 23 - palm fronds are deterministic bounded meshes with closed leaflets
+  ---
+  duration_ms: 15.704208
+  ...
+# Subtest: trunks taper along their curved centerline with finite normals
+ok 24 - trunks taper along their curved centerline with finite normals
+  ---
+  duration_ms: 14.853083
+  ...
+# Subtest: static batching retains painted vertex colors and does not mutate its source
+ok 25 - static batching retains painted vertex colors and does not mutate its source
+  ---
+  duration_ms: 16.235417
+  ...
+# (node:3657) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/johnmobley/sandboxes/paradise-evening-lights/paradise/public/island/coastal-garden.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /Users/johnmobley/sandboxes/paradise-evening-lights/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: sculpted assets have finite bounded geometry, colors and seam normals
+ok 26 - sculpted assets have finite bounded geometry, colors and seam normals
+  ---
+  duration_ms: 31.895083
+  ...
+# Subtest: coastal garden uses shared meshes, bounded materials and dry planting
+ok 27 - coastal garden uses shared meshes, bounded materials and dry planting
+  ---
+  duration_ms: 10.251083
+  ...
+# Subtest: decorative clusters leave the jetty and walking dog circuit clear
+ok 28 - decorative clusters leave the jetty and walking dog circuit clear
+  ---
+  duration_ms: 90.161541
+  ...
+# (node:3658) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/johnmobley/sandboxes/paradise-evening-lights/paradise/public/island/host.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /Users/johnmobley/sandboxes/paradise-evening-lights/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: sculpted face, hair, dress and apron are deterministic, finite and bounded
+ok 29 - sculpted face, hair, dress and apron are deterministic, finite and bounded
+  ---
+  duration_ms: 54.549417
+  ...
+# Subtest: all four primary sculptures are closed, consistently wound, nondegenerate solids
+ok 30 - all four primary sculptures are closed, consistently wound, nondegenerate solids
+  ---
+  duration_ms: 26.724708
+  ...
+# Subtest: host keeps the existing articulated interface with seven batched meshes
+ok 31 - host keeps the existing articulated interface with seven batched meshes
+  ---
+  duration_ms: 26.849958
+  ...
+# Subtest: face has an integrated nose and cheek relief rather than an added sphere
+ok 32 - face has an integrated nose and cheek relief rather than an added sphere
+  ---
+  duration_ms: 1.987292
+  ...
+# (node:3659) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/johnmobley/sandboxes/paradise-evening-lights/paradise/public/island/rain.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /Users/johnmobley/sandboxes/paradise-evening-lights/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: rain meets the moving sea, stays bounded, and fades when the storm passes
+ok 33 - rain meets the moving sea, stays bounded, and fades when the storm passes
+  ---
+  duration_ms: 54.231209
+  ...
+# Subtest: dry land never receives water rings; emerging land retires existing rings
+ok 34 - dry land never receives water rings; emerging land retires existing rings
+  ---
+  duration_ms: 34.188375
+  ...
+# Subtest: reduced motion disables decorative rain and invalid timesteps do not corrupt state
+ok 35 - reduced motion disables decorative rain and invalid timesteps do not corrupt state
+  ---
+  duration_ms: 0.825458
+  ...
+# (node:3660) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/johnmobley/sandboxes/paradise-evening-lights/paradise/public/island/water-light.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /Users/johnmobley/sandboxes/paradise-evening-lights/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: homogeneous light integration agrees with the analytic solution at every step count
+ok 36 - homogeneous light integration agrees with the analytic solution at every step count
+  ---
+  duration_ms: 5.846666
+  ...
+# Subtest: light paths respect occlusion and colored extinction without negative or invalid radiance
+ok 37 - light paths respect occlusion and colored extinction without negative or invalid radiance
+  ---
+  duration_ms: 0.787583
+  ...
+# Subtest: four light slices use bounded geometry with no triangle crossing between atlas tiles
+ok 38 - four light slices use bounded geometry with no triangle crossing between atlas tiles
+  ---
+  duration_ms: 46.947167
+  ...
+# Subtest: depth reconstruction returns the actual world point, including translated cameras
+ok 39 - depth reconstruction returns the actual world point, including translated cameras
+  ---
+  duration_ms: 0.551958
+  ...
+# (node:3661) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/johnmobley/sandboxes/paradise-evening-lights/paradise/public/island/ocean.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /Users/johnmobley/sandboxes/paradise-evening-lights/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: angle-addition samples reproduce the legacy finite differences
+ok 40 - angle-addition samples reproduce the legacy finite differences
+  ---
+  duration_ms: 3.636292
+  ...
+# Subtest: reflection targets retain aspect ratio without exceeding one megapixel
+ok 41 - reflection targets retain aspect ratio without exceeding one megapixel
+  ---
+  duration_ms: 0.655
+  ...
+1..41
+# tests 41
+# suites 0
+# pass 41
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 410.961542

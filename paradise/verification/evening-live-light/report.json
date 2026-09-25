@@ -1,0 +1,476 @@
+{
+  "at": "2026-09-25T08:26:07.498Z",
+  "url": "https://paradise.alhena.cc/",
+  "engine": "webkit",
+  "errors": [],
+  "scenes": [
+    {
+      "scene": {
+        "build": "unified-cove-20260924",
+        "renderer": "Three.js WebGL2",
+        "waveComponents": 32,
+        "fluid": {
+          "backend": "webgpu",
+          "reason": null,
+          "resolution": 128,
+          "ticks": 195,
+          "published": 194,
+          "pending": true,
+          "queuedSteps": 0,
+          "impulseCount": 0,
+          "peak": 0
+        },
+        "caustics": "surface-refracted-ray-grid",
+        "phase": "idle",
+        "entered": false,
+        "catches": 0,
+        "time": "noon",
+        "weather": "calm",
+        "fps": 57,
+        "canvases": 1,
+        "frames": 0,
+        "bobber": [
+          0,
+          0,
+          0
+        ],
+        "surface": 0,
+        "tension": 0,
+        "reelProgress": 0,
+        "motionEnabled": false
+      },
+      "lights": {
+        "preset": {
+          "level": 0,
+          "window": 0,
+          "bulb": 0.08,
+          "bar": 2,
+          "porch": 0,
+          "festoon": 0,
+          "dock": 0
+        },
+        "windowEmission": 0,
+        "bulbEmission": 0.08,
+        "lightCount": 4,
+        "shadowLights": 0,
+        "lights": [
+          {
+            "name": "bar",
+            "intensity": 2,
+            "range": 7,
+            "position": [
+              4.777168254388463,
+              3.8470209832095854,
+              3.8111102296826087
+            ]
+          },
+          {
+            "name": "porch",
+            "intensity": 0,
+            "range": 6,
+            "position": [
+              -5.182972988076427,
+              3.0938894429620127,
+              5.6251706393364955
+            ]
+          },
+          {
+            "name": "festoon",
+            "intensity": 0,
+            "range": 7,
+            "position": [
+              0,
+              2.9,
+              1.65
+            ]
+          },
+          {
+            "name": "dock",
+            "intensity": 0,
+            "range": 5,
+            "position": [
+              1.7799999999999994,
+              1.182,
+              14.120000000000001
+            ]
+          }
+        ]
+      },
+      "image": "noon-calm.png"
+    },
+    {
+      "scene": {
+        "build": "unified-cove-20260924",
+        "renderer": "Three.js WebGL2",
+        "waveComponents": 32,
+        "fluid": {
+          "backend": "webgpu",
+          "reason": null,
+          "resolution": 128,
+          "ticks": 349,
+          "published": 348,
+          "pending": true,
+          "queuedSteps": 0,
+          "impulseCount": 0,
+          "peak": 0
+        },
+        "caustics": "surface-refracted-ray-grid",
+        "phase": "idle",
+        "entered": false,
+        "catches": 0,
+        "time": "sunset",
+        "weather": "breeze",
+        "fps": 55,
+        "canvases": 1,
+        "frames": 0,
+        "bobber": [
+          0,
+          0,
+          0
+        ],
+        "surface": 0,
+        "tension": 0,
+        "reelProgress": 0,
+        "motionEnabled": false
+      },
+      "lights": {
+        "preset": {
+          "level": 0.18,
+          "window": 0.504,
+          "bulb": 0.6559999999999999,
+          "bar": 4.88,
+          "porch": 1.6199999999999999,
+          "festoon": 2.88,
+          "dock": 1.26
+        },
+        "windowEmission": 0.504,
+        "bulbEmission": 0.6559999999999999,
+        "lightCount": 4,
+        "shadowLights": 0,
+        "lights": [
+          {
+            "name": "bar",
+            "intensity": 4.88,
+            "range": 7,
+            "position": [
+              4.777168254388463,
+              3.8470209832095854,
+              3.8111102296826087
+            ]
+          },
+          {
+            "name": "porch",
+            "intensity": 1.6199999999999999,
+            "range": 6,
+            "position": [
+              -5.182972988076427,
+              3.0938894429620127,
+              5.6251706393364955
+            ]
+          },
+          {
+            "name": "festoon",
+            "intensity": 2.88,
+            "range": 7,
+            "position": [
+              0,
+              2.9,
+              1.65
+            ]
+          },
+          {
+            "name": "dock",
+            "intensity": 1.26,
+            "range": 5,
+            "position": [
+              1.7799999999999994,
+              1.182,
+              14.120000000000001
+            ]
+          }
+        ]
+      },
+      "image": "sunset-breeze.png"
+    },
+    {
+      "scene": {
+        "build": "unified-cove-20260924",
+        "renderer": "Three.js WebGL2",
+        "waveComponents": 32,
+        "fluid": {
+          "backend": "webgpu",
+          "reason": null,
+          "resolution": 128,
+          "ticks": 506,
+          "published": 505,
+          "pending": true,
+          "queuedSteps": 0,
+          "impulseCount": 0,
+          "peak": 0
+        },
+        "caustics": "surface-refracted-ray-grid",
+        "phase": "idle",
+        "entered": false,
+        "catches": 0,
+        "time": "night",
+        "weather": "calm",
+        "fps": 56,
+        "canvases": 1,
+        "frames": 0,
+        "bobber": [
+          0,
+          0,
+          0
+        ],
+        "surface": 0,
+        "tension": 0,
+        "reelProgress": 0,
+        "motionEnabled": false
+      },
+      "lights": {
+        "preset": {
+          "level": 1,
+          "window": 2.8,
+          "bulb": 3.2800000000000002,
+          "bar": 18,
+          "porch": 9,
+          "festoon": 16,
+          "dock": 7
+        },
+        "windowEmission": 2.8,
+        "bulbEmission": 3.2800000000000002,
+        "lightCount": 4,
+        "shadowLights": 0,
+        "lights": [
+          {
+            "name": "bar",
+            "intensity": 18,
+            "range": 7,
+            "position": [
+              4.777168254388463,
+              3.8470209832095854,
+              3.8111102296826087
+            ]
+          },
+          {
+            "name": "porch",
+            "intensity": 9,
+            "range": 6,
+            "position": [
+              -5.182972988076427,
+              3.0938894429620127,
+              5.6251706393364955
+            ]
+          },
+          {
+            "name": "festoon",
+            "intensity": 16,
+            "range": 7,
+            "position": [
+              0,
+              2.9,
+              1.65
+            ]
+          },
+          {
+            "name": "dock",
+            "intensity": 7,
+            "range": 5,
+            "position": [
+              1.7799999999999994,
+              1.182,
+              14.120000000000001
+            ]
+          }
+        ]
+      },
+      "image": "night-calm.png"
+    },
+    {
+      "scene": {
+        "build": "unified-cove-20260924",
+        "renderer": "Three.js WebGL2",
+        "waveComponents": 32,
+        "fluid": {
+          "backend": "webgpu",
+          "reason": null,
+          "resolution": 128,
+          "ticks": 663,
+          "published": 662,
+          "pending": true,
+          "queuedSteps": 0,
+          "impulseCount": 0,
+          "peak": 0
+        },
+        "caustics": "surface-refracted-ray-grid",
+        "phase": "idle",
+        "entered": false,
+        "catches": 0,
+        "time": "night",
+        "weather": "storm",
+        "fps": 41,
+        "canvases": 1,
+        "frames": 0,
+        "bobber": [
+          0,
+          0,
+          0
+        ],
+        "surface": 0,
+        "tension": 0,
+        "reelProgress": 0,
+        "motionEnabled": false
+      },
+      "lights": {
+        "preset": {
+          "level": 1,
+          "window": 2.8,
+          "bulb": 3.2800000000000002,
+          "bar": 18,
+          "porch": 9,
+          "festoon": 16,
+          "dock": 7
+        },
+        "windowEmission": 2.8,
+        "bulbEmission": 3.2800000000000002,
+        "lightCount": 4,
+        "shadowLights": 0,
+        "lights": [
+          {
+            "name": "bar",
+            "intensity": 18,
+            "range": 7,
+            "position": [
+              4.777168254388463,
+              3.8470209832095854,
+              3.8111102296826087
+            ]
+          },
+          {
+            "name": "porch",
+            "intensity": 9,
+            "range": 6,
+            "position": [
+              -5.182972988076427,
+              3.0938894429620127,
+              5.6251706393364955
+            ]
+          },
+          {
+            "name": "festoon",
+            "intensity": 16,
+            "range": 7,
+            "position": [
+              0,
+              2.9,
+              1.65
+            ]
+          },
+          {
+            "name": "dock",
+            "intensity": 7,
+            "range": 5,
+            "position": [
+              1.7799999999999994,
+              1.182,
+              14.120000000000001
+            ]
+          }
+        ]
+      },
+      "image": "night-storm.png"
+    }
+  ],
+  "fishing": {
+    "build": "unified-cove-20260924",
+    "renderer": "Three.js WebGL2",
+    "waveComponents": 32,
+    "fluid": {
+      "backend": "webgpu",
+      "reason": null,
+      "resolution": 128,
+      "ticks": 819,
+      "published": 819,
+      "pending": false,
+      "queuedSteps": 0,
+      "impulseCount": 16,
+      "peak": 0.05702515318989754
+    },
+    "caustics": "surface-refracted-ray-grid",
+    "phase": "hunt",
+    "entered": true,
+    "catches": 0,
+    "time": "night",
+    "weather": "storm",
+    "fps": 59,
+    "canvases": 1,
+    "frames": 0,
+    "bobber": [
+      0.5,
+      -0.24944135027016862,
+      19
+    ],
+    "surface": -0.20238348610168322,
+    "tension": 0,
+    "reelProgress": 0,
+    "motionEnabled": false
+  },
+  "reduced": {
+    "preset": {
+      "level": 1,
+      "window": 2.8,
+      "bulb": 3.2800000000000002,
+      "bar": 18,
+      "porch": 9,
+      "festoon": 16,
+      "dock": 7
+    },
+    "windowEmission": 2.8,
+    "bulbEmission": 3.2800000000000002,
+    "lightCount": 4,
+    "shadowLights": 0,
+    "lights": [
+      {
+        "name": "bar",
+        "intensity": 18,
+        "range": 7,
+        "position": [
+          4.777168254388463,
+          3.8470209832095854,
+          3.8111102296826087
+        ]
+      },
+      {
+        "name": "porch",
+        "intensity": 9,
+        "range": 6,
+        "position": [
+          -5.182972988076427,
+          3.0938894429620127,
+          5.6251706393364955
+        ]
+      },
+      {
+        "name": "festoon",
+        "intensity": 16,
+        "range": 7,
+        "position": [
+          0,
+          2.9,
+          1.65
+        ]
+      },
+      {
+        "name": "dock",
+        "intensity": 7,
+        "range": 5,
+        "position": [
+          1.7799999999999994,
+          1.182,
+          14.120000000000001
+        ]
+      }
+    ]
+  },
+  "ok": true
+}
