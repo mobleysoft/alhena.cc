@@ -36,8 +36,31 @@ not proof of wrist motion or haptics on a physical phone.
 ## Release state
 
 Prepared from canonical main `b1afa71058a680ddf38f427f0d5fd04e3fad24e6` in an
-isolated worktree. Production verification will be recorded after the guarded
-deployment; local success alone is not a live-release claim.
+isolated worktree. Source commit: `3bb5f89e5d853388748b4d9fc1518c7fbcc507c3`.
+
+Deployed with `paradise/safe-deploy.sh` from the clean release clone on main,
+after verifying the Cloudflare account as `Johnmobley99@gmail.com`. The wrapper
+reran all 38 tests successfully, retained the ASSETS binding, and verified the
+public root and modules. The shell initially selected Node 20; Wrangler refused
+before deploying. Using the already-installed Node 26 through a command-local
+PATH resolved this without changing global configuration.
+
+- Worker: `alhena-paradise-worker`.
+- Production URL: `https://paradise.alhena.cc/`.
+- Version: `99c1c3a0-5f65-4e12-a760-8baf329b0ccb`.
+- Deployment list confirms 100% on that version at `2026-09-25T07:38:00.036Z`.
+- `host-live-source/source-hashes.json`: all 18 checked root/runtime/vendor files
+  return HTTP 200 and exactly match their local SHA-256 hashes.
+- `host-live-model/report.json`: live WebKit character gallery, blink, head turn,
+  cast and reduced-motion checks pass; zero captured browser errors.
+- `host-live-flow/report.json`: live Chromium full fishing flow, saved catch,
+  reactions, night/storm controls, portrait and landscape touch checks pass;
+  zero captured browser errors. Landing, catch and both mobile fishing frames
+  were visually inspected.
+
+The canonical repo's unrelated untracked `paradise/public/island/shore.js` was
+neither modified nor included. This release does not push the canonical repo's
+unrelated pending commits to its GitHub remote.
 
 The separate full-3D breaking-wave experiment is not included. The larger visual
 goal remains open, including a convincing overturning breaker and further
