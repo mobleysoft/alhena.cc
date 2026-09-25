@@ -268,4 +268,5 @@ function animate(now){
 }
 // Read-only evidence for browser verification; gameplay is exercised through real controls.
 window.__paradise={volume:()=>ocean.volumeEvidence(),rain:()=>rain.snapshot(),spray:()=>splashes.snapshot(),actors:()=>island.actors(),optics:()=>ocean.causticEvidence(),snapshot:()=>({build:document.body.dataset.paradiseBuild,renderer:'Three.js WebGL2',waveComponents:32,fluid:ocean.fluid.snapshot(),caustics:'surface-refracted-ray-grid',phase,entered,catches:catchCount(catches),time:timeKey,weather:weatherKey,fps:Math.round(fps),canvases:document.querySelectorAll('canvas').length,frames:document.querySelectorAll('iframe').length,bobber:bobber.position.toArray(),surface:ocean.height(bobber.position.x,bobber.position.z),tension,reelProgress,motionEnabled})};
+window.__paradise.surface=()=>ocean.surfaceEvidence();
 requestAnimationFrame(animate);

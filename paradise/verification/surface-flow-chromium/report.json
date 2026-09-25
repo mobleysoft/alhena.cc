@@ -1,0 +1,130 @@
+{
+  "at": "2026-09-25T05:08:30.564Z",
+  "url": "http://127.0.0.1:8796/",
+  "engine": "chromium",
+  "checks": [
+    "cast, wave-tracking buoyancy, strike, tension fight, catch",
+    "dog watches the strike; Alhena greets the catch; reactions settle",
+    "catch persists after reload",
+    "time/weather controls update the real scene",
+    "portrait: touch cast, readable controls, journal, no overflow",
+    "landscape: touch cast, readable controls, journal, no overflow"
+  ],
+  "screenshots": [
+    "desktop-landing.png",
+    "desktop-fishing.png",
+    "desktop-strike.png",
+    "desktop-catch.png",
+    "desktop-night-storm.png",
+    "mobile-portrait-landing.png",
+    "mobile-portrait-fishing.png",
+    "mobile-landscape-landing.png",
+    "mobile-landscape-fishing.png"
+  ],
+  "errors": [],
+  "initial": {
+    "build": "unified-cove-20260924",
+    "renderer": "Three.js WebGL2",
+    "waveComponents": 32,
+    "fluid": {
+      "backend": "webgpu",
+      "reason": null,
+      "resolution": 128,
+      "ticks": 155,
+      "published": 155,
+      "pending": false,
+      "queuedSteps": 0,
+      "impulseCount": 0,
+      "peak": 0
+    },
+    "caustics": "surface-refracted-ray-grid",
+    "phase": "idle",
+    "entered": false,
+    "catches": 0,
+    "time": "sunset",
+    "weather": "breeze",
+    "fps": 60,
+    "canvases": 1,
+    "frames": 0,
+    "bobber": [
+      0,
+      0,
+      0
+    ],
+    "surface": 0,
+    "tension": 0,
+    "reelProgress": 0,
+    "motionEnabled": false
+  },
+  "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+  "buoyancyMeanError": 0.062100392537365885,
+  "portrait": {
+    "build": "unified-cove-20260924",
+    "renderer": "Three.js WebGL2",
+    "waveComponents": 32,
+    "fluid": {
+      "backend": "webgpu",
+      "reason": null,
+      "resolution": 128,
+      "ticks": 159,
+      "published": 158,
+      "pending": true,
+      "queuedSteps": 0,
+      "impulseCount": 0,
+      "peak": 0
+    },
+    "caustics": "surface-refracted-ray-grid",
+    "phase": "idle",
+    "entered": false,
+    "catches": 0,
+    "time": "sunset",
+    "weather": "breeze",
+    "fps": 60,
+    "canvases": 1,
+    "frames": 0,
+    "bobber": [
+      0,
+      0,
+      0
+    ],
+    "surface": 0,
+    "tension": 0,
+    "reelProgress": 0,
+    "motionEnabled": false
+  },
+  "landscape": {
+    "build": "unified-cove-20260924",
+    "renderer": "Three.js WebGL2",
+    "waveComponents": 32,
+    "fluid": {
+      "backend": "webgpu",
+      "reason": null,
+      "resolution": 128,
+      "ticks": 160,
+      "published": 159,
+      "pending": true,
+      "queuedSteps": 0,
+      "impulseCount": 0,
+      "peak": 0
+    },
+    "caustics": "surface-refracted-ray-grid",
+    "phase": "idle",
+    "entered": false,
+    "catches": 0,
+    "time": "sunset",
+    "weather": "breeze",
+    "fps": 60,
+    "canvases": 1,
+    "frames": 0,
+    "bobber": [
+      0,
+      0,
+      0
+    ],
+    "surface": 0,
+    "tension": 0,
+    "reelProgress": 0,
+    "motionEnabled": false
+  },
+  "ok": true
+}

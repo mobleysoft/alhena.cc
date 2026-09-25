@@ -3,6 +3,20 @@ import { createRippleField, RIPPLE } from './ripple-field.js';
 import { createWaterLight, waterLightGLSL } from './water-light.js';
 
 const TAU = Math.PI * 2;
+export const NORMAL_EPSILON = .04;
+export const normalSteps = wave => new THREE.Vector4(Math.cos(wave.kx*NORMAL_EPSILON),Math.sin(wave.kx*NORMAL_EPSILON),Math.cos(wave.kz*NORMAL_EPSILON),Math.sin(wave.kz*NORMAL_EPSILON));
+export function reflectionSize(width,height) {
+  const scale=Math.min(1,Math.sqrt(1048576/(width*height)));
+  return [Math.max(1,Math.floor(width*scale)),Math.max(1,Math.floor(height*scale))];
+}
+export function createReflectionTarget(renderer,width,height) {
+  return new THREE.WebGLRenderTarget(...reflectionSize(width,height),{samples:Math.min(4,renderer.capabilities.maxSamples)});
+}
+export const causticWindowGLSL = `
+float causticCoverage(vec2 uv) {
+  float edge=min(min(uv.x,uv.y),min(1.0-uv.x,1.0-uv.y));
+  return smoothstep(0.0,.07,edge);
+}`;
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 // Small wind waves supply the curvature that focuses sunlight. The legacy
 // 32-component swell remains unchanged; this layer also enters CPU buoyancy.
@@ -40,7 +54,7 @@ float ground(vec2 p) {
   return 1.18 - 3.9 * smoothstep(.48, 1.22, r) - 16.0 * smoothstep(1.3,4.8,r)
     + .10 * sin(p.x * .55) * cos(p.y * .47) * (1.0 - smoothstep(.45, .95, r));
 }`;
-const heightGLSL = `
+export const heightGLSL = `
 uniform float uTime;
 uniform float uChop;
 uniform vec4 uWaves[32];
@@ -66,6 +80,32 @@ float heightAt(vec2 p) {
   return h+rippleAt(p);
 }`;
 
+// Angle addition reproduces four central-difference height samples using one
+// sin/cos pair per wave. The coefficients are precomputed when weather changes.
+export const surfaceNormalGLSL = `
+uniform vec4 uWaveSteps[32];
+uniform vec4 uShortSteps[4];
+vec4 shiftedWave(float phase, vec4 step) {
+  float s=sin(phase),c=cos(phase);
+  return vec4(s*step.x+c*step.y,s*step.x-c*step.y,s*step.z+c*step.w,s*step.z-c*step.w);
+}
+vec3 surfaceNormal(vec2 p) {
+  vec4 heights=vec4(0.0);
+  for(int i=0;i<32;i++) {
+    vec4 w=uWaves[i];
+    heights+=w.z*shiftedWave(dot(w.xy,p)-uFrequencies[i]*uTime+w.w,uWaveSteps[i]);
+  }
+  heights*=uChop;
+  for(int i=0;i<4;i++) {
+    vec4 w=uShortWaves[i];
+    heights+=w.z*uRippleWind*shiftedWave(dot(w.xy,p)-w.w*uTime,uShortSteps[i]);
+  }
+  vec2 dx=vec2(${NORMAL_EPSILON},0.0),dz=dx.yx;
+  heights*=smoothstep(vec4(-.05),vec4(8.0),-vec4(ground(p+dx),ground(p-dx),ground(p+dz),ground(p-dz)));
+  heights+=vec4(rippleAt(p+dx),rippleAt(p-dx),rippleAt(p+dz),rippleAt(p-dz));
+  return normalize(vec3(heights.y-heights.x,${NORMAL_EPSILON*2},heights.w-heights.z));
+}`;
+
 export function createOcean(renderer, scene) {
   let waves = spectrum(12), wind=12, chop = 1.2, time = 0, causticTime=-1;
   const rippleTexture=new THREE.DataTexture(new Float32Array(RIPPLE.size**2*4),RIPPLE.size,RIPPLE.size,THREE.RGBAFormat,THREE.FloatType);
@@ -73,11 +113,14 @@ export function createOcean(renderer, scene) {
   const fluid=createRippleField(groundHeight,{preferGPU:new URLSearchParams(location.search).get('fluid')!=='cpu',onChange:data=>{rippleTexture.image.data=data;rippleTexture.needsUpdate=true;}});
   const size = new THREE.Vector2(); renderer.getDrawingBufferSize(size);
   const refractTarget = new THREE.WebGLRenderTarget(size.x, size.y, { depthBuffer: true, depthTexture: new THREE.DepthTexture(size.x, size.y) });
-  const reflectTarget = new THREE.WebGLRenderTarget(Math.max(256, size.x >> 1), Math.max(256, size.y >> 1));
+  const reflectTarget = createReflectionTarget(renderer,size.x,size.y);
   const uniforms = {
     uTime: { value: 0 }, uChop: { value: chop },
     uWaves: { value: waves.map(w => new THREE.Vector4(w.kx, w.kz, w.amplitude, w.phase)) },
     uFrequencies: { value: waves.map(w => w.freq) }, uRipples: { value: rippleTexture },
+    uWaveSteps:{value:waves.map(normalSteps)},uShortSteps:{value:SHORT_WAVES.map(normalSteps)},
+    uPixelNormals:{value:new URLSearchParams(location.search).get('normals')==='vertex'?0:1},
+    uSurfaceDebug:{value:Number(new URLSearchParams(location.search).get('water-debug'))||0},
     uShortWaves:{value:SHORT_WAVES.map(w=>new THREE.Vector4(w.kx,w.kz,w.amplitude,w.frequency))},uRippleWind:{value:1},
     uResolution: { value: size }, uRefraction: { value: refractTarget.texture }, uReflection: { value: reflectTarget.texture },
     uSun: { value: new THREE.Vector3(-.6, .7, -.5).normalize() },
@@ -118,6 +161,9 @@ export function createOcean(renderer, scene) {
       uniform float uSpecular;
       uniform sampler2D uRefractionDepth;
       uniform mat4 uInverseViewProjection;
+      uniform float uPixelNormals;
+      uniform float uSurfaceDebug;
+      ${surfaceNormalGLSL}
       ${waterLightGLSL}
       vec3 refractedHit(vec2 uv) {
         float d = texture2D(uRefractionDepth, uv).r;
@@ -128,7 +174,7 @@ export function createOcean(renderer, scene) {
         float h = vWorld.y;
         float depth = h - ground(vWorld.xz);
         if (depth < .015) discard;
-        vec3 n = normalize(vWaterNormal);
+        vec3 n = uPixelNormals > .5 ? surfaceNormal(vWorld.xz) : normalize(vWaterNormal);
         vec2 phase = vec2(vWorld.x * 8.0 + vWorld.z * 9.0 - uTime * 1.8, vWorld.x * 13.0 - vWorld.z * 7.0 + uTime * 2.0);
         // Suppress sub-pixel capillary waves instead of aliasing them into a grid.
         vec2 footprint = fwidth(phase);
@@ -154,6 +200,11 @@ export function createOcean(renderer, scene) {
         col = mix(col, vec3(.9,.96,.89) * uLight, foam * .7);
         float fog = 1.0 - exp(-length(cameraPosition-vWorld) * .006);
         col = mix(col, uSky, fog * .7);
+        if(uSurfaceDebug==1.0)col=n*.5+.5;
+        if(uSurfaceDebug==2.0)col=reflection;
+        if(uSurfaceDebug==3.0)col=bed;
+        if(uSurfaceDebug==4.0)col=vec3(length(hit-vWorld)/30.0);
+        if(uSurfaceDebug==5.0)col=transmitted;
         gl_FragColor = vec4(col, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -188,7 +239,7 @@ export function createOcean(renderer, scene) {
         vec3 origin=vec3(p.x,h,p.y);float distanceToBed=max(0.0,(h-ground(p))/max(.15,-ray.y));
         vec3 hit=origin+ray*distanceToBed;
         distanceToBed=max(0.0,(h-ground(hit.xz))/max(.15,-ray.y));hit=origin+ray*min(distanceToBed,18.0);
-        vOriginal=origin;vProjected=hit;vWet=step(.03,h-ground(p))*step(-12.0,ground(p));
+        vOriginal=origin;vProjected=hit;vWet=step(.03,h-ground(p))*(1.0-smoothstep(10.0,14.0,-ground(p)));
         gl_Position=vec4(hit.x/20.0,(hit.z-10.0)/20.0,0.0,1.0);
       }`,
     fragmentShader:`varying vec3 vOriginal,vProjected;varying float vWet;
@@ -205,6 +256,7 @@ export function createOcean(renderer, scene) {
   const clip = new THREE.Plane(new THREE.Vector3(0, 1, 0), -.02);
   return {
     mesh, uniforms, fluid, volumeEvidence: () => volume.evidence(),
+    surfaceEvidence: () => ({normalMode:uniforms.uPixelNormals.value?'per-pixel central difference':'legacy vertex interpolation',epsilon:NORMAL_EPSILON,reflection:{width:reflectTarget.width,height:reflectTarget.height,samples:reflectTarget.samples}}),
     optics:{caustics:{value:causticTarget.texture},light:uniforms.uLight,sun:uniforms.uSun},
     causticEvidence() {
       const pixels=new Uint16Array(causticSize*causticSize*4);
@@ -220,12 +272,12 @@ export function createOcean(renderer, scene) {
     impulse(x, z, strength = .09) { fluid.impulse(x,z,strength); },
     setWeather(nextWind, choppiness) {
       wind=nextWind;waves = spectrum(wind); chop = choppiness; uniforms.uChop.value = chop;uniforms.uRippleWind.value=Math.min(1.6,Math.max(.4,wind/12));
-      waves.forEach((w,i) => { uniforms.uWaves.value[i].set(w.kx,w.kz,w.amplitude,w.phase); uniforms.uFrequencies.value[i]=w.freq; });
+      waves.forEach((w,i) => { uniforms.uWaves.value[i].set(w.kx,w.kz,w.amplitude,w.phase); uniforms.uFrequencies.value[i]=w.freq;uniforms.uWaveSteps.value[i].copy(normalSteps(w)); });
     },
     update(t) { time=t; uniforms.uTime.value=t;fluid.step(); },
     resize() {
       renderer.getDrawingBufferSize(size); refractTarget.setSize(size.x,size.y);
-      reflectTarget.setSize(Math.max(256,size.x>>1),Math.max(256,size.y>>1));
+      reflectTarget.setSize(...reflectionSize(size.x,size.y));
     },
     render(camera, outputTarget = null) {
       if(time-causticTime>1/30){
@@ -256,7 +308,7 @@ export function makeSandMaterial(timeUniform,optics) {
     shader.uniforms.uCaustics=optics.caustics;shader.uniforms.uCausticLight=optics.light;shader.uniforms.uCausticSun=optics.sun;
     shader.vertexShader = 'varying vec3 vTerrain;\n' + shader.vertexShader;
     shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvTerrain=position;');
-    shader.fragmentShader = 'varying vec3 vTerrain; uniform float uTime,uCausticLight;uniform sampler2D uCaustics;uniform vec3 uCausticSun;\n' + shader.fragmentShader;
+    shader.fragmentShader = 'varying vec3 vTerrain; uniform float uTime,uCausticLight;uniform sampler2D uCaustics;uniform vec3 uCausticSun;\n' + causticWindowGLSL + '\n' + shader.fragmentShader;
     shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       float grain = fract(sin(dot(floor(vTerrain.xz*85.0),vec2(12.9898,78.233)))*43758.5453);
       diffuseColor.rgb *= .94 + grain * .12;
@@ -264,9 +316,8 @@ export function makeSandMaterial(timeUniform,optics) {
       diffuseColor.rgb *= mix(1.0,.79,wet);
       vec2 causticUv=(vTerrain.xz-vec2(-20.0,-10.0))/40.0;
       float caustic=texture2D(uCaustics,causticUv).r;
-      caustic*=step(0.0,causticUv.x)*step(0.0,causticUv.y)*step(causticUv.x,1.0)*step(causticUv.y,1.0);
       float submerged=1.0-smoothstep(-.15,.015,vTerrain.y);
-      float light=max(0.0,caustic-.8)*submerged*exp(min(0.0,vTerrain.y)*.23)*uCausticLight;
+      float light=max(0.0,caustic-.8)*causticCoverage(causticUv)*submerged*exp(min(0.0,vTerrain.y)*.23)*uCausticLight;
       diffuseColor.rgb += vec3(.15,.20,.16)*min(light,2.5);`);
   };
   return material;

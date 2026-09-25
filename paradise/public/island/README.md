@@ -26,7 +26,12 @@ PlayCanvas iframe, or independent background renderer.
   waves supplement (not replace) the original 32-component swell.
   A sunlight-ray grid refracts through this same height field onto the seabed;
   projected area contraction determines caustic brightness. This replaces the
-  former painted sine-net caustics.
+  former painted sine-net caustics. Surface normals are now evaluated per
+  pixel using angle-addition central differences of that exact same wave
+  height field, avoiding offshore triangle interpolation of short waves.
+  Planar reflections use up to 4x MSAA with a one-megapixel render-target
+  ceiling. Seabed caustics fade at their atlas/depth boundaries rather than
+  revealing a rectangular light patch.
 - `water-light.js`: four depth slices of surface-refracted sunlight packed into
   a 512x512 half-float atlas. The water shader integrates single scattering in
   eight steps along its depth-reconstructed view ray, stopping at the actual
@@ -94,6 +99,15 @@ fixtures, confirms unit concentration under a flat water surface, and compares
 actual shader radiance to a numerical reference at eight optical path lengths.
 It supports Chromium and WebKit. `?volume=off` disables in-scattered radiance
 for visual comparison without changing wave physics or the refraction endpoint.
+
+Surface optics: `node --test paradise/scripts/test-water-surface.mjs` and
+`node paradise/scripts/verify-water-surface.mjs`. GPU fixtures compare 144
+normal samples against direct height-field differences across three winds and
+three times, check actual multisample edge coverage and bounded caustic fades.
+The old interpolated-normal path remains available as `?normals=vertex` for
+comparison. Read-only `?water-debug=1` through `5` display normals, reflection,
+refraction color, optical path length and transmitted radiance respectively.
+These diagnostics do not alter fishing or wave physics.
 
 Rendering background: [GPU Gems, Volume Rendering Techniques](https://developer.nvidia.com/gpugems/gpugems/part-vi-beyond-triangles/chapter-39-volume-rendering-techniques)
 describes slice reconstruction and accumulation along viewing rays. This
