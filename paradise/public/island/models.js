@@ -4,6 +4,7 @@ import { mergeGeometries } from './vendor/BufferGeometryUtils.js';
 import { createQuadruped, LEG, LEGS } from './locomotion.js';
 import { createFrondGeometry, createTrunkGeometry, frondSpine } from './foliage.js';
 import { prepareStaticGeometry } from './static-geometry.js';
+import { createCoastalGarden } from './coastal-garden.js';
 
 const clay = (color, roughness=.7) => new THREE.MeshStandardMaterial({color,roughness,metalness:0});
 const mat = {
@@ -176,13 +177,7 @@ export function createIsland(scene,timeUniform,optics) {
   const dog=lab(world);dog.g.position.set(-.4,groundHeight(-.4,7),7);
   const palms=[palm(world,-8,2,6.8,.8),palm(world,-7,6,5.9,-.3),palm(world,8,3,6.7,.6)];
   umbrella(world,-4.7,-.5);
-  // Rounded granite outcrops and planting concentrate around the island rim.
-  const rock=clay('#959c86'),rockLight=clay('#b8b8a0');
-  for(let i=0;i<32;i++) {const angle=i*2.39996,r=10.1+(i%4)*.3,x=Math.cos(angle)*r,z=3+Math.sin(angle)*r*.69;
-    const s=.35+(i%5)*.13;oval(world,s,s*.68,s*.87,i%3?rock:rockLight,x,groundHeight(x,z)+s*.23,z).rotation.y=angle;}
-  for(let i=0;i<22;i++) {const a=i*2.3999,x=Math.cos(a)*9,z=4+Math.sin(a)*5.8;
-    if(z<0)continue;const bush=group(world,x,groundHeight(x,z),z);
-    for(let j=0;j<4;j++)oval(bush,.45,.5,.4,j%2?mat.green:mat.leaf,Math.sin(j*2)*.3,.25,Math.cos(j*2)*.3);}
+  createCoastalGarden(world,groundHeight);
   for(let i=0;i<45;i++) {const a=i*2.4,r=6+Math.sin(i)*2,x=Math.cos(a)*r,z=1+Math.sin(a)*4;
     const h=groundHeight(x,z);if(h<.15)continue;const s=.04+(i%3)*.025;oval(world,s,.025,s*.73,mat.cream,x,h+.016,z);}
   const cablePoints=[[-3,3.5,1],[-.1,2.7,1.9],[3,3.5,1]];tube(world,cablePoints,.015,mat.wood);

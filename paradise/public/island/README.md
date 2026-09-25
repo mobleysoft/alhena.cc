@@ -9,6 +9,10 @@ PlayCanvas iframe, or independent background renderer.
   gradients, shared frond geometry and tapered curved trunks. Growth rings
   follow the trunk surface instead of floating as separate cylinders. These
   are authored miniature meshes, not downloaded photo cutouts or simulation.
+- `coastal-garden.js`: asymmetric weathered-stone clusters and folded coastal
+  rosettes replacing the ring of sphere props. Geometry variants and two shared
+  materials are merged by the existing static batching path; planting stays
+  above the waterline and clears the jetty and dog circuit.
 - `locomotion.js`: terrain-aware quadruped controller and two-bone IK.
   Planted paws retain world-space positions; only one paw swings at a time.
   Turn speed, foot urgency and a small body crouch keep targets reachable.
