@@ -1,12 +1,13 @@
 import * as THREE from './vendor/three.module.min.js';
 import { groundHeight, makeSandMaterial } from './ocean.js';
 import { mergeGeometries } from './vendor/BufferGeometryUtils.js';
-import { createQuadruped, LEG, LEGS } from './locomotion.js';
+import { createQuadruped } from './locomotion.js';
 import { createFrondGeometry, createTrunkGeometry, frondSpine } from './foliage.js';
 import { prepareStaticGeometry } from './static-geometry.js';
 import { createCoastalGarden } from './coastal-garden.js';
 import { createHost } from './host.js';
 import { createEveningLights, createWindowMaterial } from './evening-light.js';
+import { createLabrador } from './labrador.js';
 
 const clay = (color, roughness=.7) => new THREE.MeshStandardMaterial({color,roughness,metalness:0});
 const mat = {
@@ -99,29 +100,6 @@ function beachBar(parent,x,z) {
   return {g,actor};
 }
 
-function lab(parent) {
-  const g=group(parent), body=group(g,0,.76,0);
-  oval(body,.38,.4,.75,mat.black);oval(body,.36,.47,.38,mat.black,0,.02,.43);
-  const neck=group(body,0,.3,.52), head=group(neck,0,.22,.12);
-  oval(head,.33,.33,.36,mat.black);oval(head,.22,.16,.28,mat.black,0,-.07,.3);oval(head,.15,.1,.08,mat.dark,0,-.04,.55);
-  const ears=[];
-  for(const side of [-1,1]){const ear=oval(head,.14,.28,.13,mat.black,side*.28,-.06,-.02);ear.rotation.z=side*.24;ears.push(ear);
-    oval(head,.035,.036,.023,mat.gold,side*.175,.05,.27);oval(head,.019,.024,.014,mat.dark,side*.18,.051,.288);}
-  const collar=mesh(neck,new THREE.TorusGeometry(.235,.038,9,28),mat.coral,0,.02,.015);collar.rotation.x=Math.PI/2;
-  oval(neck,.067,.08,.02,mat.gold,0,-.08,.255);
-  const legs=[];
-  for(const spec of LEGS) {
-    const hip=group(body,spec.x,-.04,spec.z);oval(hip,spec.z<0?.14:.115,LEG.upper*.58,.12,mat.black,0,-LEG.upper/2,0);
-    const knee=group(hip,0,-LEG.upper,0);oval(knee,.088,.085,.087,mat.black);
-    oval(knee,.078,LEG.lower*.56,.08,mat.black,0,-LEG.lower/2,0);
-    const paw=group(knee,0,-LEG.lower,0);oval(paw,.12,LEG.pad,.16,mat.black,0,0,.025);
-    for(const toe of [-1,0,1])oval(paw,.034,.033,.065,mat.black,toe*.058,-.013,.13);
-    legs.push({hip,knee,paw,id:spec.id});
-  }
-  const tail=group(body,0,.12,-.63);tube(tail,[[0,0,0],[0,.02,-.28],[.13,.18,-.6],[.2,.4,-.78]],.065,mat.black);
-  g.rotation.y=-.6;return {g,body,head,neck,ears,legs,tail};
-}
-
 function jetty(parent) {
   const g=group(parent,1,0,10);g.rotation.y=Math.PI;
   for(let j=0;j<22;j++){const z=1.4-j*.3;box(g,2.1,.12,.27,mat.lightWood,0,.75,z,.045);
@@ -158,7 +136,7 @@ export function createIsland(scene,timeUniform,optics) {
   const ground=mesh(world,groundGeo,makeSandMaterial(timeUniform,optics));ground.castShadow=false;
   const windowMaterial=createWindowMaterial();
   const cottage=house(world,-5,3,windowMaterial), bar=beachBar(world,4.5,3.1), dock=jetty(world);
-  const dog=lab(world);dog.g.position.set(-.4,groundHeight(-.4,7),7);
+  const dog=createLabrador(world);dog.g.position.set(-.4,groundHeight(-.4,7),7);
   const palms=[palm(world,-8,2,6.8,.8),palm(world,-7,6,5.9,-.3),palm(world,8,3,6.7,.6)];
   umbrella(world,-4.7,-.5);
   createCoastalGarden(world,groundHeight);
@@ -189,7 +167,7 @@ export function createIsland(scene,timeUniform,optics) {
   let previousPhase='idle',greeting=0,pose=gait.snapshot();
   return {world,dog,bar,cottage,palms,board,lighting,ground,dock,
     actors() {
-      return {...gait.snapshot(),renderedFeet:dog.legs.map(leg=>({id:leg.id,position:leg.paw.getWorldPosition(new THREE.Vector3()).toArray()})),greeting,host:bar.actor.evidence()};
+      return {...gait.snapshot(),renderedFeet:dog.legs.map(leg=>({id:leg.id,position:leg.paw.getWorldPosition(new THREE.Vector3()).toArray()})),greeting,host:bar.actor.evidence(),dog:dog.evidence()};
     },
     update(t,dt,wind=1,{phase='idle',target=[.5,0,19],reducedMotion=false}={}) {
       if(phase==='landed'&&previousPhase!=='landed')greeting=2.8;previousPhase=phase;greeting=Math.max(0,greeting-dt);
@@ -209,7 +187,8 @@ export function createIsland(scene,timeUniform,optics) {
       dog.head.rotation.y+=(yaw-dog.head.rotation.y)*follow;
       dog.head.rotation.x+=((pose.mode==='sniffing'?.5+Math.sin(t*5)*.06:.02)-dog.head.rotation.x)*follow;
       dog.neck.rotation.x+=((pose.mode==='sniffing'?.18:0)-dog.neck.rotation.x)*follow;
-      dog.tail.rotation.z=reducedMotion?0:Math.sin(t*(active?7:3.5))*(active?.32:.16);
+      dog.tail.rotation.y=reducedMotion?0:Math.sin(t*(active?7:3.5))*(active?.32:.16);
+      const dogBlink=reducedMotion?1:1-.93*Math.max(0,1-Math.abs(t%5.3-.16)/.14);dog.eyes.forEach(eye=>eye.scale.y=dogBlink);
       dog.ears.forEach((ear,i)=>{ear.rotation.x=reducedMotion?0:Math.sin(t*4+i)*pose.speed*.2;});
       bar.actor.head.rotation.y+=( (active?-.22:Math.sin(t*.35)*.12)-bar.actor.head.rotation.y)*follow;
       bar.actor.body.rotation.z=reducedMotion?0:Math.sin(t*.8)*.01;

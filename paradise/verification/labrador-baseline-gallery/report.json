@@ -1,0 +1,17 @@
+{
+  "at": "2026-09-25T09:09:29.925Z",
+  "url": "http://127.0.0.1:8798/",
+  "engine": "webkit",
+  "baseline": true,
+  "errors": [],
+  "fixture": {
+    "meshes": 42,
+    "triangles": 29584,
+    "calls": [
+      42,
+      42,
+      27
+    ]
+  },
+  "ok": true
+}
