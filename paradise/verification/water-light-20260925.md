@@ -67,3 +67,26 @@ Design references:
 for slice reconstruction/accumulation, and
 [Three.js DepthTexture](https://threejs.org/docs/pages/DepthTexture.html)
 for depth attachment behavior. The implementation is authored here.
+
+## Deployment
+
+- Source commit `0a203038bc6585cd684c5c109479cdeeca369f3a`, fast-forwarded
+  into canonical main, deployed from a separate clean-main release clone.
+- `paradise/safe-deploy.sh` passed all preflight checks, 28 unit tests and
+  every post-deploy public body check, including the new water-light module.
+- Worker `alhena-paradise-worker`, authenticated account
+  `johnmobley99@gmail.com`, version `4be63d0a-dfe7-49ea-a245-78a39c6e0f1b`.
+- Deployment `ff28a254-4cfe-459b-a3b7-9dd56b4e2242`, 100% traffic,
+  created `2026-09-25T04:50:43.63177Z`, independently confirmed through API.
+- All 16 active runtime files return HTTP 200 and exactly match the release
+  by SHA-256: `water-light-live-source/`.
+- The optical fixtures also pass against the real public domain, with the
+  same 0.000020312 GPU-reference error and no runtime errors. Live fishing
+  and night/storm screenshots are saved in `water-light-live-optics/`.
+- The completed public-site interaction suite also reports no errors:
+  casting, wave-tracking buoyancy, hook/fight/catch, actor reactions, catch
+  persistence, weather/time changes and portrait/landscape touch layouts.
+  Evidence: `water-light-live/report.json` and its screenshots. Initial
+  desktop frame rate was 60 FPS; this does not establish phone performance.
+- The owned localhost preview process has been stopped. No model or daemon
+  was installed, and unrelated untracked shoreline work remains untouched.
