@@ -3,221 +3,199 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ALHENA.CC | Sovereign Operations</title>
+    <title>Alhena | Personal AI Companion</title>
+    <meta name="description" content="Personal AI companion for talking through everyday decisions. Not therapy or medical care.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-dark: #050505;
-            --accent-glow: rgba(0, 255, 204, 0.15);
-            --glass-bg: rgba(20, 20, 20, 0.4);
-            --glass-border: rgba(255, 255, 255, 0.05);
-            --text-primary: #f0f0f0;
-            --text-muted: #888;
+            --bg: #0a0f1f;
+            --surface: rgba(139, 92, 246, 0.05);
+            --border: rgba(139, 92, 246, 0.15);
+            --accent: #8B5CF6;
+            --accent-glow: rgba(139, 92, 246, 0.25);
+            --text: #F3F4F6;
+            --text-muted: #9CA3AF;
+            --wellness: #10B981;
         }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            margin: 0;
-            padding: 0;
-            background-color: var(--bg-dark);
-            color: var(--text-primary);
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            overflow: hidden;
-            background-image: radial-gradient(circle at 50% 50%, #1a1a1a 0%, #000 100%);
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', -apple-system, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            background-image: radial-gradient(circle at 50% -20%, var(--accent-glow) 0%, transparent 60%);
         }
-        /* WebGL Container Layer */
-        #canvas-container {
-            position: absolute;
-            top: 0; left: 0; width: 100vw; height: 100vh;
-            z-index: 0;
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(12px);
         }
-        /* Somatic UI Layer (Glassmorphism) */
-        .glass-panel {
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            width: 80%;
-            max-width: 800px;
-            padding: 40px;
-            background: var(--glass-bg);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            border-radius: 24px;
-            box-shadow: 0 30px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.1);
-            z-index: 10;
-            animation: emerge 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-            opacity: 0;
+
+        .logo {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #FFF;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
-        @keyframes emerge {
-            0% { opacity: 0; transform: translate(-50%, -45%) scale(0.95); filter: blur(10px); }
-            100% { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: blur(0); }
+
+        .logo span {
+            color: var(--accent);
         }
+
+        main {
+            flex: 1;
+            max-width: 900px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+        }
+
+        .hero {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
         h1 {
-            font-size: 3rem;
-            letter-spacing: -0.05em;
-            margin: 0 0 10px 0;
-            background: linear-gradient(180deg, #fff 0%, #aaa 100%);
+            font-family: 'Outfit', sans-serif;
+            font-size: 3.5rem;
+            font-weight: 900;
+            letter-spacing: -1px;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, #FFFFFF, var(--accent));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
-        .metrics {
-            display: flex;
-            gap: 20px;
-            margin-top: 30px;
+
+        .tagline {
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            max-width: 700px;
+            margin: 0 auto 3rem auto;
+            line-height: 1.6;
         }
-        .metric-card {
-            flex: 1;
-            padding: 20px;
-            background: rgba(0,0,0,0.4);
-            border-radius: 12px;
-            border: 1px solid rgba(255,255,255,0.03);
+
+        .companion-zone {
+            border: 2px solid var(--border);
+            border-radius: 20px;
+            padding: 3rem 2rem;
+            text-align: center;
+            background: var(--surface);
+            backdrop-filter: blur(12px);
+            margin-bottom: 3rem;
             transition: all 0.3s ease;
         }
-        .metric-card:hover {
-            background: rgba(255,255,255,0.03);
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px var(--accent-glow);
+
+        .companion-zone:hover {
+            border-color: var(--accent);
+            background: rgba(139, 92, 246, 0.1);
+            box-shadow: 0 0 30px var(--accent-glow);
         }
-        .metric-value { font-size: 2rem; font-weight: 600; color: #00ffcc; }
-        .metric-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-top: 5px; }
-        
-        /* Micro-interactions */
-        .status-dot {
-            display: inline-block; width: 8px; height: 8px;
-            background: #00ffcc; border-radius: 50%;
-            margin-right: 10px;
-            box-shadow: 0 0 10px #00ffcc;
-            animation: pulse 2s infinite;
+
+        .companion-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            display: inline-block;
         }
-        @keyframes pulse {
-            0% { opacity: 0.5; box-shadow: 0 0 5px #00ffcc; }
-            50% { opacity: 1; box-shadow: 0 0 15px #00ffcc, 0 0 30px #00ffcc; }
-            100% { opacity: 0.5; box-shadow: 0 0 5px #00ffcc; }
+
+        .companion-text h3 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .companion-text p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .disclaimer {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            max-width: 640px;
+            margin: 0 auto 2rem auto;
+            padding: 0.85rem 1.25rem;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: rgba(139, 92, 246, 0.06);
+            line-height: 1.5;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 1rem 2rem;
+            background: var(--accent-glow);
+            color: #FFF;
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            text-align: center;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            margin-top: 1.5rem;
+        }
+
+        .btn:hover {
+            background: var(--accent);
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        footer {
+            padding: 2rem;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        footer a {
+            color: var(--text-muted);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            color: var(--accent);
         }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-
-    <!-- MASCOM_ANALYTICS_CORTEX -->
-    <script>
-        (function() {
-            try {
-                const payload = {
-                    node: "alhena.cc",
-                    timestamp: new Date().toISOString(),
-                    vector: window.location.pathname,
-                    agent: navigator.userAgent
-                };
-                navigator.sendBeacon("http://127.0.0.1:8889/track", JSON.stringify(payload));
-            } catch(e) {}
-        })();
-    </script>
-    
 </head>
 <body>
-    <div id="canvas-container"></div>
-    
-    <div class="glass-panel">
-        <div style="display: flex; align-items: center; margin-bottom: 20px;">
-            <div class="status-dot"></div>
-            <span style="color: var(--text-muted); font-size: 0.9rem; letter-spacing: 0.1em; text-transform: uppercase;">SOVEREIGN NODE ACTIVE</span>
-        </div>
-        <h1>ALHENA.CC</h1>
-        <p style="color: var(--text-muted); font-size: 1.1rem; line-height: 1.6; max-width: 600px;">
-            Premium, enigmatic, hyper-modern. Physical environment protocol: quantum_field.
-        </p>
-        
-        <div class="metrics">
-            <div class="metric-card">
-                <div class="metric-value">99.9%</div>
-                <div class="metric-label">Neural Coherence</div>
+    <header>
+        <div class="logo"><b>A</b><span>lhena</span></div>
+    </header>
+
+    <main>
+        <section class="hero">
+            <h1>Your Personal AI Companion</h1>
+            <p class="tagline">A supportive companion for talking through everyday decisions.</p>
+            <p class="disclaimer">Alhena is not a therapist and does not provide medical or mental-health treatment. In a crisis, call or text 988 (Suicide &amp; Crisis Lifeline) or text HOME to 741741 (Crisis Text Line) - real, free, 24/7 resources.</p>
+
+            <div class="companion-zone">
+                <div class="companion-icon">&#10024;</div>
+                <div class="companion-text">
+                    <h3>Start a Conversation</h3>
+                    <p>Share what's on your mind. No signup required - free to use right now.</p>
+                </div>
+                <a class="btn" href="https://alhena.cc/app">CONNECT WITH ALHENA</a>
             </div>
-            <div class="metric-card">
-                <div class="metric-value">0ms</div>
-                <div class="metric-label">API Latency</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-value">LOCAL</div>
-                <div class="metric-label">Execution Vector</div>
-            </div>
-        </div>
-    </div>
+        </section>
+    </main>
 
-    <script>
-        // Evolved WebGL Matrix
-        const container = document.getElementById('canvas-container');
-        const scene = new THREE.Scene();
-        scene.fog = new THREE.FogExp2(0x050505, 0.002);
-        
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        container.appendChild(renderer.domElement);
-        
-        // Complex geometry generation instead of naked cubes
-        const geometry = new THREE.IcosahedronGeometry(10, 1);
-        const material = new THREE.MeshBasicMaterial({ 
-            color: 0x00ffcc, 
-            wireframe: true,
-            transparent: true,
-            opacity: 0.15
-        });
-        
-        const mesh = new THREE.Mesh(geometry, material);
-        scene.add(mesh);
-        
-        // Particles
-        const particlesGeometry = new THREE.BufferGeometry();
-        const particlesCount = 2000;
-        const posArray = new Float32Array(particlesCount * 3);
-        for(let i=0; i<particlesCount * 3; i++) {
-            posArray[i] = (Math.random() - 0.5) * 100;
-        }
-        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-        const particlesMaterial = new THREE.PointsMaterial({
-            size: 0.05,
-            color: 0x00ffcc,
-            transparent: true,
-            opacity: 0.5
-        });
-        const particlesMesh = new THREE.Points(particlesGeometry, particlesMaterial);
-        scene.add(particlesMesh);
-        
-        camera.position.z = 25;
-        
-        // Interactive Mouse Tracking
-        let mouseX = 0;
-        let mouseY = 0;
-        document.addEventListener('mousemove', (event) => {
-            mouseX = event.clientX / window.innerWidth - 0.5;
-            mouseY = event.clientY / window.innerHeight - 0.5;
-        });
-        
-        function animate() {
-            requestAnimationFrame(animate);
-            mesh.rotation.x += 0.001;
-            mesh.rotation.y += 0.002;
-            
-            particlesMesh.rotation.y = -mouseX * 0.5;
-            particlesMesh.rotation.x = -mouseY * 0.5;
-            
-            renderer.render(scene, camera);
-        }
-        animate();
-        
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-    </script>
-
-    <!-- MASCOM_INTERLINK -->
-    <div style="position: absolute; bottom: 20px; right: 40px; z-index: 100; font-family: monospace; font-size: 0.7rem; letter-spacing: 0.1em; display: flex; gap: 20px;">
-        <a href="app.html" style="color: #00ffcc; text-decoration: none; text-shadow: 0 0 5px rgba(0,255,204,0.3); transition: color 0.2s;">COMPANION APP</a>
-
-        <a href="blog.html" style="color: #00ffcc; text-decoration: none; text-shadow: 0 0 5px rgba(0,255,204,0.3); transition: color 0.2s;">INTELLIGENCE CORTEX</a>
-
-        <a href="http://localhost:8888" style="color: #888; text-decoration: none; transition: color 0.2s;">SOVEREIGN GATEWAY</a>
-    </div>
-    
+    <footer>
+        This is a static mirror. The real, live product is at <a href="https://alhena.cc/">alhena.cc</a>.
+    </footer>
 </body>
 </html>
