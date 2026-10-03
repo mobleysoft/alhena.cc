@@ -25,6 +25,18 @@ export function surfaceTexel(kind, u, v) {
   }
   if (kind === 'ceramic') return { color: .96 + broad * .025 + pores * .009,
     height: .5 + broad * .10 + pores * .10, roughness: .86 + broad * .07 + pores * .03 };
+  if (kind === 'markercard') {
+    // Cardstock colored with a broad felt-tip: overlapping pass streaks
+    // (markers never lay down perfectly flat ink) over a fibrous paper
+    // base. Added for WeylandAI's envelope/folder-tab UI object; kept
+    // here rather than forked so any venture using tactile-materials
+    // inherits it.
+    const passA = wave(u,v,3,1,.4), passB = wave(u,v,1,-4,2.1), passC = wave(u,v,7,6,3.6);
+    const streaks = Math.max(0, passA)*.5 + Math.max(0, passB)*.35 + Math.max(0, passC)*.15;
+    const fiber = broad * .5 + pores * .5;
+    return { color: .88 + streaks * .1 + fiber * .025,
+      height: .5 + fiber * .06, roughness: .68 + streaks * .1 + fiber * .04 };
+  }
   throw Error(`Unknown tactile surface: ${kind}`);
 }
 
