@@ -156,7 +156,7 @@ function act(){
   if(phase==='strike'){tension=.25;reelProgress=0;setPhase('fight','Feather the reel. Ease off when the line glows red.');haptic([30,40,30]);}
 }
 function release(){holding=false;}
-$('cast').addEventListener('pointerdown',event=>{event.preventDefault();$('cast').setPointerCapture(event.pointerId);act();if(phase==='fight')holding=true;});
+$('cast').addEventListener('pointerdown',event=>{event.preventDefault();act();if(phase==='fight')holding=true;try{$('cast').setPointerCapture(event.pointerId);}catch{}});
 $('cast').addEventListener('pointerup',release);$('cast').addEventListener('pointercancel',release);
 addEventListener('pointerup',release);addEventListener('blur',release);
 addEventListener('keydown',e=>{if(e.code!=='Space'||e.repeat||e.target.matches('button,input,select,textarea'))return;e.preventDefault();act();holding=phase==='fight';});
@@ -170,7 +170,7 @@ function land(){
 function updateFishing(dt){
   if(phase==='cast'){
     const t=Math.min(1,(elapsed-phaseAt)/1.2);bobber.position.lerpVectors(rodTip,new THREE.Vector3(.5,0,19),t);bobber.position.y+=Math.sin(t*Math.PI)*2.8;
-    if(t===1){impact(.5,19,.22);setPhase('hunt','Watch the float. A twitch will bring the shadows closer.');biteAt=elapsed+7+Math.random()*4;nextNibble=elapsed+2.5;}
+    if(t===1){impact(.5,19,.22);setPhase('hunt','Watch the float. A twitch will bring the shadows closer.');biteAt=elapsed+4+Math.random()*4;nextNibble=elapsed+2.5;}
   }else if(['hunt','strike','fight'].includes(phase)){
     const h=ocean.height(bobber.position.x,bobber.position.z);
     const dip=phase==='strike'?-.18:0;
@@ -178,19 +178,19 @@ function updateFishing(dt){
     bobber.rotation.z=Math.atan((ocean.height(bobber.position.x+.04,bobber.position.z)-h)/.04)*.8;
     if(phase==='hunt' && elapsed>=nextNibble){bobberVy-=.6;ocean.impulse(bobber.position.x,bobber.position.z,.035);nextNibble=elapsed+2.6;haptic(8);}
     if(phase==='hunt' && elapsed>=biteAt){setPhase('strike','The float is under. Tap now!');impact(bobber.position.x,bobber.position.z,.28);haptic([40,20,40]);}
-    if(phase==='strike' && elapsed-phaseAt>2.2){setPhase('hunt','A clever one. Twitch the lure and try again.');biteAt=elapsed+5;}
+    if(phase==='strike' && elapsed-phaseAt>3.0){setPhase('hunt','A clever one. Twitch the lure and try again.');biteAt=elapsed+5;}
     if(phase==='fight'){
-      const jumping=Math.sin((elapsed-phaseAt)*1.55)>.96;
-      tension=THREE.MathUtils.clamp(tension+dt*(holding?.2+(jumping?.7:0):-.42),0,1);
-      if(holding && tension<.86)reelProgress+=dt*.115;
+      const jumping=Math.sin((elapsed-phaseAt)*1.55)>.985;
+      tension=THREE.MathUtils.clamp(tension+dt*(holding?.12+(jumping?.5:0):-.55),0,1);
+      if(holding && tension<.92)reelProgress+=dt*.17;
       bobber.position.x=.5+Math.sin(elapsed*1.6)*.5;bobber.position.z=19-reelProgress*3;
       if(jumping && elapsed-lastImpulse>.9){lastImpulse=elapsed;impact(bobber.position.x,bobber.position.z,.24);haptic(22);}
-      $('status').textContent=jumping?'It is jumping. Release the reel!':tension>.78?'Ease off. Let the line cool.':'Keep a gentle pull. The line tells you everything.';
+      $('status').textContent=jumping?'It is jumping. Release the reel!':tension>.82?'Ease off. Let the line cool.':'Keep a gentle pull. The line tells you everything.';
       if(tension>=1){setPhase('hunt','The line slipped. Take a breath and try again.');biteAt=elapsed+6;holding=false;tension=0;reelProgress=0;}
       else if(reelProgress>=1)land();
     }
   }
-  lineMat.color.set(tension>.78?'#ec624b':tension>.27?'#f3c867':'#fff4d8');
+  lineMat.color.set(tension>.82?'#ec624b':tension>.3?'#f3c867':'#fff4d8');
   if(line.visible){
     if(!lineReady){nodes.forEach((n,i)=>{n.p.lerpVectors(rodTip,bobber.position,i/24);n.old.copy(n.p);});lineReady=true;}
     const length=rodTip.distanceTo(bobber.position)*(1.025+(1-tension)*.015)/24;
