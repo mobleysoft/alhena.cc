@@ -193,8 +193,8 @@ function updateFishing(dt){
     bobberVy+=(h+dip-bobber.position.y)*36*dt;bobberVy*=Math.exp(-7*dt);bobber.position.y+=bobberVy*dt;
     bobber.rotation.z=Math.atan((ocean.height(bobber.position.x+.04,bobber.position.z)-h)/.04)*.8;
     if(phase==='hunt' && elapsed>=nextNibble){bobberVy-=.6;ocean.impulse(bobber.position.x,bobber.position.z,.035);nextNibble=elapsed+2.6;haptic(8);}
-    if(phase==='hunt' && elapsed>=biteAt){setPhase('strike','The float is under. Tap now!');impact(bobber.position.x,bobber.position.z,.28);haptic([40,20,40]);}
-    if(phase==='strike' && elapsed-phaseAt>3.0){setPhase('hunt','A clever one. Twitch the lure and try again.');biteAt=elapsed+5;}
+    if(phase==='hunt' && elapsed>=biteAt){setPhase('strike','The float is under. Pull the rod!');impact(bobber.position.x,bobber.position.z,.28);haptic([40,20,40]);}
+    if(phase==='strike' && elapsed-phaseAt>3.0){setPhase('hunt','A clever one. Nudge the rod and try again.');biteAt=elapsed+5;}
     if(phase==='fight'){
       const jumping=Math.sin((elapsed-phaseAt)*1.55)>.985;
       const force=keyPull?1:pull; // how hard the rod is pulled back
