@@ -32,11 +32,14 @@
       <button data-weather="calm">Still</button><button data-weather="breeze">Breezy</button><button data-weather="storm">Rainstorm</button>
     </div></fieldset>
     <div class="settings-actions"><button id="motion">Enable wrist casting</button><button id="sound" aria-pressed="false">Sound off</button><button id="view">Island view</button></div>
-    <p id="motion-status">Drag to look around. Space casts, hooks, or reels. Release to ease the line.</p>
+    <p id="motion-status">Drag to look around. Drag the rod back and let go to cast; pull to hook and reel, ease off to cool the line. Space does the same.</p>
   </section>
   <div class="play-controls" id="play-controls" hidden>
     <div class="play-copy"><span class="eyebrow" id="phase">A GOOD DAY FOR NOTHING</span><p id="status" role="status" aria-live="polite">Cast toward a shadow in the water.</p></div>
-    <button id="cast" class="primary">Cast a line <span aria-hidden="true">&#8599;</span></button>
+    <div id="rod" class="rod" role="slider" aria-label="Fishing rod. Drag back and let go to cast. Pull to set the hook and to reel; ease off to let the line cool." aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
+      <div class="rod-ring"></div><div class="rod-knob" id="rod-knob"></div>
+      <span class="rod-label" id="cast">Pull back, let go to cast</span>
+    </div>
     <button id="journal" class="journal-button" aria-expanded="false">Field notes <span id="catch-count">0</span></button>
   </div>
   <aside id="journal-panel" class="journal" hidden><h2>Little discoveries.</h2><p>Every catch is released back into the cove.</p><ol id="catch-list"></ol><button id="close-journal">Back to the water</button></aside>

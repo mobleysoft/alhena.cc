@@ -109,7 +109,7 @@ rod.position.set(1.1,1.5,13);rod.rotation.x=-.7;rod.rotation.z=.3;rod.castShadow
 const linePositions=new Float32Array(25*3),lineGeo=new THREE.BufferGeometry();lineGeo.setAttribute('position',new THREE.BufferAttribute(linePositions,3));
 const lineMat=new THREE.LineBasicMaterial({color:'#fff7d8'}),line=new THREE.Line(lineGeo,lineMat);line.frustumCulled=false;line.visible=false;scene.add(line);
 const nodes=Array.from({length:25},()=>({p:new THREE.Vector3(),old:new THREE.Vector3()}));
-let lineReady=false,bobberVy=0,phase='idle',phaseAt=0,nextNibble=0,biteAt=0,lastImpulse=0,tension=0,reelProgress=0,holding=false;
+let lineReady=false,bobberVy=0,phase='idle',phaseAt=0,nextNibble=0,biteAt=0,lastImpulse=0,tension=0,reelProgress=0,holding=false,pull=0,keyPull=false;
 let entered=false,wide=true,elapsed=0,orbit=0,motionEnabled=false,audioEnabled=false,audioContext;
 const storage={getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)};
 const catches=readCatches(storage);
@@ -142,7 +142,7 @@ function impact(x,z,strength){
 }
 function setPhase(value,text){
   phase=value;phaseAt=elapsed;$('phase').textContent={idle:'A GOOD DAY FOR NOTHING',cast:'A LITTLE FURTHER',hunt:'FOLLOW THE SHADOWS',strike:'NOW. SET THE HOOK.',fight:'EASY DOES IT',landed:'A LITTLE DISCOVERY'}[value];
-  $('status').textContent=text;$('cast').textContent={idle:'Cast a line',cast:'Casting...',hunt:'Twitch the lure',strike:'Hook!',fight:'Hold to reel',landed:'Cast again'}[value];
+  $('status').textContent=text;$('cast').textContent={idle:'Pull back, let go to cast',cast:'Casting...',hunt:'Nudge to twitch the lure',strike:'Pull to set the hook!',fight:'Pull to reel, ease off to cool',landed:'Pull back, let go to cast again'}[value];
 }
 function cast(){
   bobber.visible=true;line.visible=true;lineReady=false;bobberVy=0;holding=false;
@@ -156,15 +156,31 @@ function act(){
   if(phase==='strike'){tension=.25;reelProgress=0;setPhase('fight','Feather the reel. Ease off when the line glows red.');haptic([30,40,30]);}
 }
 function release(){holding=false;}
-$('cast').addEventListener('pointerdown',event=>{event.preventDefault();act();if(phase==='fight')holding=true;try{$('cast').setPointerCapture(event.pointerId);}catch{}});
-$('cast').addEventListener('pointerup',release);$('cast').addEventListener('pointercancel',release);
-addEventListener('pointerup',release);addEventListener('blur',release);
-addEventListener('keydown',e=>{if(e.code!=='Space'||e.repeat||e.target.matches('button,input,select,textarea'))return;e.preventDefault();act();holding=phase==='fight';});
-addEventListener('keyup',e=>{if(e.code==='Space')release();});
+// Rod stick (2026-10-05, John: fishing should be joystick based, not button
+// based). The stick is analogue: pull (0..1) is how far it is dragged back
+// toward the player. Idle/landed: pull past .55 and let go = cast. Hunt: a
+// quick pull-and-release = twitch. Strike: pull past .4 = hook set. Fight:
+// pull reels and loads the line, easing off lets it cool. Drags are gestures
+// the OS never hijacks, unlike press-and-hold, and the displacement is the
+// tension the player feels in the line.
+const rodEl=$('rod'),rodKnob=$('rod-knob');
+const stick={id:null,cx:0,cy:0,r:52,peak:0,releasedAt:0};
+function setPull(v){pull=Math.max(0,Math.min(1,v));rodEl.setAttribute('aria-valuenow',String(Math.round(pull*100)));rodEl.classList.toggle('pulling',pull>.08);}
+function rodDown(e){if(!entered)return;e.preventDefault();const b=rodEl.getBoundingClientRect();stick.cx=b.left+b.width/2;stick.cy=b.top+b.height/2;stick.r=b.width*.42;stick.id=e.pointerId;stick.peak=0;try{rodEl.setPointerCapture(e.pointerId);}catch{}rodMove(e);}
+function rodMove(e){if(stick.id!==e.pointerId)return;let dx=e.clientX-stick.cx,dy=e.clientY-stick.cy;const len=Math.hypot(dx,dy);if(len>stick.r){dx=dx/len*stick.r;dy=dy/len*stick.r;}rodKnob.style.transform='translate(calc(-50% + '+dx+'px), calc(-50% + '+dy+'px))';const p=Math.max(0,dy)/stick.r;setPull(p);stick.peak=Math.max(stick.peak,p);
+  if(phase==='strike'&&p>.4){act();}
+  if(phase==='fight')holding=p>.12;}
+function rodUp(e){if(stick.id!==e.pointerId)return;stick.id=null;rodKnob.style.transform='translate(-50%,-50%)';const peak=stick.peak;setPull(0);holding=false;
+  if((phase==='idle'||phase==='landed')&&peak>.55){cast();return;}
+  if(phase==='hunt'&&peak>.25){act();}}
+rodEl.addEventListener('pointerdown',rodDown);rodEl.addEventListener('pointermove',rodMove);rodEl.addEventListener('pointerup',rodUp);rodEl.addEventListener('pointercancel',rodUp);rodEl.addEventListener('lostpointercapture',rodUp);
+addEventListener('blur',()=>{holding=false;keyPull=false;setPull(0);});
+addEventListener('keydown',e=>{if(e.code!=='Space'||e.repeat||e.target.matches('button,input,select,textarea'))return;e.preventDefault();keyPull=true;setPull(1);if(phase==='idle'||phase==='landed'){cast();return;}act();holding=phase==='fight';});
+addEventListener('keyup',e=>{if(e.code==='Space'){keyPull=false;setPull(0);release();}});
 function land(){
   const name=chooseFish(weatherKey,timeKey);recordCatch(catches,name,storage);
   journal();$('catch-name').textContent=name;$('catch-toast').hidden=false;setTimeout(()=>$('catch-toast').hidden=true,4500);
-  setPhase('landed','A good catch. Back to the sea it goes.');haptic([30,45,70]);sound(600,.6);holding=false;
+  setPhase('landed','A good catch. Back to the sea it goes.');haptic([30,45,70]);sound(600,.6);holding=false;rodEl.classList.remove('red');
   impact(bobber.position.x,bobber.position.z,.2);bobber.visible=false;line.visible=false;
 }
 function updateFishing(dt){
@@ -181,12 +197,14 @@ function updateFishing(dt){
     if(phase==='strike' && elapsed-phaseAt>3.0){setPhase('hunt','A clever one. Twitch the lure and try again.');biteAt=elapsed+5;}
     if(phase==='fight'){
       const jumping=Math.sin((elapsed-phaseAt)*1.55)>.985;
-      tension=THREE.MathUtils.clamp(tension+dt*(holding?.12+(jumping?.5:0):-.55),0,1);
-      if(holding && tension<.92)reelProgress+=dt*.17;
+      const force=keyPull?1:pull; // how hard the rod is pulled back
+      tension=THREE.MathUtils.clamp(tension+dt*(force>.12?.06+force*.14+(jumping?.5*force:0):-.55),0,1);
+      if(force>.12 && tension<.92)reelProgress+=dt*(.08+.14*force);
+      rodEl.classList.toggle('red',tension>.82);
       bobber.position.x=.5+Math.sin(elapsed*1.6)*.5;bobber.position.z=19-reelProgress*3;
       if(jumping && elapsed-lastImpulse>.9){lastImpulse=elapsed;impact(bobber.position.x,bobber.position.z,.24);haptic(22);}
       $('status').textContent=jumping?'It is jumping. Release the reel!':tension>.82?'Ease off. Let the line cool.':'Keep a gentle pull. The line tells you everything.';
-      if(tension>=1){setPhase('hunt','The line slipped. Take a breath and try again.');biteAt=elapsed+6;holding=false;tension=0;reelProgress=0;}
+      if(tension>=1){setPhase('hunt','The line slipped. Take a breath and try again.');biteAt=elapsed+6;holding=false;tension=0;reelProgress=0;rodEl.classList.remove('red');}
       else if(reelProgress>=1)land();
     }
   }

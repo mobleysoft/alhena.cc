@@ -5,3 +5,15 @@
 @media(max-width:600px) and (orientation:portrait){.masthead{top:max(20px,env(safe-area-inset-top));left:22px;right:22px}.wordmark{font-size:30px}.welcome{top:16vh;max-width:300px}.welcome h1{font-size:50px;margin:15px 0}.welcome p{font-size:12px;line-height:1.75;margin-bottom:18px}.welcome-foot{display:none}.welcome .primary{padding:15px 24px}.island-label{bottom:13vh}.island-label p{font-size:13px}.ambient-caption{font-size:8px;bottom:max(20px,env(safe-area-inset-bottom))}.ambient-caption #loading{display:none}.play-controls{bottom:max(56px,calc(env(safe-area-inset-bottom) + 30px));flex-wrap:wrap;gap:8px}.play-copy{flex:1 0 100%;max-width:none}.play-controls .primary{flex:1}.settings{top:82px}.catch-toast{top:16%;max-width:90vw}}
 @media(max-height:540px) and (orientation:landscape){.masthead{top:12px;left:20px;right:20px}.wordmark{font-size:27px}.round-button{width:34px;height:34px}.welcome{top:23vh;left:5vw}.welcome h1{font-size:44px;margin:12px 0}.welcome p{font-size:11px;line-height:1.5;margin-bottom:16px}.welcome-foot{display:none}.welcome .primary{padding:13px 23px}.eyebrow{font-size:8px}.ambient-caption{bottom:12px}.play-controls{bottom:38px}.play-copy{padding:10px 15px;max-width:300px}.settings{top:60px;bottom:30px;overflow:auto}.island-label{bottom:20vh}.catch-toast{top:18%;padding:18px}.edition{display:none}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* Rod stick (2026-10-05): the analogue control that replaced the Cast button. */
+.rod{position:relative;flex:0 0 auto;width:118px;height:118px;border-radius:50%;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;cursor:grab}
+.rod:active{cursor:grabbing}
+.rod-ring{position:absolute;inset:0;border-radius:50%;border:1px solid var(--line);background:#f7f4e9b8;backdrop-filter:blur(12px);box-shadow:0 6px 18px #203b3512}
+.rod-ring::before{content:"";position:absolute;left:50%;top:14px;bottom:14px;width:1px;background:#203b3533;transform:translateX(-50%)}
+.rod-knob{position:absolute;left:50%;top:50%;width:46px;height:46px;border-radius:50%;background:var(--ink);box-shadow:0 4px 14px #203b3540;transform:translate(-50%,-50%);transition:transform .08s linear,background .2s}
+.rod.pulling .rod-knob{background:#375b47}
+.rod.red .rod-knob{background:#c8503a}
+.rod-label{position:absolute;left:50%;top:calc(100% + 8px);transform:translateX(-50%);white-space:nowrap;font-size:10px;letter-spacing:.04em;color:var(--ink);opacity:.85}
+.night .rod-ring{background:#173333a0;border-color:#f7f4e92a}.night .rod-ring::before{background:#f7f4e92a}.night .rod-knob{background:#e7d8ad}.night .rod.pulling .rod-knob{background:#f3e4b8}.night .rod-label{color:var(--paper)}
+@media(max-width:600px){.rod{width:104px;height:104px}.rod-knob{width:42px;height:42px}}
