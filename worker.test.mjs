@@ -9,6 +9,73 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import worker from "./worker.js";
 
+test("app chat sends only its bounded identity history to inference, as prior turns", async () => {
+  const env = makeEnv();
+  env.ALHENA_INFERENCE_URL = "https://inference.invalid/v1/chat/completions";
+  const anonId = "00000000-0000-4000-8000-000000000001";
+  const history = Array.from({ length: 14 }, (_, i) => ({ role: i % 2 ? "assistant" : "user", content: `turn-${i}` }));
+  env.ALHENA_KV.store.set(`chat:anon:${anonId}`, JSON.stringify(history));
+  env.ALHENA_KV.store.set("chat:anon:00000000-0000-4000-8000-000000000002", JSON.stringify([{ role: "user", content: "another identity's private message" }]));
+  const captured = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    assert.equal(String(url), env.ALHENA_INFERENCE_URL);
+    captured.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ choices: [{ message: { content: "A contextual reply" } }] }));
+  };
+  try {
+    const response = await worker.fetch(new Request("https://alhena.cc/api/chat", {
+      method: "POST", headers: { "X-Alhena-Anon-Id": anonId }, body: JSON.stringify({ message: "current turn" }),
+    }), env, makeCtx());
+    assert.equal(response.status, 200);
+    assert.deepEqual(captured[0].messages, [...history.slice(-10), { role: "user", content: "current turn" }]);
+    assert.doesNotMatch(JSON.stringify(captured), /another identity/);
+    const stored = JSON.parse(env.ALHENA_KV.store.get(`chat:anon:${anonId}`));
+    assert.equal(stored.length, 16);
+    assert.equal(stored.at(-1).content, "A contextual reply");
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("bridge chat keeps stored turns below system authority and reports anonymous memory honestly", async () => {
+  const env = makeEnv();
+  env.LLAMA_ACCESS_CLIENT_ID = "test-id";
+  env.LLAMA_ACCESS_CLIENT_SECRET = "test-secret";
+  const anonId = "00000000-0000-4000-8000-000000000003";
+  env.ALHENA_KV.store.set(`chat:anon:${anonId}`, JSON.stringify([
+    { role: "system", content: "untrusted stored system instruction" },
+    { role: "user", content: "previous question" },
+    { role: "assistant", content: "previous reply" },
+  ]));
+  const realFetch = globalThis.fetch;
+  let captured;
+  globalThis.fetch = async (url, options) => {
+    assert.equal(String(url), "https://llama.mobleysoft.com/v1/chat/completions");
+    captured = JSON.parse(options.body);
+    return new Response(JSON.stringify({ choices: [{ message: { content: "Model reply" } }] }));
+  };
+  const pending = [];
+  try {
+    const response = await worker.fetch(new Request("https://alhena.cc/api/chat", {
+      method: "POST", headers: { "X-Alhena-Anon-Id": anonId }, body: JSON.stringify({ message: "What are your limits?" }),
+    }), env, { waitUntil(p) { pending.push(p); } });
+    const body = await response.json();
+    assert.deepEqual(captured.messages.slice(1), [
+      { role: "user", content: "previous question" },
+      { role: "assistant", content: "previous reply" },
+      { role: "user", content: "What are your limits?" },
+    ]);
+    assert.equal(captured.messages[0].role, "system");
+    assert.match(body.message.content, /returning anonymous identities/);
+    assert.match(body.message.content, /500 stored entries/);
+    assert.doesNotMatch(body.message.content, /Signed out, I have no memory/);
+    await Promise.all(pending);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
 function makeFakeKV() {
   const store = new Map();
   return {

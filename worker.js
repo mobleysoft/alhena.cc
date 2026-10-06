@@ -308,7 +308,7 @@ function authForErrorResponse(e, corsHeaders) {
 // {guidance, isFallback, usedLlamaBridge, inferenceSource} so callers -
 // including the self-awareness answer below - can honestly report which
 // one happened for THIS call, not a static claim.
-async function runAlhenaInference(env, systemPrompt, userContent) {
+async function runAlhenaInference(env, systemPrompt, userContent, priorMessages = []) {
   let inferenceRes = null;
   let isFallback = true;
   let usedLlamaBridge = false;
@@ -331,6 +331,7 @@ async function runAlhenaInference(env, systemPrompt, userContent) {
         body: JSON.stringify({
           messages: [
             { role: 'system', content: systemPrompt },
+            ...priorMessages,
             { role: 'user', content: userContent },
           ],
           temperature: 0.7,
@@ -365,7 +366,7 @@ async function runAlhenaInference(env, systemPrompt, userContent) {
         },
         body: JSON.stringify({
           system: systemPrompt,
-          messages: [{ role: 'user', content: userContent }],
+          messages: [...priorMessages, { role: 'user', content: userContent }],
           temperature: 0.7,
           max_tokens: 1000
         })
@@ -479,7 +480,7 @@ function isSelfReflectionQuestion(text) {
 // call just computed, so this can never claim a live model connection the
 // request itself didn't have (or fail to admit one it did) - grounded in
 // this session's real state, not a static paragraph reused every time.
-function buildSelfAwareAnswer({ isFallback, inferenceSource }) {
+function buildSelfAwareAnswer({ isFallback, inferenceSource }, { storedCap = MAX_STORED_GUIDANCE_SESSIONS, contextTurns = GUIDANCE_HISTORY_TURNS_INJECTED } = {}) {
   const liveLine = isFallback
     ? `Honestly: for this exact reply, I did not have a live language model connected (inference_source: "none"). My code has two possible model backends wired in - a shared internal bridge at llama.mobleysoft.com (credentials provisioned as of 2026-09-13, normally live) and an older direct-URL path (points at a host that has never resolved). Since the bridge is normally configured, this specific call most likely hit a transient failure (a timeout or an error from the bridge itself) rather than a missing-credential gap - either way, this answer is a hand-written, code-grounded fallback response, not something a model generated for you.`
     : `For this exact reply, I did have a live model connection (inference_source: "${inferenceSource}") - a real model call actually ran just now, though this particular paragraph is still hand-written and code-grounded rather than model-generated, on purpose (see below).`;
@@ -488,18 +489,18 @@ function buildSelfAwareAnswer({ isFallback, inferenceSource }) {
 
 ${liveLine}
 
-Memory: I only remember past conversations if you're signed in (through AuthFor, the shared identity provider - I have no local user store of my own). Signed in, your session history is stored in Cloudflare KV, capped at 200 saved sessions, and I pull your last 5 turns back into context on each new message. Signed out, I have no memory of anything before this exact message - not "a little," none.
+Memory: This channel stores history in Cloudflare KV for both signed-in accounts and returning anonymous identities, capped at ${storedCap} stored entries. I include up to ${contextTurns} recent conversation turns in each new model request. Anonymous continuity depends on keeping the same anonymous ID on this device; signing in uses a separate account history. This is a bounded context window, not unlimited recall or automatic memory shared with every other channel.
 
 Roadmap, honestly labeled as NOT built yet: there's a real design sketch (called the "Gofaineat Cascade," written 2026-09-12) for eventually turning how I generate guidance into a chain of narrow, reviewable classifier stages instead of one open-ended model call - first classifying what you're actually asking about, then how much emotional weight it carries, then picking one response strategy from a fixed, pre-authored menu, and only then generating the smallest possible fill-in-the-blank reply. The piece most likely to get built first is a dedicated crisis-signal classifier, because right now whether to point you to real crisis resources (988 / Crisis Text Line) depends on a general model noticing the signal, not a dedicated, auditable check. None of that cascade exists in my code today - I'm describing a real plan, not a feature I already have.
 
 If something about how I work here seems off, missing, or worth building, say so - a real note gets written to a log (POST /api/v1/companion/self-reflection) that a real person actually reads later, not just acknowledged and dropped.`;
 }
 
-async function generateChatReply(env, message) {
+async function generateChatReply(env, message, priorMessages = [], contextTurns = GUIDANCE_HISTORY_TURNS_INJECTED) {
   const systemPrompt = 'You are Alhena, a supportive companion for talking through everyday decisions. You are not a therapist and do not provide medical or mental-health treatment.';
-  const result = await runAlhenaInference(env, systemPrompt, message);
+  const result = await runAlhenaInference(env, systemPrompt, message, priorMessages);
   if (isSelfReflectionQuestion(message)) {
-    result.guidance = buildSelfAwareAnswer(result);
+    result.guidance = buildSelfAwareAnswer(result, { storedCap: MAX_STORED_CHAT_MESSAGES, contextTurns });
     result.self_reflection = true;
   }
   return result;
@@ -689,7 +690,10 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
         // isn't trusted here.
         const isSelfReflection = isSelfReflectionQuestion(question);
         if (isSelfReflection) {
-          guidance = buildSelfAwareAnswer(inferenceResult);
+          guidance = buildSelfAwareAnswer(inferenceResult, {
+            storedCap: MAX_STORED_GUIDANCE_SESSIONS,
+            contextTurns: tier === 'elite' ? GUIDANCE_HISTORY_TURNS_INJECTED_ELITE : GUIDANCE_HISTORY_TURNS_INJECTED,
+          });
         }
 
         // Fire event tracking to VendyAI telemetry
@@ -1136,8 +1140,13 @@ Decision type: ${decision_type || 'general_guidance'}${historyContext}`;
 
         const key = `chat:${identity.email}`;
         const list = await readKvList(env, key);
+        const contextTurns = tier === 'elite' ? GUIDANCE_HISTORY_TURNS_INJECTED_ELITE : GUIDANCE_HISTORY_TURNS_INJECTED;
+        const priorMessages = list
+          .filter((entry) => (entry.role === 'user' || entry.role === 'assistant') && typeof entry.content === 'string')
+          .slice(-contextTurns * 2)
+          .map(({ role, content }) => ({ role, content }));
         list.push({ role: 'user', content: body.message, timestamp: new Date().toISOString() });
-        const inference = await generateChatReply(env, body.message);
+        const inference = await generateChatReply(env, body.message, priorMessages, contextTurns);
         if (tier === 'free') {
           ctx.waitUntil(incrementDailySessionCount(env, identity.email));
         }
